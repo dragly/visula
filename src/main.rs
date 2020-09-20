@@ -1,5 +1,3 @@
-#![feature(async_closure)]
-use cgmath;
 use winit::{
     event::Event,
     event_loop::{ControlFlow, EventLoop},

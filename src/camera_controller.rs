@@ -45,28 +45,25 @@ impl CameraController {
                 _ => {}
             },
             WindowEvent::CursorMoved { position, .. } => {
-                match self.previous_postion {
-                    Some(previous_postion) => {
-                        let position_diff = PhysicalPosition {
-                            x: position.x - previous_postion.x,
-                            y: position.y - previous_postion.y,
-                        };
-                        if self.left_pressed {
-                            self.yaw -= 0.02 * position_diff.x as f32;
-                            self.pitch -= 0.02 * position_diff.y as f32;
-                            needs_redraw = true;
-                        }
-                        if self.right_pressed {
-                            self.center.x += 0.2
-                                * (self.yaw.sin() * position_diff.x as f32
-                                    + self.yaw.cos() * position_diff.y as f32);
-                            self.center.y -= 0.2
-                                * (self.yaw.cos() * position_diff.x as f32
-                                    + self.yaw.sin() * position_diff.y as f32);
-                            needs_redraw = true;
-                        }
+                if let Some(previous_postion) = self.previous_postion {
+                    let position_diff = PhysicalPosition {
+                        x: position.x - previous_postion.x,
+                        y: position.y - previous_postion.y,
+                    };
+                    if self.left_pressed {
+                        self.yaw -= 0.02 * position_diff.x as f32;
+                        self.pitch -= 0.02 * position_diff.y as f32;
+                        needs_redraw = true;
                     }
-                    None => {}
+                    if self.right_pressed {
+                        self.center.x += 0.2
+                            * (self.yaw.sin() * position_diff.x as f32
+                                + self.yaw.cos() * position_diff.y as f32);
+                        self.center.y -= 0.2
+                            * (self.yaw.cos() * position_diff.x as f32
+                                + self.yaw.sin() * position_diff.y as f32);
+                        needs_redraw = true;
+                    }
                 }
                 // TODO add previous position separate for left and right and only set it when
                 // button down
@@ -109,11 +106,8 @@ fn create_model_view_projection(
         center.z - view_vector.z,
     );
     let up = Vector3::unit_z();
-    let view_matrix = cgmath::Matrix4::look_at(
-        position,
-        Point3::new(center.x, center.y, center.z),
-        up
-    );
+    let view_matrix =
+        cgmath::Matrix4::look_at(position, Point3::new(center.x, center.y, center.z), up);
 
     let model_view_projection_matrix = OPENGL_TO_WGPU_MATRIX * projection_matrix * view_matrix;
 
@@ -131,7 +125,7 @@ fn create_model_view_projection(
     }
 }
 
-#[cfg_attr(rustfmt, rustfmt_skip)]
+#[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
     1.0, 0.0, 0.0, 0.0,
     0.0, 1.0, 0.0, 0.0,
