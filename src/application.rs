@@ -42,8 +42,10 @@ impl Application {
             .iter()
             .filter_map(|particle| {
                 let position = match particle.xyz {
-                    trajan::coordinate::Coordinate::Position { x, y, z } => Some(Point3::new(x, y, z)),
-                    _ => None
+                    trajan::coordinate::Coordinate::Position { x, y, z } => {
+                        Some(Point3::new(x, y, z))
+                    }
+                    _ => None,
                 };
                 println!("Name {}", particle.name);
                 let (color, radius) = match particle.name.as_ref() {
@@ -80,6 +82,7 @@ impl Application {
                 event: WindowEvent::CloseRequested,
                 ..
             } => *control_flow = ControlFlow::Exit,
+            #[cfg(target_arch = "wasm32")]
             Event::UserEvent(CustomEvent::DropEvent(drop_event)) => {
                 self.handle_drop(drop_event);
             }

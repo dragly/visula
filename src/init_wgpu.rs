@@ -7,7 +7,6 @@ use crate::sphere::Sphere;
 use crate::vec_to_buffer::vec_to_buffer;
 use crate::Point3;
 
-use bytemuck;
 use bytemuck::{Pod, Zeroable};
 use std::mem::size_of;
 use winit::{event_loop::EventLoopProxy, window::Window};
@@ -83,9 +82,8 @@ pub async fn init(
         window,
         depth_texture,
     }));
-    match event_result {
-        Err(_) => println!("ERROR: Could not send event! Is the event loop closed?"),
-        _ => {}
+    if event_result.is_err() {
+        println!("ERROR: Could not send event! Is the event loop closed?")
     }
 }
 

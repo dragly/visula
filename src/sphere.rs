@@ -1,6 +1,5 @@
 use crate::Point3;
 
-use bytemuck;
 use bytemuck::{Pod, Zeroable};
 
 #[repr(C)]
@@ -13,4 +12,3 @@ pub struct Sphere {
 
 unsafe impl Pod for Sphere {}
 unsafe impl Zeroable for Sphere {}
-

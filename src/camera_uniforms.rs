@@ -1,8 +1,6 @@
-use crate::{Matrix4, Point3, Vector3};
+use crate::{Matrix4, Vector3};
 
-use bytemuck;
 use bytemuck::{Pod, Zeroable};
-use std::mem;
 use std::mem::size_of;
 
 #[repr(C)]
@@ -26,6 +24,6 @@ unsafe impl Zeroable for CameraUniforms {}
 impl AsRef<[f32; size_of::<CameraUniforms>() / size_of::<f32>()]> for CameraUniforms {
     #[inline]
     fn as_ref(&self) -> &[f32; size_of::<CameraUniforms>() / size_of::<f32>()] {
-        unsafe { mem::transmute(self) }
+        unsafe { &*(self as *const CameraUniforms as *const [f32; 48]) }
     }
 }
