@@ -1,7 +1,9 @@
+use cgmath;
 use winit::{
     event::Event,
     event_loop::{ControlFlow, EventLoop},
 };
+use structopt::StructOpt;
 
 mod application;
 mod camera_controller;
@@ -21,11 +23,19 @@ mod setup_wasm;
 use application::Application;
 use custom_event::CustomEvent;
 
+type Vector2 = cgmath::Vector2<f32>;
 type Vector3 = cgmath::Vector3<f32>;
 type Matrix4 = cgmath::Matrix4<f32>;
 type Point3 = cgmath::Point3<f32>;
 
+#[derive(StructOpt)]
+struct Cli {
+    filename: Option<std::path::PathBuf>,
+}
+
 fn main() {
+    let args = Cli::from_args();
+
     let event_loop = EventLoop::<CustomEvent>::with_user_event();
     let proxy = event_loop.create_proxy();
     let window = winit::window::Window::new(&event_loop).unwrap();
@@ -46,10 +56,13 @@ fn main() {
 
     let mut application: Option<Application> = None;
 
-    event_loop.run(move |event, _, control_flow| {
+    event_loop.run(move |mut event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
         match event {
-            Event::UserEvent(CustomEvent::Ready(app)) => {
+            Event::UserEvent(CustomEvent::Ready(mut app)) => {
+                if let Some(filename) = &args.filename {
+                    app.handle_zdf(&filename);
+                }
                 application = Some(app);
             }
             event => match &mut application {

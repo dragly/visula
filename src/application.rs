@@ -5,9 +5,13 @@ use crate::drop_event::DropEvent;
 use crate::pipeline::Pipeline;
 use crate::sphere::Sphere;
 use crate::vec_to_buffer::vec_to_buffer;
-use crate::Point3;
+use crate::{Point3, Vector3};
+use cgmath::EuclideanSpace;
+use std::iter::FromIterator;
+use ndarray::Array;
 
 use std::mem::size_of;
+use std::path::PathBuf;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::ControlFlow,
@@ -27,7 +31,55 @@ pub struct Application {
 }
 
 impl Application {
-    pub fn handle_drop(&mut self, DropEvent { name, text, .. }: &DropEvent) {
+    pub fn handle_zdf(&mut self, path: &PathBuf) {
+        let name: &str = path.to_str().unwrap().as_ref();
+        let file = netcdf::open(name).unwrap();
+        let group = &file.group("data").unwrap().unwrap();
+        let pointcloud = &group
+            .variable("pointcloud")
+            .expect("Could not find pointcloud");
+
+        let points = pointcloud.values::<f32>(None, None).unwrap();
+
+        let mut mean_position = Point3::new(0.0, 0.0, 0.0);
+        assert!(points.shape()[2] == 3);
+        let shape = (points.shape()[0] * points.shape()[1], points.shape()[2]);
+        let points_flat = points.into_shape(shape).unwrap();
+        let instance_data: Vec<Sphere> = (&points_flat).outer_iter().filter_map(|point| {
+            let x = point[0];
+            let y = point[1];
+            let z = point[2];
+            if x.is_nan() || y.is_nan() || z.is_nan() {
+                return None;
+            }
+            let position = Point3::new(x, y, z);
+            let (color, radius) = (Point3::new(1.0, 0.0, 0.0), 1.0);
+
+            mean_position += position.to_vec();
+
+            Some(Sphere {
+                position,
+                radius,
+                color,
+            })
+        })
+        .collect();
+
+        let instance_count = instance_data.len();
+
+        self.camera_controller.center = (mean_position / instance_count as f32).to_vec();
+        println!("{:?}", self.camera_controller);
+
+        let instance_buffer = self.device.create_buffer_with_data(
+            bytemuck::cast_slice(&instance_data),
+            wgpu::BufferUsage::VERTEX,
+        );
+
+        // TODO there is a way to update an existing buffer instead of creating a new one
+        self.points.instance_buffer = instance_buffer;
+        self.points.instance_count = instance_count;
+    }
+    pub fn handle_xyz(&mut self, DropEvent { name, text, .. }: &DropEvent) {
         log::info!("Got a drop {}", name);
         let text_bytes = text;
         let inner = std::io::Cursor::new(&text_bytes[..]);
@@ -84,7 +136,7 @@ impl Application {
             } => *control_flow = ControlFlow::Exit,
             #[cfg(target_arch = "wasm32")]
             Event::UserEvent(CustomEvent::DropEvent(drop_event)) => {
-                self.handle_drop(drop_event);
+                self.handle_xyz(drop_event);
             }
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),
@@ -186,16 +238,26 @@ impl Application {
                 self.queue.submit(Some(encoder.finish()));
             }
             Event::WindowEvent {
-                event: WindowEvent::DroppedFile(path_buf),
+                event: WindowEvent::DroppedFile(path),
                 ..
             } => {
-                log::info!("Dropped file {:?}", path_buf);
-                let bytes = std::fs::read(path_buf).unwrap();
+                log::info!("Dropped file {:?}", path);
+                let bytes = std::fs::read(path).unwrap();
                 let drop_event = DropEvent {
-                    name: path_buf.to_str().unwrap().to_string(),
+                    name: path.to_str().unwrap().to_string(),
                     text: bytes,
                 };
-                self.handle_drop(&drop_event);
+                if let Some(extension) = path.extension() {
+                    if let Some(extension) = extension.to_str() {
+                        match extension.as_ref() {
+                            "xyz" => self.handle_xyz(&drop_event),
+                            "zdf" => self.handle_zdf(&path),
+                            _ => {
+                                log::warn!("Unsupported format {}", extension);
+                            }
+                        }
+                    }
+                }
             }
             Event::WindowEvent {
                 event: window_event,
