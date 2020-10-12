@@ -1,19 +1,28 @@
 use crate::camera_uniforms::CameraUniforms;
-use crate::{Point3, Vector3};
+use crate::{Point3, Vector2, Vector3};
+use cgmath::prelude::*;
 
 use winit::{
     dpi::PhysicalPosition,
-    event::{ElementState, MouseButton, WindowEvent},
+    event::{
+        ElementState, MouseButton,
+        MouseScrollDelta::{LineDelta, PixelDelta},
+        WindowEvent,
+    },
 };
 
+#[derive(Debug)]
 pub struct CameraController {
     left_pressed: bool,
     right_pressed: bool,
+    control_pressed: bool,
     previous_postion: Option<PhysicalPosition<f64>>,
-    yaw: f32,
-    pitch: f32,
-    distance: f32,
-    center: Vector3,
+    pub distance: f32,
+    pub center: Vector3,
+    pub forward: Vector3,
+    pub up: Vector3,
+    pub rotational_speed: f32,
+    pub roll_speed: f32,
 }
 
 impl CameraController {
@@ -21,18 +30,45 @@ impl CameraController {
         CameraController {
             left_pressed: false,
             right_pressed: false,
-            yaw: 0.5,
-            pitch: 0.5,
-            distance: 3.0,
+            control_pressed: false,
+            forward: Vector3::unit_y(),
+            up: Vector3::unit_z(),
+            distance: 1000.0,
             center: Vector3::new(0.0, 0.0, 0.0),
             previous_postion: None,
+            rotational_speed: 0.005,
+            roll_speed: 0.005,
         }
     }
 
     pub fn handle_event(&mut self, window_event: &WindowEvent) -> bool {
         let mut needs_redraw = false;
 
+        let up = self.up.normalize();
+        let forward = self.forward.normalize();
+        let right = Vector3::cross(forward, up).normalize();
+        let flat_forward = Vector3::cross(up, right).normalize();
+
         match window_event {
+            WindowEvent::ModifiersChanged(state) => {
+                self.control_pressed = state.contains(winit::event::ModifiersState::CTRL);
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                let diff = match delta {
+                    LineDelta(_x, y) => *y,
+                    PixelDelta(delta) => {
+                        log::warn!("PixelDelta not tested");
+                        delta.y as f32
+                    }
+                };
+                let factor = 1.0 + 0.1 * diff.abs();
+                if diff > 0.0 {
+                    self.distance /= factor;
+                } else {
+                    self.distance *= factor;
+                }
+                needs_redraw = true;
+            }
             WindowEvent::MouseInput { state, button, .. } => match &button {
                 MouseButton::Left => match state {
                     ElementState::Pressed => self.left_pressed = true,
@@ -46,22 +82,67 @@ impl CameraController {
             },
             WindowEvent::CursorMoved { position, .. } => {
                 if let Some(previous_postion) = self.previous_postion {
-                    let position_diff = PhysicalPosition {
-                        x: position.x - previous_postion.x,
-                        y: position.y - previous_postion.y,
+                    let position_diff = Vector2 {
+                        x: position.x as f32 - previous_postion.x as f32,
+                        y: position.y as f32 - previous_postion.y as f32,
                     };
                     if self.left_pressed {
-                        self.yaw -= 0.02 * position_diff.x as f32;
-                        self.pitch -= 0.02 * position_diff.y as f32;
+                        if self.control_pressed {
+                            let offset_up = -position_diff.y as f32;
+                            let offset_right = position_diff.x as f32;
+                            let offset = offset_up + offset_right;
+                            let rotation = cgmath::Quaternion::from_axis_angle(
+                                forward,
+                                cgmath::Rad(self.roll_speed * offset),
+                            );
+                            self.up = (rotation * self.up).normalize();
+                            self.forward = (rotation * self.forward).normalize();
+                        } else {
+                            if (position_diff.x + position_diff.y).abs() < 0.001 {
+                                self.previous_postion = Some(*position);
+                                return false;
+                            }
+                            let offset_up = up * position_diff.y as f32;
+                            let offset_right = -right * position_diff.x as f32;
+                            let offset = offset_up + offset_right;
+                            let axis = Vector3::cross(offset, forward).normalize();
+                            let rotation = cgmath::Quaternion::from_axis_angle(
+                                axis,
+                                cgmath::Rad(
+                                    self.rotational_speed * position_diff.magnitude() as f32,
+                                ),
+                            );
+                            let new_forward = (rotation * self.forward).normalize();
+                            if Vector3::dot(up, new_forward).abs() > 0.99 {
+                                if position_diff.x.abs() < 0.001 {
+                                    self.previous_postion = Some(*position);
+                                    return false;
+                                }
+                                let offset = offset_right;
+                                let axis = Vector3::cross(offset, forward).normalize();
+                                let rotation = cgmath::Quaternion::from_axis_angle(
+                                    axis,
+                                    cgmath::Rad(
+                                        self.rotational_speed * (position_diff.x).abs() as f32,
+                                    ),
+                                );
+                                let new_forward = (rotation * self.forward).normalize();
+                                self.forward = new_forward;
+                                self.previous_postion = Some(*position);
+                                return true;
+                            }
+                            self.forward = new_forward;
+                        }
                         needs_redraw = true;
                     }
                     if self.right_pressed {
-                        self.center.x += 0.2
-                            * (self.yaw.sin() * position_diff.x as f32
-                                + self.yaw.cos() * position_diff.y as f32);
-                        self.center.y -= 0.2
-                            * (self.yaw.cos() * position_diff.x as f32
-                                + self.yaw.sin() * position_diff.y as f32);
+                        if self.control_pressed {
+                            self.center +=
+                                up * position_diff.y as f32 - right * position_diff.x as f32;
+                        } else {
+                            self.center += flat_forward * position_diff.y as f32
+                                - right * position_diff.x as f32;
+                        }
                         needs_redraw = true;
                     }
                 }
@@ -76,51 +157,42 @@ impl CameraController {
     }
 
     pub fn model_view_projection_matrix(&self, aspect_ratio: f32) -> CameraUniforms {
-        create_model_view_projection(
-            aspect_ratio,
-            self.yaw,
-            self.pitch,
-            self.center,
-            self.distance,
-        )
+        create_model_view_projection(aspect_ratio, self)
     }
 }
 
 fn create_model_view_projection(
     aspect_ratio: f32,
-    yaw: f32,
-    pitch: f32,
-    center: Vector3,
-    distance: f32,
+    CameraController {
+        up,
+        forward,
+        center,
+        distance,
+        ..
+    }: &CameraController,
 ) -> CameraUniforms {
-    let view_vector = -distance
-        * Vector3::new(
-            distance * yaw.cos() * pitch.sin(),
-            distance * yaw.sin() * pitch.sin(),
-            distance * pitch.cos(),
-        );
-    let projection_matrix = cgmath::perspective(cgmath::Deg(45f32), aspect_ratio, 1.0, 100.0);
+    let view_vector = forward * *distance;
+    let projection_matrix = cgmath::perspective(cgmath::Deg(45f32), aspect_ratio, 10.0, 10000.0);
     let position = Point3::new(
         center.x - view_vector.x,
         center.y - view_vector.y,
         center.z - view_vector.z,
     );
-    let up = Vector3::unit_z();
     let view_matrix =
-        cgmath::Matrix4::look_at(position, Point3::new(center.x, center.y, center.z), up);
+        cgmath::Matrix4::look_at(position, Point3::new(center.x, center.y, center.z), *up);
 
     let model_view_projection_matrix = OPENGL_TO_WGPU_MATRIX * projection_matrix * view_matrix;
 
     CameraUniforms {
         view_matrix,
         model_view_projection_matrix,
-        center,
+        center: *center,
         dummy0: 0.0,
         view_vector,
         dummy1: 0.0,
         position: position - Point3::new(0.0, 0.0, 0.0),
         dummy2: 0.0,
-        up,
+        up: *up,
         dummy3: 0.0,
     }
 }
