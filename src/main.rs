@@ -1,4 +1,3 @@
-
 use structopt::StructOpt;
 use winit::{
     event::Event,

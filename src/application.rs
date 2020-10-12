@@ -5,10 +5,8 @@ use crate::drop_event::DropEvent;
 use crate::pipeline::Pipeline;
 use crate::sphere::Sphere;
 use crate::vec_to_buffer::vec_to_buffer;
-use crate::{Point3};
+use crate::Point3;
 use cgmath::EuclideanSpace;
-
-
 
 use std::mem::size_of;
 use std::path::PathBuf;
