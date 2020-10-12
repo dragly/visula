@@ -81,69 +81,69 @@ impl CameraController {
                 _ => {}
             },
             WindowEvent::CursorMoved { position, .. } => {
-                match self.previous_postion {
-                    Some(previous_postion) => {
-                        let position_diff = Vector2 {
-                            x: position.x as f32 - previous_postion.x as f32,
-                            y: position.y as f32 - previous_postion.y as f32,
-                        };
-                        if self.left_pressed {
-                            if self.control_pressed {
-                                let offset_up = -position_diff.y as f32;
-                                let offset_right = position_diff.x as f32;
-                                let offset = offset_up + offset_right;
-                                let rotation = cgmath::Quaternion::from_axis_angle(
-                                    forward,
-                                    cgmath::Rad(self.roll_speed * offset),
-                                );
-                                self.up = (rotation * self.up).normalize();
-                                self.forward = (rotation * self.forward).normalize();
-                            } else {
-                                if (position_diff.x + position_diff.y).abs() < 0.001 {
+                if let Some(previous_postion) = self.previous_postion {
+                    let position_diff = Vector2 {
+                        x: position.x as f32 - previous_postion.x as f32,
+                        y: position.y as f32 - previous_postion.y as f32,
+                    };
+                    if self.left_pressed {
+                        if self.control_pressed {
+                            let offset_up = -position_diff.y as f32;
+                            let offset_right = position_diff.x as f32;
+                            let offset = offset_up + offset_right;
+                            let rotation = cgmath::Quaternion::from_axis_angle(
+                                forward,
+                                cgmath::Rad(self.roll_speed * offset),
+                            );
+                            self.up = (rotation * self.up).normalize();
+                            self.forward = (rotation * self.forward).normalize();
+                        } else {
+                            if (position_diff.x + position_diff.y).abs() < 0.001 {
+                                self.previous_postion = Some(*position);
+                                return false;
+                            }
+                            let offset_up = up * position_diff.y as f32;
+                            let offset_right = -right * position_diff.x as f32;
+                            let offset = offset_up + offset_right;
+                            let axis = Vector3::cross(offset, forward).normalize();
+                            let rotation = cgmath::Quaternion::from_axis_angle(
+                                axis,
+                                cgmath::Rad(
+                                    self.rotational_speed * position_diff.magnitude() as f32,
+                                ),
+                            );
+                            let new_forward = (rotation * self.forward).normalize();
+                            if Vector3::dot(up, new_forward).abs() > 0.99 {
+                                if position_diff.x.abs() < 0.001 {
                                     self.previous_postion = Some(*position);
                                     return false;
                                 }
-                                let offset_up = up * position_diff.y as f32;
-                                let offset_right = -right * position_diff.x as f32;
-                                let offset = offset_up + offset_right;
+                                let offset = offset_right;
                                 let axis = Vector3::cross(offset, forward).normalize();
                                 let rotation = cgmath::Quaternion::from_axis_angle(
                                     axis,
                                     cgmath::Rad(
-                                        self.rotational_speed * position_diff.magnitude() as f32,
+                                        self.rotational_speed * (position_diff.x).abs() as f32,
                                     ),
                                 );
                                 let new_forward = (rotation * self.forward).normalize();
-                                if Vector3::dot(up, new_forward).abs() > 0.99 {
-                                    if position_diff.x.abs() < 0.001 {
-                                        self.previous_postion = Some(*position);
-                                        return false;
-                                    }
-                                    let offset = offset_right;
-                                    let axis = Vector3::cross(offset, forward).normalize();
-                                    let rotation = cgmath::Quaternion::from_axis_angle(
-                                        axis,
-                                        cgmath::Rad(self.rotational_speed * (position_diff.x).abs() as f32),
-                                    );
-                                    let new_forward = (rotation * self.forward).normalize();
-                                    self.forward = new_forward;
-                                    self.previous_postion = Some(*position);
-                                    return true;
-                                }
                                 self.forward = new_forward;
+                                self.previous_postion = Some(*position);
+                                return true;
                             }
-                            needs_redraw = true;
+                            self.forward = new_forward;
                         }
-                        if self.right_pressed {
-                            if self.control_pressed {
-                                self.center +=
-                                    up * position_diff.y as f32 - right * position_diff.x as f32;
-                            } else {
-                                self.center += flat_forward * position_diff.y as f32
-                                    - right * position_diff.x as f32;
-                            }
-                            needs_redraw = true;
+                        needs_redraw = true;
+                    }
+                    if self.right_pressed {
+                        if self.control_pressed {
+                            self.center +=
+                                up * position_diff.y as f32 - right * position_diff.x as f32;
+                        } else {
+                            self.center += flat_forward * position_diff.y as f32
+                                - right * position_diff.x as f32;
                         }
+                        needs_redraw = true;
                     }
                 }
                 // TODO add previous position separate for left and right and only set it when

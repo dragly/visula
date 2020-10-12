@@ -1,9 +1,9 @@
 use cgmath;
+use structopt::StructOpt;
 use winit::{
     event::Event,
     event_loop::{ControlFlow, EventLoop},
 };
-use structopt::StructOpt;
 
 mod application;
 mod camera_controller;

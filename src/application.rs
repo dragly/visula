@@ -7,8 +7,8 @@ use crate::sphere::Sphere;
 use crate::vec_to_buffer::vec_to_buffer;
 use crate::{Point3, Vector3};
 use cgmath::EuclideanSpace;
-use std::iter::FromIterator;
 use ndarray::Array;
+use std::iter::FromIterator;
 
 use std::mem::size_of;
 use std::path::PathBuf;
@@ -45,25 +45,27 @@ impl Application {
         assert!(points.shape()[2] == 3);
         let shape = (points.shape()[0] * points.shape()[1], points.shape()[2]);
         let points_flat = points.into_shape(shape).unwrap();
-        let instance_data: Vec<Sphere> = (&points_flat).outer_iter().filter_map(|point| {
-            let x = point[0];
-            let y = point[1];
-            let z = point[2];
-            if x.is_nan() || y.is_nan() || z.is_nan() {
-                return None;
-            }
-            let position = Point3::new(x, y, z);
-            let (color, radius) = (Point3::new(1.0, 0.0, 0.0), 1.0);
+        let instance_data: Vec<Sphere> = (&points_flat)
+            .outer_iter()
+            .filter_map(|point| {
+                let x = point[0];
+                let y = point[1];
+                let z = point[2];
+                if x.is_nan() || y.is_nan() || z.is_nan() {
+                    return None;
+                }
+                let position = Point3::new(x, y, z);
+                let (color, radius) = (Point3::new(1.0, 0.0, 0.0), 1.0);
 
-            mean_position += position.to_vec();
+                mean_position += position.to_vec();
 
-            Some(Sphere {
-                position,
-                radius,
-                color,
+                Some(Sphere {
+                    position,
+                    radius,
+                    color,
+                })
             })
-        })
-        .collect();
+            .collect();
 
         let instance_count = instance_data.len();
 
