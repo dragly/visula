@@ -1,4 +1,4 @@
-use cgmath;
+
 use structopt::StructOpt;
 use winit::{
     event::Event,
@@ -56,7 +56,7 @@ fn main() {
 
     let mut application: Option<Application> = None;
 
-    event_loop.run(move |mut event, _, control_flow| {
+    event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
         match event {
             Event::UserEvent(CustomEvent::Ready(mut app)) => {

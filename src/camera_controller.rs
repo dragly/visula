@@ -186,7 +186,7 @@ fn create_model_view_projection(
     CameraUniforms {
         view_matrix,
         model_view_projection_matrix,
-        center: center.clone(),
+        center: *center,
         dummy0: 0.0,
         view_vector,
         dummy1: 0.0,

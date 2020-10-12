@@ -5,10 +5,10 @@ use crate::drop_event::DropEvent;
 use crate::pipeline::Pipeline;
 use crate::sphere::Sphere;
 use crate::vec_to_buffer::vec_to_buffer;
-use crate::{Point3, Vector3};
+use crate::{Point3};
 use cgmath::EuclideanSpace;
-use ndarray::Array;
-use std::iter::FromIterator;
+
+
 
 use std::mem::size_of;
 use std::path::PathBuf;
@@ -251,7 +251,7 @@ impl Application {
                 };
                 if let Some(extension) = path.extension() {
                     if let Some(extension) = extension.to_str() {
-                        match extension.as_ref() {
+                        match extension {
                             "xyz" => self.handle_xyz(&drop_event),
                             "zdf" => self.handle_zdf(&path),
                             _ => {
