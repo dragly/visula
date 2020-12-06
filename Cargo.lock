@@ -621,20 +621,20 @@ dependencies = [
 [[package]]
 name = "gfx-auxil"
 version = "0.5.0"
-source = "git+https://github.com/gfx-rs/gfx#654ad48ee39ce2a341407ae2857ddf4db639ea54"
+source = "git+https://github.com/gfx-rs/gfx?rev=1d14789011cb892f4c1a205d3f8a87d479c2e354#1d14789011cb892f4c1a205d3f8a87d479c2e354"
 dependencies = [
  "fxhash",
- "gfx-hal 0.6.0 (git+https://github.com/gfx-rs/gfx)",
+ "gfx-hal 0.6.0 (git+https://github.com/gfx-rs/gfx?rev=1d14789011cb892f4c1a205d3f8a87d479c2e354)",
  "spirv_cross",
 ]
 
 [[package]]
 name = "gfx-auxil"
 version = "0.5.0"
-source = "git+https://github.com/gfx-rs/gfx?rev=1d14789011cb892f4c1a205d3f8a87d479c2e354#1d14789011cb892f4c1a205d3f8a87d479c2e354"
+source = "git+https://github.com/gfx-rs/gfx#654ad48ee39ce2a341407ae2857ddf4db639ea54"
 dependencies = [
  "fxhash",
- "gfx-hal 0.6.0 (git+https://github.com/gfx-rs/gfx?rev=1d14789011cb892f4c1a205d3f8a87d479c2e354)",
+ "gfx-hal 0.6.0 (git+https://github.com/gfx-rs/gfx)",
  "spirv_cross",
 ]
 
@@ -692,6 +692,28 @@ dependencies = [
 [[package]]
 name = "gfx-backend-gl"
 version = "0.6.0"
+source = "git+https://github.com/gfx-rs/gfx?rev=1d14789011cb892f4c1a205d3f8a87d479c2e354#1d14789011cb892f4c1a205d3f8a87d479c2e354"
+dependencies = [
+ "arrayvec",
+ "bitflags",
+ "gfx-auxil 0.5.0 (git+https://github.com/gfx-rs/gfx?rev=1d14789011cb892f4c1a205d3f8a87d479c2e354)",
+ "gfx-hal 0.6.0 (git+https://github.com/gfx-rs/gfx?rev=1d14789011cb892f4c1a205d3f8a87d479c2e354)",
+ "glow",
+ "js-sys",
+ "khronos-egl",
+ "lazy_static",
+ "log",
+ "parking_lot 0.11.1",
+ "raw-window-handle",
+ "smallvec",
+ "spirv_cross",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
+name = "gfx-backend-gl"
+version = "0.6.0"
 source = "git+https://github.com/gfx-rs/gfx#654ad48ee39ce2a341407ae2857ddf4db639ea54"
 dependencies = [
  "arrayvec",
@@ -710,28 +732,6 @@ dependencies = [
  "wasm-bindgen",
  "web-sys",
  "x11",
-]
-
-[[package]]
-name = "gfx-backend-gl"
-version = "0.6.0"
-source = "git+https://github.com/gfx-rs/gfx?rev=1d14789011cb892f4c1a205d3f8a87d479c2e354#1d14789011cb892f4c1a205d3f8a87d479c2e354"
-dependencies = [
- "arrayvec",
- "bitflags",
- "gfx-auxil 0.5.0 (git+https://github.com/gfx-rs/gfx?rev=1d14789011cb892f4c1a205d3f8a87d479c2e354)",
- "gfx-hal 0.6.0 (git+https://github.com/gfx-rs/gfx?rev=1d14789011cb892f4c1a205d3f8a87d479c2e354)",
- "glow",
- "js-sys",
- "khronos-egl",
- "lazy_static",
- "log",
- "parking_lot 0.11.1",
- "raw-window-handle",
- "smallvec",
- "spirv_cross",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]
@@ -780,21 +780,21 @@ dependencies = [
 [[package]]
 name = "gfx-hal"
 version = "0.6.0"
+source = "git+https://github.com/gfx-rs/gfx?rev=1d14789011cb892f4c1a205d3f8a87d479c2e354#1d14789011cb892f4c1a205d3f8a87d479c2e354"
+dependencies = [
+ "bitflags",
+ "raw-window-handle",
+]
+
+[[package]]
+name = "gfx-hal"
+version = "0.6.0"
 source = "git+https://github.com/gfx-rs/gfx#654ad48ee39ce2a341407ae2857ddf4db639ea54"
 dependencies = [
  "bitflags",
  "naga 0.2.0 (git+https://github.com/gfx-rs/naga?tag=gfx-2)",
  "raw-window-handle",
  "thiserror",
-]
-
-[[package]]
-name = "gfx-hal"
-version = "0.6.0"
-source = "git+https://github.com/gfx-rs/gfx?rev=1d14789011cb892f4c1a205d3f8a87d479c2e354#1d14789011cb892f4c1a205d3f8a87d479c2e354"
-dependencies = [
- "bitflags",
- "raw-window-handle",
 ]
 
 [[package]]
