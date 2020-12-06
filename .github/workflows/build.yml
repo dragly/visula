@@ -18,7 +18,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-
+      - name: Install dependencies
+        run: sudo apt-get install libegl1-mesa-dev
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
