@@ -8,13 +8,18 @@ name: Continuous integration
 jobs:
   ci:
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.experimental }}
     strategy:
       matrix:
+        experimental:
+          - false
         rust:
           - stable
           - beta
           - nightly
-          - 1.43.0  # Minimum supported Rust version
+        include:
+          - rust: 1.43.0  # Minimum supported Rust version
+            experimental: true
 
     steps:
       - uses: actions/checkout@v2
