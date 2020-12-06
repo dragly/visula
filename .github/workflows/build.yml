@@ -1,4 +1,7 @@
-on: push
+on:
+  push:
+  schedule:
+    - cron: '15 14 12 * *'
 
 name: Continuous integration
 
