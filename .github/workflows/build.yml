@@ -16,9 +16,9 @@ jobs:
         rust:
           - stable
           - beta
-          - nightly
+          - 1.46.0  # Minimum supported Rust version
         include:
-          - rust: 1.43.0  # Minimum supported Rust version
+          - rust: nightly
             experimental: true
 
     steps:
