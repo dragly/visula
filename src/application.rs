@@ -8,6 +8,8 @@ use crate::vec_to_buffer::vec_to_buffer;
 use crate::Point3;
 use cgmath::EuclideanSpace;
 
+use wgpu::util::DeviceExt;
+
 use std::mem::size_of;
 use std::path::PathBuf;
 use winit::{
@@ -70,10 +72,13 @@ impl Application {
         self.camera_controller.center = (mean_position / instance_count as f32).to_vec();
         println!("{:?}", self.camera_controller);
 
-        let instance_buffer = self.device.create_buffer_with_data(
-            bytemuck::cast_slice(&instance_data),
-            wgpu::BufferUsage::VERTEX,
-        );
+        let instance_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Instance buffer"),
+                contents: bytemuck::cast_slice(&instance_data),
+                usage: wgpu::BufferUsage::VERTEX,
+            });
 
         // TODO there is a way to update an existing buffer instead of creating a new one
         self.points.instance_buffer = instance_buffer;
@@ -118,10 +123,13 @@ impl Application {
 
         let instance_count = instance_data.len();
 
-        let instance_buffer = self.device.create_buffer_with_data(
-            bytemuck::cast_slice(&instance_data),
-            wgpu::BufferUsage::VERTEX,
-        );
+        let instance_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Instance buffer"),
+                contents: bytemuck::cast_slice(&instance_data),
+                usage: wgpu::BufferUsage::VERTEX,
+            });
 
         // TODO there is a way to update an existing buffer instead of creating a new one
         self.points.instance_buffer = instance_buffer;
@@ -152,21 +160,22 @@ impl Application {
                     sample_count: 1,
                     dimension: wgpu::TextureDimension::D2,
                     format: wgpu::TextureFormat::Depth32Float,
-                    usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+                    usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
                     label: None,
                 });
-                self.depth_texture = depth_texture.create_default_view();
+                self.depth_texture =
+                    depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
                 self.sc_desc.width = size.width;
                 self.sc_desc.height = size.height;
             }
             Event::RedrawRequested(_) => {
-                let frame = match self.swap_chain.get_next_frame() {
+                let frame = match self.swap_chain.get_current_frame() {
                     Ok(frame) => frame,
                     Err(_) => {
                         self.swap_chain =
                             self.device.create_swap_chain(&self.surface, &self.sc_desc);
                         self.swap_chain
-                            .get_next_frame()
+                            .get_current_frame()
                             .expect("Failed to acquire next swap chain texture!")
                     }
                 };
@@ -202,24 +211,24 @@ impl Application {
                         color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                             attachment: &frame.output.view,
                             resolve_target: None,
-                            load_op: wgpu::LoadOp::Clear,
-                            store_op: wgpu::StoreOp::Store,
-                            clear_color: wgpu::Color {
-                                r: 0.1,
-                                g: 0.2,
-                                b: 0.3,
-                                a: 1.0,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color {
+                                    r: 0.1,
+                                    g: 0.2,
+                                    b: 0.3,
+                                    a: 1.0,
+                                }),
+                                store: true,
                             },
                         }],
                         depth_stencil_attachment: Some(
                             wgpu::RenderPassDepthStencilAttachmentDescriptor {
                                 attachment: &self.depth_texture,
-                                depth_load_op: wgpu::LoadOp::Clear,
-                                depth_store_op: wgpu::StoreOp::Store,
-                                stencil_load_op: wgpu::LoadOp::Clear,
-                                stencil_store_op: wgpu::StoreOp::Store,
-                                clear_depth: 1.0,
-                                clear_stencil: 0,
+                                depth_ops: Some(wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(1.0),
+                                    store: true,
+                                }),
+                                stencil_ops: None,
                             },
                         ),
                     });

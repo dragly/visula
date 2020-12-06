@@ -7,6 +7,8 @@ use crate::sphere::Sphere;
 use crate::vec_to_buffer::vec_to_buffer;
 use crate::Point3;
 
+use wgpu::util::DeviceExt;
+
 use bytemuck::{Pod, Zeroable};
 use std::mem::size_of;
 use winit::{event_loop::EventLoopProxy, window::Window};
@@ -17,26 +19,23 @@ pub async fn init(
     swapchain_format: wgpu::TextureFormat,
 ) {
     let size = window.inner_size();
-    let instance = wgpu::Instance::new();
+    let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
     let surface = unsafe { instance.create_surface(&window) };
     let adapter = instance
-        .request_adapter(
-            &wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::Default,
-                compatible_surface: Some(&surface),
-            },
-            wgpu::BackendBit::PRIMARY,
-        )
+        .request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::default(),
+            compatible_surface: Some(&surface),
+        })
         .await
         .unwrap();
 
     let (device, queue) = adapter
         .request_device(
             &wgpu::DeviceDescriptor {
+                label: None,
+                features: adapter.features(),
                 limits: wgpu::Limits::default(),
-                extensions: wgpu::Extensions {
-                    anisotropic_filtering: false,
-                },
+                shader_validation: true,
             },
             None,
         )
@@ -44,7 +43,7 @@ pub async fn init(
         .unwrap();
 
     let sc_desc = wgpu::SwapChainDescriptor {
-        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
         format: swapchain_format,
         width: size.width,
         height: size.height,
@@ -66,10 +65,10 @@ pub async fn init(
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format: wgpu::TextureFormat::Depth32Float,
-        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
         label: None,
     });
-    let depth_texture = depth_texture_in.create_default_view();
+    let depth_texture = depth_texture_in.create_view(&wgpu::TextureViewDescriptor::default());
 
     let event_result = proxy.send_event(CustomEvent::Ready(Application {
         device,
@@ -95,10 +94,11 @@ fn create_point_pipeline(
     let (vertex_data, index_data) = create_vertices();
     let index_count = index_data.len();
 
-    let vertex_buffer = device.create_buffer_with_data(
-        bytemuck::cast_slice(&vertex_data),
-        wgpu::BufferUsage::VERTEX,
-    );
+    let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Vertex buffer"),
+        contents: bytemuck::cast_slice(&vertex_data),
+        usage: wgpu::BufferUsage::VERTEX,
+    });
 
     let instance_data = vec![Sphere {
         position: Point3::new(0.0, 0.0, 0.0),
@@ -108,28 +108,32 @@ fn create_point_pipeline(
 
     let instance_count = instance_data.len();
 
-    let instance_buffer = device.create_buffer_with_data(
-        bytemuck::cast_slice(&instance_data),
-        wgpu::BufferUsage::VERTEX,
-    );
+    let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Instance buffer"),
+        contents: bytemuck::cast_slice(&instance_data),
+        usage: wgpu::BufferUsage::VERTEX,
+    });
 
-    let index_buffer =
-        device.create_buffer_with_data(bytemuck::cast_slice(&index_data), wgpu::BufferUsage::INDEX);
+    let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Index buffer"),
+        contents: bytemuck::cast_slice(&index_data),
+        usage: wgpu::BufferUsage::INDEX,
+    });
 
-    let vs_bytes = include_bytes!("shader.vert.spv");
-    let fs_bytes = include_bytes!("shader.frag.spv");
-
-    let vs_module = device
-        .create_shader_module(&wgpu::read_spirv(std::io::Cursor::new(&vs_bytes[..])).unwrap());
-    let fs_module = device
-        .create_shader_module(&wgpu::read_spirv(std::io::Cursor::new(&fs_bytes[..])).unwrap());
+    let vs_module = device.create_shader_module(wgpu::include_spirv!("shader.vert.spv"));
+    let fs_module = device.create_shader_module(wgpu::include_spirv!("shader.frag.spv"));
 
     let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
-        bindings: &[wgpu::BindGroupLayoutEntry {
+        entries: &[wgpu::BindGroupLayoutEntry {
             binding: 0,
             visibility: wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
-            ty: wgpu::BindingType::UniformBuffer { dynamic: false },
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: wgpu::BufferSize::new(size_of::<CameraUniforms>() as u64),
+            },
+            count: None,
         }],
     });
 
@@ -145,18 +149,25 @@ fn create_point_pipeline(
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: None,
         layout: &bind_group_layout,
-        bindings: &[wgpu::Binding {
+        entries: &[wgpu::BindGroupEntry {
             binding: 0,
-            resource: wgpu::BindingResource::Buffer(uniform_buffer.slice(..)),
+            resource: wgpu::BindingResource::Buffer {
+                buffer: &uniform_buffer,
+                offset: 0,
+                size: wgpu::BufferSize::new(size_of::<CameraUniforms>() as u64),
+            },
         }],
     });
 
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("pipeline"),
         bind_group_layouts: &[&bind_group_layout],
+        push_constant_ranges: &[],
     });
 
     let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        layout: &pipeline_layout,
+        label: Some("Render pipeline"),
+        layout: Some(&pipeline_layout),
         vertex_stage: wgpu::ProgrammableStageDescriptor {
             module: &vs_module,
             entry_point: "main",
@@ -166,6 +177,8 @@ fn create_point_pipeline(
             entry_point: "main",
         }),
         rasterization_state: Some(wgpu::RasterizationStateDescriptor {
+            clamp_depth: device.features().contains(wgpu::Features::DEPTH_CLAMPING),
+            polygon_mode: wgpu::PolygonMode::Fill,
             front_face: wgpu::FrontFace::Ccw,
             cull_mode: wgpu::CullMode::None,
             depth_bias: 0,
@@ -183,10 +196,7 @@ fn create_point_pipeline(
             format: wgpu::TextureFormat::Depth32Float,
             depth_write_enabled: true,
             depth_compare: wgpu::CompareFunction::Less,
-            stencil_front: wgpu::StencilStateFaceDescriptor::IGNORE,
-            stencil_back: wgpu::StencilStateFaceDescriptor::IGNORE,
-            stencil_read_mask: 0,
-            stencil_write_mask: 0,
+            stencil: wgpu::StencilStateDescriptor::default(),
         }),
         vertex_state: wgpu::VertexStateDescriptor {
             index_format: wgpu::IndexFormat::Uint16,

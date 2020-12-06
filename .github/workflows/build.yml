@@ -1,21 +1,30 @@
-on: push
+on:
+  push:
+  schedule:
+    - cron: '15 14 12 * *'
 
 name: Continuous integration
 
 jobs:
   ci:
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.experimental }}
     strategy:
       matrix:
+        experimental:
+          - false
         rust:
           - stable
           - beta
-          - nightly
-          - 1.43.0  # Minimum supported Rust version
+          - 1.46.0  # Minimum supported Rust version
+        include:
+          - rust: nightly
+            experimental: true
 
     steps:
       - uses: actions/checkout@v2
-
+      - name: Install dependencies
+        run: sudo apt-get install libegl1-mesa-dev
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
