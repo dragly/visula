@@ -10,7 +10,7 @@ use cgmath::EuclideanSpace;
 
 use wgpu::util::DeviceExt;
 
-use std::mem::size_of;
+use std::{iter::Iterator, mem::size_of};
 use std::path::PathBuf;
 use winit::{
     event::{Event, WindowEvent},
@@ -38,16 +38,21 @@ impl Application {
         let pointcloud = &group
             .variable("pointcloud")
             .expect("Could not find pointcloud");
+        let rgba_image = &group
+            .variable("rgba_image")
+            .expect("Could not find pointcloud");
 
         let points = pointcloud.values::<f32>(None, None).unwrap();
+        let colors = rgba_image.values::<f32>(None, None).unwrap();
 
         let mut mean_position = Point3::new(0.0, 0.0, 0.0);
         assert!(points.shape()[2] == 3);
-        let shape = (points.shape()[0] * points.shape()[1], points.shape()[2]);
-        let points_flat = points.into_shape(shape).unwrap();
-        let instance_data: Vec<Sphere> = (&points_flat)
-            .outer_iter()
-            .filter_map(|point| {
+        let points_shape = (points.shape()[0] * points.shape()[1], points.shape()[2]);
+        let colors_shape = (colors.shape()[0] * colors.shape()[1], colors.shape()[2]);
+        let points_flat = points.into_shape(points_shape).unwrap();
+        let colors_flat = colors.into_shape(colors_shape).unwrap();
+        let instance_data: Vec<Sphere> = points_flat.outer_iter().zip(colors_flat.outer_iter())
+            .filter_map(|(point, color)| {
                 let x = point[0];
                 let y = point[1];
                 let z = point[2];
@@ -55,7 +60,7 @@ impl Application {
                     return None;
                 }
                 let position = Point3::new(x, y, z);
-                let (color, radius) = (Point3::new(1.0, 0.0, 0.0), 1.0);
+                let (color, radius) = (Point3::new(color[0] / 255.0, color[1] / 255.0, color[2] / 255.0), 1.0);
 
                 mean_position += position.to_vec();
 
