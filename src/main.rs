@@ -11,7 +11,6 @@ mod custom_event;
 mod drop_event;
 mod init_wgpu;
 mod mesh;
-mod ordered_point;
 mod pipeline;
 mod sphere;
 mod vec_to_buffer;
@@ -43,7 +42,6 @@ fn main() {
     let mut builder = winit::window::WindowBuilder::new();
     builder = builder.with_title("Visula");
     let window = builder.build(&event_loop).unwrap();
-    //let window = winit::window::Window::new(&event_loop).unwrap();
     #[cfg(not(target_arch = "wasm32"))]
     {
         setup_other::setup_other(window, proxy);
