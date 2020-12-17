@@ -1,7 +1,8 @@
-use crate::application::Application;
+use crate::application::{Application, DrawMode};
 use crate::camera_controller::CameraController;
 use crate::camera_uniforms::CameraUniforms;
 use crate::custom_event::CustomEvent;
+use crate::mesh::MeshVertexAttributes;
 use crate::pipeline::Pipeline;
 use crate::sphere::Sphere;
 use crate::vec_to_buffer::vec_to_buffer;
@@ -33,7 +34,7 @@ pub async fn init(
         .request_device(
             &wgpu::DeviceDescriptor {
                 label: None,
-                features: adapter.features(),
+                features: wgpu::Features::empty(),
                 limits: wgpu::Limits::default(),
                 shader_validation: true,
             },
@@ -80,6 +81,7 @@ pub async fn init(
         points,
         window,
         depth_texture,
+        draw_mode: DrawMode::default(),
     }));
     if event_result.is_err() {
         println!("ERROR: Could not send event! Is the event loop closed?")
@@ -151,11 +153,7 @@ fn create_point_pipeline(
         layout: &bind_group_layout,
         entries: &[wgpu::BindGroupEntry {
             binding: 0,
-            resource: wgpu::BindingResource::Buffer {
-                buffer: &uniform_buffer,
-                offset: 0,
-                size: wgpu::BufferSize::new(size_of::<CameraUniforms>() as u64),
-            },
+            resource: uniform_buffer.as_entire_binding(),
         }],
     });
 
@@ -239,6 +237,88 @@ fn create_point_pipeline(
         alpha_to_coverage_enabled: false,
     });
 
+    let mesh_vertex_size = size_of::<MeshVertexAttributes>();
+    let mesh_vs_module = device.create_shader_module(wgpu::include_spirv!("mesh.vert.spv"));
+    let mesh_fs_module = device.create_shader_module(wgpu::include_spirv!("mesh.frag.spv"));
+    let mesh_bind_group_layout =
+        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Mesh Bind Group Layout"),
+            entries: &[
+                // Regular uniform variables like view/projection.
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStage::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new(size_of::<CameraUniforms>() as _),
+                    },
+                    count: None,
+                },
+            ],
+        });
+    let mesh_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &mesh_bind_group_layout,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: uniform_buffer.as_entire_binding(),
+        }],
+        label: Some("Mesh Normal Bind Group"),
+    });
+
+    let mesh_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("Mesh pipeline layout"),
+        bind_group_layouts: &[&mesh_bind_group_layout],
+        push_constant_ranges: &[],
+    });
+    let mesh_render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("Mesh pipeline"),
+        layout: Some(&mesh_pipeline_layout),
+        vertex_stage: wgpu::ProgrammableStageDescriptor {
+            module: &mesh_vs_module,
+            entry_point: "main",
+        },
+        fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
+            module: &mesh_fs_module,
+            entry_point: "main",
+        }),
+        rasterization_state: Some(wgpu::RasterizationStateDescriptor {
+            front_face: wgpu::FrontFace::Ccw,
+            cull_mode: wgpu::CullMode::None, // TODO make Front
+            ..Default::default()
+        }),
+        primitive_topology: wgpu::PrimitiveTopology::TriangleList,
+        color_states: &[wgpu::ColorStateDescriptor {
+            format: swapchain_format,
+            color_blend: wgpu::BlendDescriptor::REPLACE,
+            alpha_blend: wgpu::BlendDescriptor::REPLACE,
+            write_mask: wgpu::ColorWrite::ALL,
+        }],
+        depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
+            format: wgpu::TextureFormat::Depth32Float,
+            depth_write_enabled: true,
+            depth_compare: wgpu::CompareFunction::Less,
+            stencil: wgpu::StencilStateDescriptor::default(),
+        }),
+        vertex_state: wgpu::VertexStateDescriptor {
+            index_format: wgpu::IndexFormat::default(),
+            vertex_buffers: &[wgpu::VertexBufferDescriptor {
+                stride: mesh_vertex_size as wgpu::BufferAddress,
+                step_mode: wgpu::InputStepMode::Vertex,
+                attributes: &wgpu::vertex_attr_array![0 => Float3, 1 => Float3, 2 => Uchar4Norm],
+            }],
+        },
+        sample_count: 1,
+        sample_mask: !0,
+        alpha_to_coverage_enabled: false,
+    });
+
+    let mesh_vertex_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Instance buffer"),
+        contents: bytemuck::cast_slice(&Vec::<MeshVertexAttributes>::new()),
+        usage: wgpu::BufferUsage::VERTEX,
+    });
+
     Ok(Pipeline {
         render_pipeline,
         bind_group,
@@ -248,6 +328,11 @@ fn create_point_pipeline(
         instance_count,
         index_count,
         uniform_buffer,
+
+        mesh_render_pipeline,
+        mesh_vertex_buf,
+        mesh_vertex_count: 0,
+        mesh_bind_group,
     })
 }
 

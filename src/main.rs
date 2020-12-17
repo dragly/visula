@@ -10,6 +10,8 @@ mod camera_uniforms;
 mod custom_event;
 mod drop_event;
 mod init_wgpu;
+mod mesh;
+mod ordered_point;
 mod pipeline;
 mod sphere;
 mod vec_to_buffer;
@@ -29,7 +31,8 @@ type Point3 = cgmath::Point3<f32>;
 
 #[derive(StructOpt)]
 struct Cli {
-    filename: Option<std::path::PathBuf>,
+    #[structopt(long)]
+    load_zdf: Option<std::path::PathBuf>,
 }
 
 fn main() {
@@ -37,7 +40,10 @@ fn main() {
 
     let event_loop = EventLoop::<CustomEvent>::with_user_event();
     let proxy = event_loop.create_proxy();
-    let window = winit::window::Window::new(&event_loop).unwrap();
+    let mut builder = winit::window::WindowBuilder::new();
+    builder = builder.with_title("Visula");
+    let window = builder.build(&event_loop).unwrap();
+    //let window = winit::window::Window::new(&event_loop).unwrap();
     #[cfg(not(target_arch = "wasm32"))]
     {
         setup_other::setup_other(window, proxy);
@@ -59,7 +65,8 @@ fn main() {
         *control_flow = ControlFlow::Poll;
         match event {
             Event::UserEvent(CustomEvent::Ready(mut app)) => {
-                if let Some(filename) = &args.filename {
+                #[cfg(not(target_arch = "wasm32"))]
+                if let Some(filename) = &args.load_zdf {
                     app.handle_zdf(&filename);
                 }
                 application = Some(app);

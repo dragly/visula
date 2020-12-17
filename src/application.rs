@@ -2,14 +2,17 @@ use crate::camera_controller::CameraController;
 use crate::camera_uniforms::CameraUniforms;
 use crate::custom_event::CustomEvent;
 use crate::drop_event::DropEvent;
+use crate::mesh::MeshVertexAttributes;
+use crate::ordered_point::OrderedPoint;
 use crate::pipeline::Pipeline;
 use crate::sphere::Sphere;
 use crate::vec_to_buffer::vec_to_buffer;
-use crate::Point3;
+use crate::{Point3, Vector3};
 use cgmath::EuclideanSpace;
 
 use wgpu::util::DeviceExt;
 
+use ndarray::s;
 use std::path::PathBuf;
 use std::{iter::Iterator, mem::size_of};
 use winit::{
@@ -17,6 +20,18 @@ use winit::{
     event_loop::ControlFlow,
     window::Window,
 };
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum DrawMode {
+    Points,
+    Mesh,
+}
+
+impl Default for DrawMode {
+    fn default() -> Self {
+        DrawMode::Points
+    }
+}
 
 pub struct Application {
     pub device: wgpu::Device,
@@ -28,9 +43,11 @@ pub struct Application {
     pub camera_controller: CameraController,
     pub points: Pipeline,
     pub depth_texture: wgpu::TextureView,
+    pub draw_mode: DrawMode,
 }
 
 impl Application {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn handle_zdf(&mut self, path: &PathBuf) {
         let name: &str = path.to_str().unwrap().as_ref();
         let file = netcdf::open(name).unwrap();
@@ -42,8 +59,70 @@ impl Application {
             .variable("rgba_image")
             .expect("Could not find pointcloud");
 
+        let mut vertices = vec![];
         let points = pointcloud.values::<f32>(None, None).unwrap();
         let colors = rgba_image.values::<f32>(None, None).unwrap();
+        for col in 0..(points.shape()[0] - 1) {
+            for row in 0..(points.shape()[1] - 1) {
+                let col_m = (col as i64 - 1).max(0) as usize;
+                let row_m = (row as i64 - 1).max(0) as usize;
+                let col_p = (col as i64 + 1).min(points.shape()[0] as i64 - 1) as usize;
+                let row_p = (row as i64 + 1).min(points.shape()[1] as i64 - 1) as usize;
+
+                let color = colors.slice(s![col, row, ..]);
+                let color = [color[0] as u8, color[1] as u8, color[2] as u8, 255];
+                let point_c = points.slice(s![col, row, ..]);
+                let point_l = points.slice(s![col_m, row, ..]);
+                let point_r = points.slice(s![col_p, row, ..]);
+                let point_t = points.slice(s![col, row_m, ..]);
+                let point_b = points.slice(s![col, row_p, ..]);
+                let point_tl = points.slice(s![col_m, row_m, ..]);
+                let point_bl = points.slice(s![col_m, row_p, ..]);
+                let point_tr = points.slice(s![col_p, row_m, ..]);
+                let point_br = points.slice(s![col_p, row_p, ..]);
+
+                let corner_tr = (&point_r + &point_tr + &point_c + &point_t) / 4.0;
+                let corner_tl = (&point_l + &point_tl + &point_c + &point_t) / 4.0;
+                let corner_br = (&point_r + &point_br + &point_c + &point_b) / 4.0;
+                let corner_bl = (&point_l + &point_bl + &point_c + &point_b) / 4.0;
+                if !corner_tr[0].is_nan()
+                    && !corner_tl[0].is_nan()
+                    && !corner_br[0].is_nan()
+                    && !corner_bl[0].is_nan()
+                {
+                    vertices.push(MeshVertexAttributes {
+                        position: [corner_tr[0], corner_tr[1], corner_tr[2]],
+                        color,
+                        normal: [1.0, 0.0, 0.0],
+                    });
+                    vertices.push(MeshVertexAttributes {
+                        position: [corner_tl[0], corner_tl[1], corner_tl[2]],
+                        color,
+                        normal: [1.0, 0.0, 0.0],
+                    });
+                    vertices.push(MeshVertexAttributes {
+                        position: [corner_br[0], corner_br[1], corner_br[2]],
+                        color,
+                        normal: [1.0, 0.0, 0.0],
+                    });
+                    vertices.push(MeshVertexAttributes {
+                        position: [corner_tl[0], corner_tl[1], corner_tl[2]],
+                        color,
+                        normal: [1.0, 0.0, 0.0],
+                    });
+                    vertices.push(MeshVertexAttributes {
+                        position: [corner_bl[0], corner_bl[1], corner_bl[2]],
+                        color,
+                        normal: [1.0, 0.0, 0.0],
+                    });
+                    vertices.push(MeshVertexAttributes {
+                        position: [corner_br[0], corner_br[1], corner_br[2]],
+                        color,
+                        normal: [1.0, 0.0, 0.0],
+                    });
+                }
+            }
+        }
 
         let mut mean_position = Point3::new(0.0, 0.0, 0.0);
         assert!(points.shape()[2] == 3);
@@ -62,10 +141,8 @@ impl Application {
                     return None;
                 }
                 let position = Point3::new(x, y, z);
-                let (color, radius) = (
-                    Point3::new(color[0] / 255.0, color[1] / 255.0, color[2] / 255.0),
-                    1.0,
-                );
+                let color = Point3::new(color[0] / 255.0, color[1] / 255.0, color[2] / 255.0);
+                let radius = 1.0;
 
                 mean_position += position.to_vec();
 
@@ -76,11 +153,9 @@ impl Application {
                 })
             })
             .collect();
-
         let instance_count = instance_data.len();
 
         self.camera_controller.center = (mean_position / instance_count as f32).to_vec();
-        println!("{:?}", self.camera_controller);
 
         let instance_buffer = self
             .device
@@ -90,9 +165,21 @@ impl Application {
                 usage: wgpu::BufferUsage::VERTEX,
             });
 
+        let vertex_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Mesh buffer"),
+                contents: bytemuck::cast_slice(&vertices),
+                usage: wgpu::BufferUsage::VERTEX,
+            });
+
+        println!("{:?}", self.camera_controller);
+
         // TODO there is a way to update an existing buffer instead of creating a new one
         self.points.instance_buffer = instance_buffer;
         self.points.instance_count = instance_count;
+        self.points.mesh_vertex_buf = vertex_buffer;
+        self.points.mesh_vertex_count = vertices.len();
     }
     pub fn handle_xyz(&mut self, DropEvent { name, text, .. }: &DropEvent) {
         log::info!("Got a drop {}", name);
@@ -177,6 +264,7 @@ impl Application {
                     depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
                 self.sc_desc.width = size.width;
                 self.sc_desc.height = size.height;
+                self.swap_chain = self.device.create_swap_chain(&self.surface, &self.sc_desc);
             }
             Event::RedrawRequested(_) => {
                 let frame = match self.swap_chain.get_current_frame() {
@@ -216,7 +304,8 @@ impl Application {
                     );
                 }
 
-                {
+                if self.draw_mode == DrawMode::Points {
+                    // Draw points
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                             attachment: &frame.output.view,
@@ -252,6 +341,37 @@ impl Application {
                         0,
                         0..self.points.instance_count as u32,
                     );
+                } else {
+                    // Draw meshes
+                    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                            attachment: &frame.output.view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color {
+                                    r: 0.1,
+                                    g: 0.2,
+                                    b: 0.3,
+                                    a: 1.0,
+                                }),
+                                store: true,
+                            },
+                        }],
+                        depth_stencil_attachment: Some(
+                            wgpu::RenderPassDepthStencilAttachmentDescriptor {
+                                attachment: &self.depth_texture,
+                                depth_ops: Some(wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(1.0),
+                                    store: true,
+                                }),
+                                stencil_ops: None,
+                            },
+                        ),
+                    });
+                    rpass.set_pipeline(&self.points.mesh_render_pipeline);
+                    rpass.set_bind_group(0, &self.points.mesh_bind_group, &[]);
+                    rpass.set_vertex_buffer(0, self.points.mesh_vertex_buf.slice(..));
+                    rpass.draw(0..self.points.mesh_vertex_count as u32, 0..1);
                 }
 
                 self.queue.submit(Some(encoder.finish()));
@@ -270,6 +390,7 @@ impl Application {
                     if let Some(extension) = extension.to_str() {
                         match extension {
                             "xyz" => self.handle_xyz(&drop_event),
+                            #[cfg(not(target_arch = "wasm32"))]
                             "zdf" => self.handle_zdf(&path),
                             _ => {
                                 log::warn!("Unsupported format {}", extension);
@@ -277,6 +398,25 @@ impl Application {
                         }
                     }
                 }
+            }
+            Event::WindowEvent {
+                event:
+                    WindowEvent::KeyboardInput {
+                        input:
+                            winit::event::KeyboardInput {
+                                virtual_keycode: Some(winit::event::VirtualKeyCode::M),
+                                state: winit::event::ElementState::Pressed,
+                                ..
+                            },
+                        ..
+                    },
+                ..
+            } => {
+                self.draw_mode = match self.draw_mode {
+                    DrawMode::Mesh => DrawMode::Points,
+                    DrawMode::Points => DrawMode::Mesh,
+                };
+                self.window.request_redraw();
             }
             Event::WindowEvent {
                 event: window_event,

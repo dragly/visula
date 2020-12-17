@@ -7,4 +7,9 @@ pub struct Pipeline {
     pub instance_buffer: wgpu::Buffer,
     pub instance_count: usize,
     pub uniform_buffer: wgpu::Buffer,
+
+    pub mesh_vertex_buf: wgpu::Buffer,
+    pub mesh_vertex_count: usize,
+    pub mesh_bind_group: wgpu::BindGroup,
+    pub mesh_render_pipeline: wgpu::RenderPipeline,
 }
