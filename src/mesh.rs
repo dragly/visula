@@ -7,4 +7,3 @@ pub struct MeshVertexAttributes {
     pub normal: [f32; 3],
     pub color: [u8; 4],
 }
-

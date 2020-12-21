@@ -3,11 +3,10 @@ use crate::camera_uniforms::CameraUniforms;
 use crate::custom_event::CustomEvent;
 use crate::drop_event::DropEvent;
 use crate::mesh::MeshVertexAttributes;
-use crate::ordered_point::OrderedPoint;
 use crate::pipeline::Pipeline;
 use crate::sphere::Sphere;
 use crate::vec_to_buffer::vec_to_buffer;
-use crate::{Point3, Vector3};
+use crate::Point3;
 use cgmath::EuclideanSpace;
 
 use wgpu::util::DeviceExt;
@@ -48,6 +47,7 @@ pub struct Application {
 
 impl Application {
     #[cfg(not(target_arch = "wasm32"))]
+    #[allow(clippy::op_ref)]
     pub fn handle_zdf(&mut self, path: &PathBuf) {
         let name: &str = path.to_str().unwrap().as_ref();
         let file = netcdf::open(name).unwrap();
