@@ -47,6 +47,7 @@ pub struct Application {
 
 impl Application {
     #[cfg(not(target_arch = "wasm32"))]
+    #[allow(clippy::op_ref)]
     pub fn handle_zdf(&mut self, path: &PathBuf) {
         let name: &str = path.to_str().unwrap().as_ref();
         let file = netcdf::open(name).unwrap();
