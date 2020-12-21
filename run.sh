@@ -5,4 +5,4 @@ glslc shader.frag -o shader.frag.spv || exit $?
 glslc mesh.vert -o mesh.vert.spv || exit $?
 glslc mesh.frag -o mesh.frag.spv || exit $?
 popd
-RUSTFLAGS=--cfg=web_sys_unstable_apis cargo +nightly run || exit $?
+cargo run --release -- $@ || exit $?

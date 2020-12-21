@@ -6,7 +6,7 @@ use crate::mesh::MeshVertexAttributes;
 use crate::pipeline::Pipeline;
 use crate::sphere::Sphere;
 use crate::vec_to_buffer::vec_to_buffer;
-use crate::Point3;
+use crate::vertex_attr::VertexAttr;
 
 use wgpu::util::DeviceExt;
 
@@ -103,9 +103,9 @@ fn create_point_pipeline(
     });
 
     let instance_data = vec![Sphere {
-        position: Point3::new(0.0, 0.0, 0.0),
+        position: [0.0, 0.0, 0.0],
         radius: 1.0,
-        color: Point3::new(0.2, 0.3, 0.4),
+        color: [0.2, 0.3, 0.4],
     }];
 
     let instance_count = instance_data.len();
@@ -211,24 +211,7 @@ fn create_point_pipeline(
                 wgpu::VertexBufferDescriptor {
                     stride: size_of::<Sphere>() as wgpu::BufferAddress,
                     step_mode: wgpu::InputStepMode::Instance,
-                    attributes: &[
-                        wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float3,
-                            offset: 0,
-                            shader_location: 1,
-                        },
-                        // TODO create a macro for this
-                        wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float,
-                            offset: 3 * 4,
-                            shader_location: 2,
-                        },
-                        wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float3,
-                            offset: 3 * 4 + 4,
-                            shader_location: 3,
-                        },
-                    ],
+                    attributes: &Sphere::attributes(1),
                 },
             ],
         },

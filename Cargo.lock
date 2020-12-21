@@ -2173,6 +2173,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5a972e5669d67ba988ce3dc826706fb0a8b01471c088cb0b6110b805cc36aed"
 
 [[package]]
+name = "vertex_attr_derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "wgpu",
+]
+
+[[package]]
 name = "visula"
 version = "0.1.0"
 dependencies = [
@@ -2188,6 +2198,7 @@ dependencies = [
  "netcdf",
  "structopt",
  "trajan",
+ "vertex_attr_derive",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",

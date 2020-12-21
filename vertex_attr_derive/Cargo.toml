@@ -1,0 +1,16 @@
+[package]
+name = "vertex_attr_derive"
+version = "0.1.0"
+authors = ["Svenn-Arne Dragly <s@dragly.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+syn = "1.0"
+quote = "1.0"
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", rev = "41a1475b18801f97fbbaa1f7346a9d788b12d76f" }
+proc-macro2 = "1.0.24"
+
+[lib]
+proc-macro = true
