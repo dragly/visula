@@ -1,0 +1,41 @@
+[package]
+name = "visula"
+version = "0.1.0"
+authors = ["Svenn-Arne Dragly <s@dragly.com>"]
+edition = "2018"
+
+[dependencies]
+vertex_attr_derive = { path = "../vertex_attr_derive" }
+winit = { version = "0.23.0", features = ["web-sys"] }
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", rev = "41a1475b18801f97fbbaa1f7346a9d788b12d76f" }
+futures = "0.3"
+wasm-bindgen-futures = "0.4"
+wasm-bindgen = "0.2"
+cgmath = "0.17.0"
+bytemuck = { version = "1.4", features = ["derive"] }
+js-sys = "0.3.42"
+trajan = "0.1.0"
+log = "0.4"
+ndarray = "0.13.1"
+structopt = "0.3.19"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+    "Blob",
+    "DataTransfer",
+    "File",
+    "FileList",
+    "DataTransferItemList",
+    "DragEvent",
+    "Window"
+]
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+netcdf = { version = "0.5.1", features = ["ndarray", "static"] }
+env_logger = "0.7"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1.6"
+console_log = "0.1.2"
+

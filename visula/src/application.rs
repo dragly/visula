@@ -147,9 +147,9 @@ impl Application {
                 mean_position += position.to_vec();
 
                 Some(Sphere {
-                    position,
+                    position: position.into(),
                     radius,
-                    color,
+                    color: color.into(),
                 })
             })
             .collect();
@@ -209,9 +209,9 @@ impl Application {
                 };
                 match position {
                     Some(p) => Some(Sphere {
-                        position: p,
+                        position: p.into(),
                         radius,
-                        color,
+                        color: color.into(),
                     }),
                     _ => None,
                 }

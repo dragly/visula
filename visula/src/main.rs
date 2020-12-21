@@ -14,6 +14,11 @@ mod mesh;
 mod pipeline;
 mod sphere;
 mod vec_to_buffer;
+mod vertex_attr;
+mod vertex_attr_format;
+
+pub use vertex_attr::VertexAttr;
+pub use vertex_attr_format::VertexAttrFormat;
 
 #[cfg(not(target_arch = "wasm32"))]
 mod setup_other;
