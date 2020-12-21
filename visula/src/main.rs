@@ -5,14 +5,12 @@ use winit::{
 };
 
 mod application;
-mod camera_controller;
-mod camera_uniforms;
+mod camera;
 mod custom_event;
 mod drop_event;
 mod init_wgpu;
-mod mesh;
 mod pipeline;
-mod sphere;
+mod primitives;
 mod vec_to_buffer;
 mod vertex_attr;
 mod vertex_attr_format;

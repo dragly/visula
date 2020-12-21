@@ -1,10 +1,10 @@
 use crate::application::{Application, DrawMode};
-use crate::camera_controller::CameraController;
-use crate::camera_uniforms::CameraUniforms;
+use crate::camera::controller::CameraController;
+use crate::camera::uniforms::CameraUniforms;
 use crate::custom_event::CustomEvent;
-use crate::mesh::MeshVertexAttributes;
 use crate::pipeline::Pipeline;
-use crate::sphere::Sphere;
+use crate::primitives::mesh::MeshVertexAttributes;
+use crate::primitives::sphere::Sphere;
 use crate::vec_to_buffer::vec_to_buffer;
 use crate::vertex_attr::VertexAttr;
 

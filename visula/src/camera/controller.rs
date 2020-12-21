@@ -1,4 +1,4 @@
-use crate::camera_uniforms::CameraUniforms;
+use crate::camera::uniforms::CameraUniforms;
 use crate::{Point3, Vector2, Vector3};
 use cgmath::prelude::*;
 
