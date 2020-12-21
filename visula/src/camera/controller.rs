@@ -25,6 +25,12 @@ pub struct CameraController {
     pub roll_speed: f32,
 }
 
+impl Default for CameraController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CameraController {
     pub fn new() -> CameraController {
         CameraController {
