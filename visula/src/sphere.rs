@@ -1,7 +1,7 @@
-use bytemuck::{Pod, Zeroable};
-use wgpu::VertexAttributeDescriptor;
-use vertex_attr_derive::*;
 use crate::VertexAttrFormat;
+use bytemuck::{Pod, Zeroable};
+use vertex_attr_derive::*;
+use wgpu::VertexAttributeDescriptor;
 
 #[repr(C)]
 #[derive(Clone, Copy, VertexAttr)]
