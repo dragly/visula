@@ -28,6 +28,7 @@ pub use application::Application;
 pub use custom_event::CustomEvent;
 pub use drop_event::DropEvent;
 pub use pipelines::*;
+pub use primitives::*;
 pub use simulation::Simulation;
 
 pub type Vector2 = cgmath::Vector2<f32>;
