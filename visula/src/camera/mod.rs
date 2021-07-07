@@ -1,2 +1,2 @@
-pub mod uniforms;
 pub mod controller;
+pub mod uniforms;

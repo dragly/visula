@@ -9,6 +9,7 @@ mod camera;
 mod custom_event;
 mod drop_event;
 mod init_wgpu;
+mod io;
 mod pipeline;
 mod primitives;
 mod vec_to_buffer;
