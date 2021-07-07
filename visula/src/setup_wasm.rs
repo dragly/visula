@@ -83,7 +83,7 @@ pub fn setup_wasm(
         .and_then(|body| body.append_child(&canvas).ok())
         .expect("couldn't append canvas to document body");
 
-    wasm_bindgen_futures::spawn_local(init(proxy, window, wgpu::TextureFormat::Bgra8Unorm));
+    wasm_bindgen_futures::spawn_local(init(proxy, window));
 
     // From the rustwasm documentation:
     //

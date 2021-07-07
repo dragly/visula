@@ -14,12 +14,13 @@ use bytemuck::{Pod, Zeroable};
 use std::mem::size_of;
 use winit::{event_loop::EventLoopProxy, window::Window};
 
-pub async fn init(
-    proxy: EventLoopProxy<CustomEvent>,
-    window: Window,
-    swapchain_format: wgpu::TextureFormat,
-) {
+pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
     let size = window.inner_size();
+
+    // TODO remove this when https://github.com/gfx-rs/wgpu/issues/1492 is resolved
+    #[cfg(target_arch = "wasm32")]
+    let instance = wgpu::Instance::new(wgpu::BackendBit::all());
+    #[cfg(not(target_arch = "wasm32"))]
     let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
     let surface = unsafe { instance.create_surface(&window) };
     let adapter = instance
@@ -28,7 +29,7 @@ pub async fn init(
             compatible_surface: Some(&surface),
         })
         .await
-        .unwrap();
+        .expect("Failed to find an appropriate adapter");
 
     let (device, queue) = adapter
         .request_device(
@@ -36,7 +37,6 @@ pub async fn init(
                 label: None,
                 features: wgpu::Features::empty(),
                 limits: wgpu::Limits::default(),
-                shader_validation: true,
             },
             None,
         )
@@ -45,7 +45,7 @@ pub async fn init(
 
     let sc_desc = wgpu::SwapChainDescriptor {
         usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
-        format: swapchain_format,
+        format: adapter.get_swap_chain_preferred_format(&surface).unwrap(),
         width: size.width,
         height: size.height,
         present_mode: wgpu::PresentMode::Mailbox,
@@ -53,14 +53,14 @@ pub async fn init(
 
     let swap_chain = device.create_swap_chain(&surface, &sc_desc);
 
-    let points = create_point_pipeline(&device, swapchain_format).unwrap();
+    let points = create_point_pipeline(&sc_desc, &device).unwrap();
     let camera_controller = CameraController::new();
 
     let depth_texture_in = device.create_texture(&wgpu::TextureDescriptor {
         size: wgpu::Extent3d {
             width: sc_desc.width,
             height: sc_desc.height,
-            depth: 1,
+            depth_or_array_layers: 1,
         },
         mip_level_count: 1,
         sample_count: 1,
@@ -89,8 +89,8 @@ pub async fn init(
 }
 
 fn create_point_pipeline(
+    sc_desc: &wgpu::SwapChainDescriptor,
     device: &wgpu::Device,
-    swapchain_format: wgpu::TextureFormat,
 ) -> Result<Pipeline, Box<dyn std::error::Error>> {
     let vertex_size = size_of::<Vertex>();
     let (vertex_data, index_data) = create_vertices();
@@ -122,8 +122,28 @@ fn create_point_pipeline(
         usage: wgpu::BufferUsage::INDEX,
     });
 
-    let vs_module = device.create_shader_module(wgpu::include_spirv!("shader.vert.spv"));
-    let fs_module = device.create_shader_module(wgpu::include_spirv!("shader.frag.spv"));
+    let mut flags = wgpu::ShaderFlags::VALIDATION;
+    flags |= wgpu::ShaderFlags::EXPERIMENTAL_TRANSLATION;
+    let shader_module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        label: None,
+        source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(include_str!("shader.wgsl"))),
+        flags: wgpu::ShaderFlags::all(),
+    });
+
+    let vertex_buffer_layout = wgpu::VertexBufferLayout {
+        array_stride: vertex_size as wgpu::BufferAddress,
+        step_mode: wgpu::InputStepMode::Vertex,
+        attributes: &[wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Float32x4,
+            offset: 0,
+            shader_location: 0,
+        }],
+    };
+    let instance_buffer_layout = wgpu::VertexBufferLayout {
+        array_stride: size_of::<Sphere>() as wgpu::BufferAddress,
+        step_mode: wgpu::InputStepMode::Instance,
+        attributes: &Sphere::attributes(1),
+    };
 
     let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
@@ -143,7 +163,7 @@ fn create_point_pipeline(
     let model_view_projection_matrix = [0.0; size_of::<CameraUniforms>() / size_of::<f32>()];
 
     let uniform_buffer = vec_to_buffer(
-        &device,
+        device,
         &model_view_projection_matrix.to_vec(),
         wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
     );
@@ -166,63 +186,37 @@ fn create_point_pipeline(
     let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("Render pipeline"),
         layout: Some(&pipeline_layout),
-        vertex_stage: wgpu::ProgrammableStageDescriptor {
-            module: &vs_module,
-            entry_point: "main",
+        vertex: wgpu::VertexState {
+            module: &shader_module,
+            entry_point: "vs_main",
+            buffers: &[vertex_buffer_layout, instance_buffer_layout],
         },
-        fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
-            module: &fs_module,
-            entry_point: "main",
+        fragment: Some(wgpu::FragmentState {
+            module: &shader_module,
+            entry_point: "fs_main",
+            targets: &[sc_desc.format.into()],
         }),
-        rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-            clamp_depth: device.features().contains(wgpu::Features::DEPTH_CLAMPING),
-            polygon_mode: wgpu::PolygonMode::Fill,
+        primitive: wgpu::PrimitiveState {
             front_face: wgpu::FrontFace::Ccw,
-            cull_mode: wgpu::CullMode::None,
-            depth_bias: 0,
-            depth_bias_slope_scale: 0.0,
-            depth_bias_clamp: 0.0,
-        }),
-        primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-        color_states: &[wgpu::ColorStateDescriptor {
-            format: swapchain_format,
-            color_blend: wgpu::BlendDescriptor::REPLACE,
-            alpha_blend: wgpu::BlendDescriptor::REPLACE,
-            write_mask: wgpu::ColorWrite::ALL,
-        }],
-        depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
+            cull_mode: None,
+            ..Default::default()
+        },
+        depth_stencil: Some(wgpu::DepthStencilState {
             format: wgpu::TextureFormat::Depth32Float,
             depth_write_enabled: true,
             depth_compare: wgpu::CompareFunction::Less,
-            stencil: wgpu::StencilStateDescriptor::default(),
+            stencil: wgpu::StencilState::default(),
+            bias: wgpu::DepthBiasState::default(),
         }),
-        vertex_state: wgpu::VertexStateDescriptor {
-            index_format: wgpu::IndexFormat::Uint16,
-            vertex_buffers: &[
-                wgpu::VertexBufferDescriptor {
-                    stride: vertex_size as wgpu::BufferAddress,
-                    step_mode: wgpu::InputStepMode::Vertex,
-                    attributes: &[wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Float4,
-                        offset: 0,
-                        shader_location: 0,
-                    }],
-                },
-                wgpu::VertexBufferDescriptor {
-                    stride: size_of::<Sphere>() as wgpu::BufferAddress,
-                    step_mode: wgpu::InputStepMode::Instance,
-                    attributes: &Sphere::attributes(1),
-                },
-            ],
-        },
-        sample_count: 1,
-        sample_mask: !0,
-        alpha_to_coverage_enabled: false,
+        multisample: wgpu::MultisampleState::default(),
     });
 
     let mesh_vertex_size = size_of::<MeshVertexAttributes>();
-    let mesh_vs_module = device.create_shader_module(wgpu::include_spirv!("mesh.vert.spv"));
-    let mesh_fs_module = device.create_shader_module(wgpu::include_spirv!("mesh.frag.spv"));
+    let mesh_shader_module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        label: None,
+        source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(include_str!("mesh.wgsl"))),
+        flags: wgpu::ShaderFlags::all(),
+    });
     let mesh_bind_group_layout =
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Mesh Bind Group Layout"),
@@ -254,46 +248,37 @@ fn create_point_pipeline(
         bind_group_layouts: &[&mesh_bind_group_layout],
         push_constant_ranges: &[],
     });
+    let mesh_buffer_layout = wgpu::VertexBufferLayout {
+        array_stride: mesh_vertex_size as wgpu::BufferAddress,
+        step_mode: wgpu::InputStepMode::Vertex,
+        attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Unorm8x4],
+    };
     let mesh_render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("Mesh pipeline"),
         layout: Some(&mesh_pipeline_layout),
-        vertex_stage: wgpu::ProgrammableStageDescriptor {
-            module: &mesh_vs_module,
-            entry_point: "main",
+        vertex: wgpu::VertexState {
+            module: &mesh_shader_module,
+            entry_point: "vs_main",
+            buffers: &[mesh_buffer_layout],
         },
-        fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
-            module: &mesh_fs_module,
-            entry_point: "main",
+        fragment: Some(wgpu::FragmentState {
+            module: &mesh_shader_module,
+            entry_point: "fs_main",
+            targets: &[sc_desc.format.into()],
         }),
-        rasterization_state: Some(wgpu::RasterizationStateDescriptor {
+        primitive: wgpu::PrimitiveState {
             front_face: wgpu::FrontFace::Ccw,
-            cull_mode: wgpu::CullMode::None, // TODO make Front
+            cull_mode: None,
             ..Default::default()
-        }),
-        primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-        color_states: &[wgpu::ColorStateDescriptor {
-            format: swapchain_format,
-            color_blend: wgpu::BlendDescriptor::REPLACE,
-            alpha_blend: wgpu::BlendDescriptor::REPLACE,
-            write_mask: wgpu::ColorWrite::ALL,
-        }],
-        depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
+        },
+        depth_stencil: Some(wgpu::DepthStencilState {
             format: wgpu::TextureFormat::Depth32Float,
             depth_write_enabled: true,
             depth_compare: wgpu::CompareFunction::Less,
-            stencil: wgpu::StencilStateDescriptor::default(),
+            stencil: wgpu::StencilState::default(),
+            bias: wgpu::DepthBiasState::default(),
         }),
-        vertex_state: wgpu::VertexStateDescriptor {
-            index_format: wgpu::IndexFormat::default(),
-            vertex_buffers: &[wgpu::VertexBufferDescriptor {
-                stride: mesh_vertex_size as wgpu::BufferAddress,
-                step_mode: wgpu::InputStepMode::Vertex,
-                attributes: &wgpu::vertex_attr_array![0 => Float3, 1 => Float3, 2 => Uchar4Norm],
-            }],
-        },
-        sample_count: 1,
-        sample_mask: !0,
-        alpha_to_coverage_enabled: false,
+        multisample: wgpu::MultisampleState::default(),
     });
 
     let mesh_vertex_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

@@ -27,7 +27,7 @@ pub fn my_macro(input: TokenStream) -> TokenStream {
                         < #field_ident >::vertex_attr_format()
                     };
                     attributes.push(quote! {
-                        wgpu::VertexAttributeDescriptor {
+                        wgpu::VertexAttribute{
                             format: #format,
                             offset: #offset as u64,
                             shader_location: #shader_location + shader_location_offset,
@@ -44,7 +44,7 @@ pub fn my_macro(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl crate::VertexAttr for #name {
-            fn attributes(shader_location_offset: u32) -> Vec<VertexAttributeDescriptor> {
+            fn attributes(shader_location_offset: u32) -> Vec<wgpu::VertexAttribute> {
                 vec![
                     #( #attributes, )*
                 ]

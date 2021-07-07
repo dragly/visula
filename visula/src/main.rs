@@ -70,7 +70,7 @@ fn main() {
             Event::UserEvent(CustomEvent::Ready(mut app)) => {
                 #[cfg(not(target_arch = "wasm32"))]
                 if let Some(filename) = &args.load_zdf {
-                    app.handle_zdf(&filename);
+                    app.handle_zdf(filename);
                 }
                 application = Some(app);
             }

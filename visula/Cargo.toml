@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 vertex_attr_derive = { path = "../vertex_attr_derive" }
 winit = { version = "0.23.0", features = ["web-sys"] }
-wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", rev = "41a1475b18801f97fbbaa1f7346a9d788b12d76f" }
+wgpu = { version = "0.9.0", features = ["webgl"] }
 futures = "0.3"
 wasm-bindgen-futures = "0.4"
 wasm-bindgen = "0.2"
@@ -18,6 +18,7 @@ trajan = "0.1.0"
 log = "0.4"
 ndarray = "0.13.1"
 structopt = "0.3.19"
+pollster = "0.2.4"
 
 [dependencies.web-sys]
 version = "0.3"
