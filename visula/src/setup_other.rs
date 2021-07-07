@@ -7,5 +7,5 @@ use crate::init_wgpu::init;
 pub fn setup_other(window: Window, proxy: EventLoopProxy<CustomEvent>) {
     env_logger::init();
     // Temporarily avoid srgb formats for the swapchain on the web
-    futures::executor::block_on(init(proxy, window, wgpu::TextureFormat::Bgra8UnormSrgb));
+    pollster::block_on(init(proxy, window));
 }

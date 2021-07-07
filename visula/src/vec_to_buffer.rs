@@ -15,7 +15,7 @@ pub fn vec_to_buffer<T>(
     };
     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Vec to buffer"),
-        contents: bytemuck::cast_slice(&contents),
+        contents: bytemuck::cast_slice(contents),
         usage,
     })
 }

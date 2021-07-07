@@ -24,6 +24,9 @@ unsafe impl Zeroable for CameraUniforms {}
 impl AsRef<[f32; size_of::<CameraUniforms>() / size_of::<f32>()]> for CameraUniforms {
     #[inline]
     fn as_ref(&self) -> &[f32; size_of::<CameraUniforms>() / size_of::<f32>()] {
-        unsafe { &*(self as *const CameraUniforms as *const [f32; 48]) }
+        unsafe {
+            &*(self as *const CameraUniforms
+                as *const [f32; size_of::<CameraUniforms>() / size_of::<f32>()])
+        }
     }
 }

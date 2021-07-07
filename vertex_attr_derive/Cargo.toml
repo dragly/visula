@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 syn = "1.0"
 quote = "1.0"
-wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", rev = "41a1475b18801f97fbbaa1f7346a9d788b12d76f" }
+wgpu = { version = "0.9.0", features = ["webgl"] }
 proc-macro2 = "1.0.24"
 
 [lib]

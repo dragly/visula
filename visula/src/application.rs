@@ -12,7 +12,7 @@ use cgmath::EuclideanSpace;
 use wgpu::util::DeviceExt;
 
 use ndarray::s;
-use std::path::PathBuf;
+use std::path::Path;
 use std::{iter::Iterator, mem::size_of};
 use winit::{
     event::{Event, WindowEvent},
@@ -48,8 +48,8 @@ pub struct Application {
 impl Application {
     #[cfg(not(target_arch = "wasm32"))]
     #[allow(clippy::op_ref)]
-    pub fn handle_zdf(&mut self, path: &PathBuf) {
-        let name: &str = path.to_str().unwrap().as_ref();
+    pub fn handle_zdf(&mut self, path: &Path) {
+        let name: &str = path.to_str().unwrap();
         let file = netcdf::open(name).unwrap();
         let group = &file.group("data").unwrap().unwrap();
         let pointcloud = &group
@@ -207,14 +207,11 @@ impl Application {
                     "2" => (Point3::new(0.0, 1.0, 0.0), 0.4),
                     _ => (Point3::new(1.0, 1.0, 1.0), 0.6),
                 };
-                match position {
-                    Some(p) => Some(Sphere {
-                        position: p.into(),
-                        radius,
-                        color: color.into(),
-                    }),
-                    _ => None,
-                }
+                position.map(|p| Sphere {
+                    position: p.into(),
+                    radius,
+                    color: color.into(),
+                })
             })
             .collect();
 
@@ -251,7 +248,7 @@ impl Application {
                     size: wgpu::Extent3d {
                         width: size.width,
                         height: size.height,
-                        depth: 1,
+                        depth_or_array_layers: 1,
                     },
                     mip_level_count: 1,
                     sample_count: 1,
@@ -307,8 +304,9 @@ impl Application {
                 if self.draw_mode == DrawMode::Points {
                     // Draw points
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                            attachment: &frame.output.view,
+                        label: Some("points render pass"),
+                        color_attachments: &[wgpu::RenderPassColorAttachment {
+                            view: &frame.output.view,
                             resolve_target: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -320,21 +318,22 @@ impl Application {
                                 store: true,
                             },
                         }],
-                        depth_stencil_attachment: Some(
-                            wgpu::RenderPassDepthStencilAttachmentDescriptor {
-                                attachment: &self.depth_texture,
-                                depth_ops: Some(wgpu::Operations {
-                                    load: wgpu::LoadOp::Clear(1.0),
-                                    store: true,
-                                }),
-                                stencil_ops: None,
-                            },
-                        ),
+                        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                            view: &self.depth_texture,
+                            depth_ops: Some(wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(1.0),
+                                store: true,
+                            }),
+                            stencil_ops: None,
+                        }),
                     });
                     rpass.set_pipeline(&self.points.render_pipeline);
                     rpass.set_bind_group(0, &self.points.bind_group, &[]);
-                    rpass.set_index_buffer(self.points.index_buffer.slice(..));
                     rpass.set_vertex_buffer(0, self.points.vertex_buffer.slice(..));
+                    rpass.set_index_buffer(
+                        self.points.index_buffer.slice(..),
+                        wgpu::IndexFormat::Uint16,
+                    );
                     rpass.set_vertex_buffer(1, self.points.instance_buffer.slice(..));
                     rpass.draw_indexed(
                         0..self.points.index_count as u32,
@@ -344,8 +343,9 @@ impl Application {
                 } else {
                     // Draw meshes
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                            attachment: &frame.output.view,
+                        label: Some("mesh render pass"),
+                        color_attachments: &[wgpu::RenderPassColorAttachment {
+                            view: &frame.output.view,
                             resolve_target: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -357,16 +357,14 @@ impl Application {
                                 store: true,
                             },
                         }],
-                        depth_stencil_attachment: Some(
-                            wgpu::RenderPassDepthStencilAttachmentDescriptor {
-                                attachment: &self.depth_texture,
-                                depth_ops: Some(wgpu::Operations {
-                                    load: wgpu::LoadOp::Clear(1.0),
-                                    store: true,
-                                }),
-                                stencil_ops: None,
-                            },
-                        ),
+                        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                            view: &self.depth_texture,
+                            depth_ops: Some(wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(1.0),
+                                store: true,
+                            }),
+                            stencil_ops: None,
+                        }),
                     });
                     rpass.set_pipeline(&self.points.mesh_render_pipeline);
                     rpass.set_bind_group(0, &self.points.mesh_bind_group, &[]);
@@ -391,7 +389,7 @@ impl Application {
                         match extension {
                             "xyz" => self.handle_xyz(&drop_event),
                             #[cfg(not(target_arch = "wasm32"))]
-                            "zdf" => self.handle_zdf(&path),
+                            "zdf" => self.handle_zdf(path),
                             _ => {
                                 log::warn!("Unsupported format {}", extension);
                             }
@@ -422,7 +420,7 @@ impl Application {
                 event: window_event,
                 ..
             } => {
-                if self.camera_controller.handle_event(&window_event) {
+                if self.camera_controller.handle_event(window_event) {
                     self.window.request_redraw();
                 }
             }
