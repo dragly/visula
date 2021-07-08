@@ -47,10 +47,6 @@ impl Application {
                 event: WindowEvent::CloseRequested,
                 ..
             } => *control_flow = ControlFlow::Exit,
-            #[cfg(target_arch = "wasm32")]
-            Event::UserEvent(CustomEvent::DropEvent(drop_event)) => {
-                self.handle_xyz(drop_event);
-            }
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),
                 ..
