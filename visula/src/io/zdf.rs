@@ -8,6 +8,7 @@ use crate::primitives::sphere::Sphere;
 use crate::Point3;
 use crate::Vector3;
 
+#[cfg(not(target_arch = "wasm32"))]
 pub struct ZdfFile {
     pub camera_center: Vector3,
     pub instance_buffer: wgpu::Buffer,
@@ -16,6 +17,7 @@ pub struct ZdfFile {
     pub mesh_vertex_count: usize,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn read_zdf(path: &Path, device: &mut wgpu::Device) -> ZdfFile {
     let name: &str = path.to_str().unwrap();
     let file = netcdf::open(name).unwrap();
