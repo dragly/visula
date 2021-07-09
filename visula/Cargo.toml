@@ -3,6 +3,7 @@ name = "visula"
 version = "0.1.0"
 authors = ["Svenn-Arne Dragly <s@dragly.com>"]
 edition = "2018"
+default-run = "viewer"
 
 [dependencies]
 vertex_attr_derive = { path = "../vertex_attr_derive" }

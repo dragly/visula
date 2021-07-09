@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use structopt::StructOpt;
-use winit::event::WindowEvent;
+use winit::event::{KeyboardInput, VirtualKeyCode, WindowEvent};
 
 use visula::{DropEvent, InstancedPipeline, MeshPipeline, Pipeline};
 
@@ -11,9 +11,15 @@ struct Cli {
     load_zdf: Option<std::path::PathBuf>,
 }
 
-pub struct Simulation {
-    pub points: InstancedPipeline,
-    pub mesh: MeshPipeline,
+enum RenderMode {
+    Points,
+    Mesh,
+}
+
+struct Simulation {
+    render_mode: RenderMode,
+    points: InstancedPipeline,
+    mesh: MeshPipeline,
 }
 
 impl Simulation {
@@ -54,7 +60,11 @@ impl visula::Simulation for Simulation {
         let args = Cli::from_args();
         let points = visula::create_spheres_pipeline(application).unwrap();
         let mesh = visula::create_mesh_pipeline(application).unwrap();
-        let mut simulation = Simulation { points, mesh };
+        let mut simulation = Simulation {
+            render_mode: RenderMode::Points,
+            points,
+            mesh,
+        };
         if let Some(filename) = &args.load_zdf {
             #[cfg(not(target_arch = "wasm32"))]
             simulation.handle_zdf(application, filename);
@@ -65,29 +75,49 @@ impl visula::Simulation for Simulation {
     fn update(&mut self, _: &visula::Application) {}
 
     fn render<'a>(&'a mut self, render_pass: &mut wgpu::RenderPass<'a>) {
-        self.points.render(render_pass);
+        match self.render_mode {
+            RenderMode::Mesh => self.mesh.render(render_pass),
+            RenderMode::Points => self.points.render(render_pass),
+        };
     }
 
     fn handle_event(&mut self, app: &mut visula::Application, event: &WindowEvent) {
-        if let WindowEvent::DroppedFile(path) = event {
-            log::info!("Dropped file {:?}", path);
-            let bytes = std::fs::read(&path).unwrap();
-            let drop_event = DropEvent {
-                name: path.to_str().unwrap().to_string(),
-                text: bytes,
-            };
-            if let Some(extension) = path.extension() {
-                if let Some(extension) = extension.to_str() {
-                    match extension {
-                        "xyz" => self.handle_xyz(app, &drop_event),
-                        #[cfg(not(target_arch = "wasm32"))]
-                        "zdf" => self.handle_zdf(app, path),
-                        _ => {
-                            log::warn!("Unsupported format {}", extension);
+        match event {
+            WindowEvent::DroppedFile(path) => {
+                log::info!("Dropped file {:?}", path);
+                let bytes = std::fs::read(&path).unwrap();
+                let drop_event = DropEvent {
+                    name: path.to_str().unwrap().to_string(),
+                    text: bytes,
+                };
+                if let Some(extension) = path.extension() {
+                    if let Some(extension) = extension.to_str() {
+                        match extension {
+                            "xyz" => self.handle_xyz(app, &drop_event),
+                            #[cfg(not(target_arch = "wasm32"))]
+                            "zdf" => self.handle_zdf(app, path),
+                            _ => {
+                                log::warn!("Unsupported format {}", extension);
+                            }
                         }
                     }
                 }
             }
+            WindowEvent::KeyboardInput {
+                input:
+                    KeyboardInput {
+                        virtual_keycode: Some(VirtualKeyCode::M),
+                        state: winit::event::ElementState::Pressed,
+                        ..
+                    },
+                ..
+            } => {
+                self.render_mode = match self.render_mode {
+                    RenderMode::Mesh => RenderMode::Points,
+                    RenderMode::Points => RenderMode::Mesh,
+                }
+            }
+            _ => {}
         }
     }
 }
