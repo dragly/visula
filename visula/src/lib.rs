@@ -6,6 +6,9 @@ use web_sys::HtmlCanvasElement;
 use winit::dpi::LogicalSize;
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::WindowBuilderExtWebSys;
+#[cfg(target_arch = "wasm32")]
+use winit::platform::web::WindowExtWebSys;
+
 use winit::{
     event::Event,
     event_loop::{ControlFlow, EventLoop},
@@ -60,23 +63,41 @@ pub fn run<S: 'static + Simulation>() {
     let proxy = event_loop.create_proxy();
     let mut builder = winit::window::WindowBuilder::new();
     builder = builder.with_title("Visula");
+
+    #[cfg(target_arch = "wasm32")]
+    let mut canvas_existed = false;
     #[cfg(target_arch = "wasm32")]
     {
         let window = web_sys::window().expect("no global `window` exists");
         let document = window.document().expect("should have a document on window");
-        let body = document.body().expect("document should have a body");
-        let canvas = document
-            .get_element_by_id("glcanvas")
-            .unwrap()
-            .dyn_into::<HtmlCanvasElement>()
-            .unwrap();
-        builder = builder.with_inner_size(LogicalSize::new(
-            canvas.client_width(),
-            canvas.client_height(),
-        ));
-        builder = builder.with_canvas(Some(canvas));
+        if let Some(canvas) = document.get_element_by_id("glcanvas") {
+            let canvas = canvas
+                .dyn_into::<HtmlCanvasElement>()
+                .expect("could not cast to HtmlCanvasElement");
+
+            builder = builder.with_inner_size(LogicalSize::new(
+                canvas.client_width(),
+                canvas.client_height(),
+            ));
+            builder = builder.with_canvas(Some(canvas));
+            canvas_existed = true;
+        }
     }
     let window = builder.build(&event_loop).unwrap();
+    #[cfg(target_arch = "wasm32")]
+    {
+        if !canvas_existed {
+            web_sys::window()
+                .expect("no global `window` exists")
+                .document()
+                .expect("should have a document on window")
+                .body()
+                .expect("should have a body on document")
+                .append_child(&web_sys::Element::from(window.canvas()))
+                .ok()
+                .expect("couldn't append canvas to document body");
+        }
+    }
 
     #[cfg(not(target_arch = "wasm32"))]
     {
@@ -102,7 +123,7 @@ pub fn run<S: 'static + Simulation>() {
         match event {
             Event::UserEvent(CustomEvent::Ready(mut app)) => {
                 simulation = Some(S::init(&mut app).unwrap());
-                application = Some(app);
+                application = Some(*app);
             }
             event => {
                 if let (Some(app), Some(sim)) = (&mut application, &mut simulation) {
@@ -119,14 +140,9 @@ pub fn run<S: 'static + Simulation>() {
                         }
                         event => {
                             if !app.handle_event(&event, control_flow) {
-                                if let Event::WindowEvent {
-                                    event: ref window_event,
-                                    ..
-                                } = event
-                                {
-                                    sim.handle_event(app, window_event);
-                                }
+                                sim.handle_event(app, &event);
                             }
+                            app.handle_event(&event, control_flow);
                         }
                     }
                 }

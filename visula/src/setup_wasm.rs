@@ -1,8 +1,8 @@
+use js_sys::Uint8Array;
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{JsCast, JsValue};
 use winit::{event_loop::EventLoopProxy, window::Window};
 
 use crate::custom_event::CustomEvent;
@@ -40,26 +40,30 @@ pub fn setup_wasm(
                     log::info!("Files {:?}", files.length());
                     for i in 0..files.length() {
                         if let Some(file) = files.item(i) {
+                            log::info!("Processing file {i}");
                             let drop_proxy_ref = Rc::clone(&drop_proxy_main);
                             let name = file.name();
-                            let read_callback = Closure::wrap(Box::new(move |text: JsValue| {
-                                let text_bytes: Vec<u8> =
-                                    text.as_string().unwrap().as_bytes().to_vec();
-                                let event_result = (*drop_proxy_ref).borrow_mut().send_event(
-                                    CustomEvent::DropEvent(DropEvent {
-                                        name: name.clone(),
-                                        text: text_bytes,
-                                    }),
-                                );
-                                match event_result {
-                                    Ok(_) => {}
-                                    Err(_) => {
-                                        println!("ERROR: Could not register drop event! Event loop closed?");
+                            let read_callback = Closure::wrap(Box::new(
+                                move |array_buffer: JsValue| {
+                                    let array = Uint8Array::new(&array_buffer);
+                                    let bytes: Vec<u8> = array.to_vec();
+                                    let event_result = (*drop_proxy_ref).borrow_mut().send_event(
+                                        CustomEvent::DropEvent(DropEvent {
+                                            name: name.clone(),
+                                            bytes,
+                                        }),
+                                    );
+                                    log::info!("Sent event");
+                                    match event_result {
+                                        Ok(_) => {}
+                                        Err(_) => {
+                                            log::error!("Could not register drop event! Event loop closed?");
+                                        }
                                     }
-                                }
-                            })
+                                },
+                            )
                                 as Box<dyn FnMut(JsValue)>);
-                            let _ = file.text().then(&read_callback);
+                            let _ = file.array_buffer().then(&read_callback);
                             read_callback.forget();
                         }
                     }
@@ -68,17 +72,14 @@ pub fn setup_wasm(
         }
     }) as Box<dyn FnMut(&web_sys::Event)>);
 
-    let canvas = web_sys::HtmlElement::from(window.canvas());
+    log::info!("Setting up drag and drop features");
     web_sys::window()
         .and_then(|win| {
-            //win.set_ondrop(Some(JsCast::unchecked_from_js_ref(drop_callback.as_ref())));
             win.set_ondragenter(Some(JsCast::unchecked_from_js_ref(drag_enter.as_ref())));
             win.set_ondragover(Some(JsCast::unchecked_from_js_ref(drag_over.as_ref())));
             win.set_ondrop(Some(JsCast::unchecked_from_js_ref(drop_callback.as_ref())));
             win.document()
         })
-        //.and_then(|doc| doc.body())
-        //.and_then(|body| body.append_child(&canvas).ok())
         .expect("could not set up window");
 
     wasm_bindgen_futures::spawn_local(init(proxy, window));

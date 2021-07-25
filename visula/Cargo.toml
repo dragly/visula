@@ -18,7 +18,7 @@ js-sys = "0.3"
 trajan = "0.1.0"
 log = "0.4"
 structopt = "0.3"
-ndarray = "0.13.1"
+ndarray = "0.15.3"
 pollster = "0.2.4"
 num = "0.3"
 gltf = "0.15.0"
@@ -35,6 +35,7 @@ egui_wgpu_backend = { git = "https://github.com/hasenbanck/egui_wgpu_backend", r
 egui_winit_platform = "0.14"
 epi = "0.17"
 crude-profiler = "0.1.7"
+oxifive = { git = "https://github.com/dragly/oxifive" , rev="9f4314b587ef51029033288d95b4a44e40b0ddb5"}
 
 [dev-dependencies]
 slotmap = "1.0.2"
@@ -52,7 +53,6 @@ features = [
 ]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-netcdf = { version = "0.5.1", features = ["ndarray", "static"] }
 env_logger = "0.7"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

@@ -1,9 +1,10 @@
 use std::fmt::Debug;
 
 use egui::Context;
-use winit::event::WindowEvent;
+use winit::event::Event;
 
 use crate::application::Application;
+use crate::CustomEvent;
 
 pub struct SimulationRenderData<'a> {
     pub view: &'a wgpu::TextureView,
@@ -15,7 +16,7 @@ pub struct SimulationRenderData<'a> {
 pub trait Simulation: Sized {
     type Error: Debug;
     fn init(application: &mut Application) -> Result<Self, Self::Error>;
-    fn handle_event(&mut self, _application: &mut Application, _event: &WindowEvent) {}
+    fn handle_event(&mut self, _application: &mut Application, _event: &Event<CustomEvent>) {}
     fn update(&mut self, _application: &Application) {}
     fn render(&mut self, _data: &mut SimulationRenderData) {}
     fn gui(&mut self, _context: &Context) {}

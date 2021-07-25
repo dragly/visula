@@ -190,6 +190,29 @@ impl Spheres {
         }: &mut SimulationRenderData,
     ) {
         log::debug!("Rendering spheres");
+        let mut count = None;
+        for binding in self.binding_builder.bindings.values() {
+            let other = binding.inner.borrow().count;
+            if other == 0 {
+                count = None;
+                break;
+            }
+            count = match count {
+                None => Some(other),
+                Some(old) => {
+                    if other != old {
+                        None
+                    } else {
+                        Some(old)
+                    }
+                }
+            }
+        }
+        log::debug!("Line count {count:#?}");
+        if count == None {
+            log::debug!("Empty spheres buffer detected. Aborting render of spheres.");
+            return;
+        }
         let bindings: Vec<(&BufferBinding, Ref<wgpu::Buffer>)> = self
             .binding_builder
             .bindings

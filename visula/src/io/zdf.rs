@@ -1,6 +1,6 @@
 use cgmath::EuclideanSpace;
-use ndarray::s;
-use std::path::Path;
+use ndarray::{s, Ix3};
+use oxifive::ReadSeek;
 use wgpu::util::DeviceExt;
 
 use crate::primitives::mesh::MeshVertexAttributes;
@@ -8,7 +8,6 @@ use crate::primitives::sphere::Sphere;
 use crate::Point3;
 use crate::Vector3;
 
-#[cfg(not(target_arch = "wasm32"))]
 pub struct ZdfFile {
     pub camera_center: Vector3,
     pub point_cloud: Vec<Sphere>,
@@ -17,21 +16,15 @@ pub struct ZdfFile {
     pub mesh_vertex_count: usize,
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-pub fn read_zdf(path: &Path, device: &mut wgpu::Device) -> ZdfFile {
-    let name: &str = path.to_str().unwrap();
-    let file = netcdf::open(name).unwrap();
-    let group = &file.group("data").unwrap().unwrap();
-    let pointcloud = &group
-        .variable("pointcloud")
-        .expect("Could not find pointcloud");
-    let rgba_image = &group
-        .variable("rgba_image")
-        .expect("Could not find pointcloud");
+pub fn read_zdf<R: ReadSeek>(input: R, device: &mut wgpu::Device) -> ZdfFile {
+    let file = oxifive::FileReader::new(input).unwrap();
+    let data = file.group("data").unwrap();
+    let pointcloud = data.dataset("pointcloud").unwrap();
+    let rgba_image = data.dataset("rgba_image").unwrap();
 
     let mut vertices = vec![];
-    let points = pointcloud.values::<f32>(None, None).unwrap();
-    let colors = rgba_image.values::<f32>(None, None).unwrap();
+    let points = pointcloud.read::<f32, Ix3>().unwrap();
+    let colors = rgba_image.read::<u8, Ix3>().unwrap();
     for col in 0..(points.shape()[0] - 1) {
         for row in 0..(points.shape()[1] - 1) {
             let col_m = (col as i64 - 1).max(0) as usize;
@@ -111,7 +104,11 @@ pub fn read_zdf(path: &Path, device: &mut wgpu::Device) -> ZdfFile {
                 return None;
             }
             let position = Point3::new(x, y, z);
-            let color = Point3::new(color[0] / 255.0, color[1] / 255.0, color[2] / 255.0);
+            let color = Point3::new(
+                color[0] as f32 / 255.0,
+                color[1] as f32 / 255.0,
+                color[2] as f32 / 255.0,
+            );
             let radius = 1.0;
 
             mean_position += position.to_vec();
