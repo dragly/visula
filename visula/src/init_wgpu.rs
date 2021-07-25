@@ -15,7 +15,7 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
     #[cfg(target_arch = "wasm32")]
     let instance = wgpu::Instance::new(wgpu::BackendBit::all());
     #[cfg(not(target_arch = "wasm32"))]
-    let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
+    let instance = wgpu::Instance::new(wgpu::BackendBit::VULKAN);
     let surface = unsafe { instance.create_surface(&window) };
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {

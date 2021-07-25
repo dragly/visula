@@ -48,7 +48,7 @@ impl CameraController {
     }
 
     pub fn handle_event(&mut self, window_event: &WindowEvent) -> bool {
-        let mut needs_redraw = false;
+        let mut needs_redraw = true;
 
         let up = self.up.normalize();
         let forward = self.forward.normalize();

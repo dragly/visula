@@ -1,5 +1,7 @@
 use cgmath::EuclideanSpace;
 use ndarray::s;
+use oxifive::ReadSeek;
+use std::io::Cursor;
 use std::path::Path;
 use wgpu::util::DeviceExt;
 
@@ -8,7 +10,7 @@ use crate::primitives::sphere::Sphere;
 use crate::Point3;
 use crate::Vector3;
 
-#[cfg(not(target_arch = "wasm32"))]
+//#[cfg(not(target_arch = "wasm32"))]
 pub struct ZdfFile {
     pub camera_center: Vector3,
     pub instance_buffer: wgpu::Buffer,
@@ -17,21 +19,33 @@ pub struct ZdfFile {
     pub mesh_vertex_count: usize,
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-pub fn read_zdf(path: &Path, device: &mut wgpu::Device) -> ZdfFile {
-    let name: &str = path.to_str().unwrap();
-    let file = netcdf::open(name).unwrap();
-    let group = &file.group("data").unwrap().unwrap();
-    let pointcloud = &group
-        .variable("pointcloud")
-        .expect("Could not find pointcloud");
-    let rgba_image = &group
-        .variable("rgba_image")
-        .expect("Could not find pointcloud");
+//#[cfg(not(target_arch = "wasm32"))]
+pub fn read_zdf(
+    //path: &Path,
+    input: Box<dyn ReadSeek>,
+    device: &mut wgpu::Device) -> ZdfFile {
+    //let name: &str = path.to_str().unwrap();
+    //let file = netcdf::open(name).unwrap();
+    //let group = &file.group("data").unwrap().unwrap();
+    //let pointcloud = &group
+        //.variable("pointcloud")
+        //.expect("Could not find pointcloud");
+    //let rgba_image = &group
+        //.variable("rgba_image")
+        //.expect("Could not find pointcloud");
+    //let input = std::fs::File::open(name).unwrap();
+    //let input = Cursor::new(bytes);
+    //let input = Box::new(input);
+    let mut file = oxifive::File::read(input).unwrap();
+    let data = file.group("data").unwrap();
+    let pointcloud = data.dataset(&mut file, "pointcloud").unwrap();
+    let rgba_image = data.dataset(&mut file, "rgba_image").unwrap();
 
     let mut vertices = vec![];
-    let points = pointcloud.values::<f32>(None, None).unwrap();
-    let colors = rgba_image.values::<f32>(None, None).unwrap();
+    //let points = pointcloud.values::<f32>(None, None).unwrap();
+    //let colors = rgba_image.values::<f32>(None, None).unwrap();
+    let points = pointcloud.read_2d::<f32>(&mut file).unwrap();
+    let colors = rgba_image.read_2d::<u8>(&mut file).unwrap();
     for col in 0..(points.shape()[0] - 1) {
         for row in 0..(points.shape()[1] - 1) {
             let col_m = (col as i64 - 1).max(0) as usize;
@@ -111,7 +125,8 @@ pub fn read_zdf(path: &Path, device: &mut wgpu::Device) -> ZdfFile {
                 return None;
             }
             let position = Point3::new(x, y, z);
-            let color = Point3::new(color[0] / 255.0, color[1] / 255.0, color[2] / 255.0);
+            //let color = Point3::new(color[0] as f32 / 255.0, color[1] as f32 / 255.0, color[2] as f32 / 255.0);
+            let color = Point3::new(1.0, 0.5, 0.2);
             let radius = 1.0;
 
             mean_position += position.to_vec();

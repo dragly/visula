@@ -18,9 +18,10 @@ js-sys = "0.3"
 trajan = "0.1.0"
 log = "0.4"
 structopt = "0.3"
-ndarray = "0.13.1"
+ndarray = "0.15.3"
 pollster = "0.2.4"
 num = "0.3"
+oxifive = { path = "../../../oxifive/master/" }
 
 [dependencies.web-sys]
 version = "0.3"
