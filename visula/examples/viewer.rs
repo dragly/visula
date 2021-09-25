@@ -55,8 +55,12 @@ impl Simulation {
     }
 }
 
+#[derive(Debug)]
+struct Error {}
+
 impl visula::Simulation for Simulation {
-    fn init(application: &mut visula::Application) -> Simulation {
+    type Error = Error;
+    fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
         let args = Cli::from_args();
         let points = visula::create_spheres_pipeline(application).unwrap();
         let mesh = visula::create_mesh_pipeline(application).unwrap();
@@ -69,7 +73,7 @@ impl visula::Simulation for Simulation {
             #[cfg(not(target_arch = "wasm32"))]
             simulation.handle_zdf(application, filename);
         }
-        simulation
+        Ok(simulation)
     }
 
     fn update(&mut self, _: &visula::Application) {}

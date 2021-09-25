@@ -15,7 +15,7 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
     #[cfg(target_arch = "wasm32")]
     let instance = wgpu::Instance::new(wgpu::BackendBit::all());
     #[cfg(not(target_arch = "wasm32"))]
-    let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
+    let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
     let surface = unsafe { instance.create_surface(&window) };
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
@@ -37,29 +37,29 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
         .await
         .unwrap();
 
-    let sc_desc = wgpu::SwapChainDescriptor {
-        usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
-        format: adapter.get_swap_chain_preferred_format(&surface).unwrap(),
+    let config = wgpu::SurfaceConfiguration {
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        format: surface.get_preferred_format(&adapter).unwrap(),
         width: size.width,
         height: size.height,
         present_mode: wgpu::PresentMode::Mailbox,
     };
 
-    let swap_chain = device.create_swap_chain(&surface, &sc_desc);
+    surface.configure(&device, &config);
 
     let camera_controller = CameraController::new();
 
     let depth_texture_in = device.create_texture(&wgpu::TextureDescriptor {
         size: wgpu::Extent3d {
-            width: sc_desc.width,
-            height: sc_desc.height,
+            width: config.width,
+            height: config.height,
             depth_or_array_layers: 1,
         },
         mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format: wgpu::TextureFormat::Depth32Float,
-        usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         label: None,
     });
     let depth_texture = depth_texture_in.create_view(&wgpu::TextureViewDescriptor::default());
@@ -69,7 +69,7 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
             label: None,
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
+                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
@@ -85,7 +85,7 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
     let camera_uniform_buffer = vec_to_buffer(
         &device,
         &model_view_projection_matrix.to_vec(),
-        wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+        wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
     );
 
     let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -101,8 +101,7 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
         camera_uniform_buffer,
         device,
         queue,
-        sc_desc,
-        swap_chain,
+        config,
         camera_controller,
         surface,
         window,

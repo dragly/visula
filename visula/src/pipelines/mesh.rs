@@ -31,7 +31,6 @@ pub fn create_mesh_pipeline(
     let shader_module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
         label: None,
         source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(include_str!("../mesh.wgsl"))),
-        flags: wgpu::ShaderFlags::all(),
     });
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Mesh pipeline layout"),
@@ -40,7 +39,7 @@ pub fn create_mesh_pipeline(
     });
     let buffer_layout = wgpu::VertexBufferLayout {
         array_stride: vertex_size as wgpu::BufferAddress,
-        step_mode: wgpu::InputStepMode::Vertex,
+        step_mode: wgpu::VertexStepMode::Vertex,
         attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Unorm8x4],
     };
     let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -54,7 +53,7 @@ pub fn create_mesh_pipeline(
         fragment: Some(wgpu::FragmentState {
             module: &shader_module,
             entry_point: "fs_main",
-            targets: &[application.sc_desc.format.into()],
+            targets: &[application.config.format.into()],
         }),
         primitive: wgpu::PrimitiveState {
             front_face: wgpu::FrontFace::Ccw,
@@ -74,7 +73,7 @@ pub fn create_mesh_pipeline(
     let vertex_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Instance buffer"),
         contents: bytemuck::cast_slice(&Vec::<MeshVertexAttributes>::new()),
-        usage: wgpu::BufferUsage::VERTEX,
+        usage: wgpu::BufferUsages::VERTEX,
     });
 
     Ok(MeshPipeline {

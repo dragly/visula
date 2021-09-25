@@ -3,7 +3,7 @@ use wgpu::util::DeviceExt;
 pub fn vec_to_buffer<T>(
     device: &wgpu::Device,
     data: &[T],
-    usage: wgpu::BufferUsage,
+    usage: wgpu::BufferUsages,
 ) -> wgpu::Buffer {
     let contents = unsafe {
         // TODO consider if it is necessary to do to_vec here to obtain a copy

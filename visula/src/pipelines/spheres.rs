@@ -52,7 +52,7 @@ pub fn create_spheres_pipeline(
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Vertex buffer"),
         contents: bytemuck::cast_slice(&vertex_data),
-        usage: wgpu::BufferUsage::VERTEX,
+        usage: wgpu::BufferUsages::VERTEX,
     });
 
     let instance_data = vec![Sphere {
@@ -66,13 +66,13 @@ pub fn create_spheres_pipeline(
     let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Instance buffer"),
         contents: bytemuck::cast_slice(&instance_data),
-        usage: wgpu::BufferUsage::VERTEX,
+        usage: wgpu::BufferUsages::VERTEX,
     });
 
     let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index buffer"),
         contents: bytemuck::cast_slice(&index_data),
-        usage: wgpu::BufferUsage::INDEX,
+        usage: wgpu::BufferUsages::INDEX,
     });
 
     let shader_module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
@@ -80,7 +80,6 @@ pub fn create_spheres_pipeline(
         source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(include_str!(
             "../shader.wgsl"
         ))),
-        flags: wgpu::ShaderFlags::all(),
     });
 
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -91,7 +90,7 @@ pub fn create_spheres_pipeline(
 
     let vertex_buffer_layout = wgpu::VertexBufferLayout {
         array_stride: vertex_size as wgpu::BufferAddress,
-        step_mode: wgpu::InputStepMode::Vertex,
+        step_mode: wgpu::VertexStepMode::Vertex,
         attributes: &[wgpu::VertexAttribute {
             format: wgpu::VertexFormat::Float32x4,
             offset: 0,
@@ -100,7 +99,7 @@ pub fn create_spheres_pipeline(
     };
     let instance_buffer_layout = wgpu::VertexBufferLayout {
         array_stride: size_of::<Sphere>() as wgpu::BufferAddress,
-        step_mode: wgpu::InputStepMode::Instance,
+        step_mode: wgpu::VertexStepMode::Instance,
         attributes: &Sphere::attributes(1),
     };
 
@@ -115,7 +114,7 @@ pub fn create_spheres_pipeline(
         fragment: Some(wgpu::FragmentState {
             module: &shader_module,
             entry_point: "fs_main",
-            targets: &[application.sc_desc.format.into()],
+            targets: &[application.config.format.into()],
         }),
         primitive: wgpu::PrimitiveState {
             front_face: wgpu::FrontFace::Ccw,

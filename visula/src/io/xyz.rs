@@ -43,7 +43,7 @@ pub fn read_xyz(text: &[u8], device: &mut wgpu::Device) -> XyzFile {
     let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Instance buffer"),
         contents: bytemuck::cast_slice(&instance_data),
-        usage: wgpu::BufferUsage::VERTEX,
+        usage: wgpu::BufferUsages::VERTEX,
     });
 
     XyzFile {

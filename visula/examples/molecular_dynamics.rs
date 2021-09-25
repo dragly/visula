@@ -103,18 +103,22 @@ fn generate(count: usize) -> Vec<Particle> {
     current_particles
 }
 
+#[derive(Debug)]
+struct Error {}
+
 struct Simulation {
     particles: Vec<Particle>,
     points: InstancedPipeline,
 }
 
 impl visula::Simulation for Simulation {
-    fn init(application: &mut visula::Application) -> Simulation {
+    type Error = Error;
+    fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
         let cli = Cli::from_args();
         let count = cli.count.unwrap_or(6);
         let points = visula::create_spheres_pipeline(application).unwrap();
         let particles = generate(count);
-        Simulation { particles, points }
+        Ok(Simulation { particles, points })
     }
 
     fn update(&mut self, application: &visula::Application) {
@@ -170,7 +174,7 @@ impl visula::Simulation for Simulation {
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Instance buffer"),
                     contents: bytemuck::cast_slice(&points_data),
-                    usage: wgpu::BufferUsage::VERTEX,
+                    usage: wgpu::BufferUsages::VERTEX,
                 });
         self.points.instance_buffer = instance_buffer;
         self.points.instance_count = points_data.len();

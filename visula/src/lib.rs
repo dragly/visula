@@ -7,6 +7,7 @@ pub mod application;
 pub mod camera;
 pub mod custom_event;
 pub mod drop_event;
+pub mod error;
 pub mod init_wgpu;
 pub mod io;
 pub mod pipelines;
@@ -66,7 +67,7 @@ pub fn run<S: 'static + Simulation>() {
         *control_flow = ControlFlow::Poll;
         match event {
             Event::UserEvent(CustomEvent::Ready(mut app)) => {
-                simulation = Some(S::init(&mut app));
+                simulation = Some(S::init(&mut app).unwrap());
                 application = Some(app);
             }
             event => {

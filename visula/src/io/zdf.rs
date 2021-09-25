@@ -130,13 +130,13 @@ pub fn read_zdf(path: &Path, device: &mut wgpu::Device) -> ZdfFile {
     let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Instance buffer"),
         contents: bytemuck::cast_slice(&instance_data),
-        usage: wgpu::BufferUsage::VERTEX,
+        usage: wgpu::BufferUsages::VERTEX,
     });
 
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Mesh buffer"),
         contents: bytemuck::cast_slice(&vertices),
-        usage: wgpu::BufferUsage::VERTEX,
+        usage: wgpu::BufferUsages::VERTEX,
     });
 
     ZdfFile {
