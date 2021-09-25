@@ -8,6 +8,7 @@ use crate::primitives::mesh::MeshVertexAttributes;
 pub struct MeshPipeline {
     pub render_pipeline: wgpu::RenderPipeline,
     pub vertex_buf: wgpu::Buffer,
+    pub index_buf: wgpu::Buffer,
     pub vertex_count: usize,
 }
 
@@ -15,7 +16,8 @@ impl Pipeline for MeshPipeline {
     fn render<'a>(&'a mut self, render_pass: &mut wgpu::RenderPass<'a>) {
         render_pass.set_pipeline(&self.render_pipeline);
         render_pass.set_vertex_buffer(0, self.vertex_buf.slice(..));
-        render_pass.draw(0..self.vertex_count as u32, 0..1);
+        render_pass.set_index_buffer(self.index_buf.slice(..), wgpu::IndexFormat::Uint32);
+        render_pass.draw_indexed(0..self.vertex_count as u32, 0, 0..1);
     }
 }
 
@@ -76,9 +78,16 @@ pub fn create_mesh_pipeline(
         usage: wgpu::BufferUsages::VERTEX,
     });
 
+    let index_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Index buffer"),
+        contents: bytemuck::cast_slice(&Vec::<u32>::new()),
+        usage: wgpu::BufferUsages::INDEX,
+    });
+
     Ok(MeshPipeline {
         render_pipeline,
         vertex_buf,
+        index_buf,
         vertex_count: 0,
     })
 }

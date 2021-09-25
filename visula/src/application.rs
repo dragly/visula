@@ -122,9 +122,9 @@ impl Application {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
         {
-            let model_view_projection_matrix = self.camera_controller.model_view_projection_matrix(
-                self.config.width as f32 / self.config.height as f32,
-            );
+            let model_view_projection_matrix = self
+                .camera_controller
+                .model_view_projection_matrix(self.config.width as f32 / self.config.height as f32);
 
             let model_view_projection_matrix_ref = model_view_projection_matrix.as_ref();
 
@@ -143,7 +143,10 @@ impl Application {
         }
 
         {
-            let view = frame.output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+            let view = frame
+                .output
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor::default());
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("render"),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
