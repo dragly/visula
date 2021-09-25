@@ -104,7 +104,7 @@ impl CameraController {
                             self.up = (rotation * self.up).normalize();
                             self.forward = (rotation * self.forward).normalize();
                         } else {
-                            if (position_diff.x + position_diff.y).abs() < 0.001 {
+                            if (position_diff.x + position_diff.y).abs() < 0.000001 {
                                 self.previous_postion = Some(*position);
                                 return false;
                             }
@@ -120,7 +120,7 @@ impl CameraController {
                             );
                             let new_forward = (rotation * self.forward).normalize();
                             if Vector3::dot(up, new_forward).abs() > 0.99 {
-                                if position_diff.x.abs() < 0.001 {
+                                if position_diff.x.abs() < 0.00001 {
                                     self.previous_postion = Some(*position);
                                     return false;
                                 }

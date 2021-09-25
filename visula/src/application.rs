@@ -28,8 +28,7 @@ impl Default for DrawMode {
 pub struct Application {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
-    pub swap_chain: wgpu::SwapChain,
-    pub sc_desc: wgpu::SwapChainDescriptor,
+    pub config: wgpu::SurfaceConfiguration,
     pub surface: wgpu::Surface,
     pub window: Window,
     pub camera_controller: CameraController,
@@ -61,14 +60,14 @@ impl Application {
                     sample_count: 1,
                     dimension: wgpu::TextureDimension::D2,
                     format: wgpu::TextureFormat::Depth32Float,
-                    usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
+                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                     label: None,
                 });
                 self.depth_texture =
                     depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
-                self.sc_desc.width = size.width;
-                self.sc_desc.height = size.height;
-                self.swap_chain = self.device.create_swap_chain(&self.surface, &self.sc_desc);
+                self.config.width = size.width;
+                self.config.height = size.height;
+                self.surface.configure(&self.device, &self.config);
             }
             Event::WindowEvent {
                 event:
@@ -108,11 +107,11 @@ impl Application {
     where
         S: Simulation,
     {
-        let frame = match self.swap_chain.get_current_frame() {
+        let frame = match self.surface.get_current_frame() {
             Ok(frame) => frame,
             Err(_) => {
-                self.swap_chain = self.device.create_swap_chain(&self.surface, &self.sc_desc);
-                self.swap_chain
+                self.surface.configure(&self.device, &self.config);
+                self.surface
                     .get_current_frame()
                     .expect("Failed to acquire next swap chain texture!")
             }
@@ -123,16 +122,16 @@ impl Application {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
         {
-            let model_view_projection_matrix = self.camera_controller.model_view_projection_matrix(
-                self.sc_desc.width as f32 / self.sc_desc.height as f32,
-            );
+            let model_view_projection_matrix = self
+                .camera_controller
+                .model_view_projection_matrix(self.config.width as f32 / self.config.height as f32);
 
             let model_view_projection_matrix_ref = model_view_projection_matrix.as_ref();
 
             let temp_buf = vec_to_buffer(
                 &self.device,
                 &model_view_projection_matrix_ref.to_vec(),
-                wgpu::BufferUsage::COPY_SRC,
+                wgpu::BufferUsages::COPY_SRC,
             );
             encoder.copy_buffer_to_buffer(
                 &temp_buf,
@@ -144,10 +143,14 @@ impl Application {
         }
 
         {
+            let view = frame
+                .output
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor::default());
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("render"),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &frame.output.view,
+                    view: &view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
