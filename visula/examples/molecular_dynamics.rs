@@ -1,4 +1,5 @@
 use cgmath::InnerSpace;
+use itertools_num::linspace;
 use num::clamp;
 use structopt::StructOpt;
 use wgpu::util::DeviceExt;
@@ -84,13 +85,10 @@ fn generate(count: usize) -> Vec<Particle> {
     let mut current_particles: Vec<Particle> = Vec::new();
     let side = 4.4 * count as f32;
     let start = -side / 2.0;
-    for i in 0..count {
-        for j in 0..count {
-            for k in 0..count {
-                let position = |w| start + (w as f32) / count as f32 * side;
-                let x = position(i);
-                let y = position(j);
-                let z = position(k);
+    let end = side / 2.0;
+    for x in linspace(start, end, count) {
+        for y in linspace(start, end, count) {
+            for z in linspace(start, end, count) {
                 current_particles.push(Particle {
                     position: Vector3::new(x, y, z),
                     velocity: Vector3::new(0.0, 0.0, 0.0),
