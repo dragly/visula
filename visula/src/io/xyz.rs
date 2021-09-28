@@ -1,13 +1,11 @@
 use crate::primitives::sphere::Sphere;
 use crate::Point3;
-use wgpu::util::DeviceExt;
 
 pub struct XyzFile {
-    pub instance_buffer: wgpu::Buffer,
-    pub instance_count: usize,
+    pub point_cloud: Vec<Sphere>,
 }
 
-pub fn read_xyz(text: &[u8], device: &mut wgpu::Device) -> XyzFile {
+pub fn read_xyz(text: &[u8], _device: &mut wgpu::Device) -> XyzFile {
     let text_bytes = text;
     let inner = std::io::Cursor::new(text_bytes);
     let mut trajectory = trajan::xyz::XYZReader::<f32, std::io::Cursor<&[u8]>>::new(
@@ -16,7 +14,7 @@ pub fn read_xyz(text: &[u8], device: &mut wgpu::Device) -> XyzFile {
     );
     let snapshot = trajectory.read_snapshot().unwrap();
 
-    let instance_data: Vec<Sphere> = snapshot
+    let point_cloud: Vec<Sphere> = snapshot
         .particles
         .iter()
         .filter_map(|particle| {
@@ -38,16 +36,5 @@ pub fn read_xyz(text: &[u8], device: &mut wgpu::Device) -> XyzFile {
         })
         .collect();
 
-    let instance_count = instance_data.len();
-
-    let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Instance buffer"),
-        contents: bytemuck::cast_slice(&instance_data),
-        usage: wgpu::BufferUsages::VERTEX,
-    });
-
-    XyzFile {
-        instance_buffer,
-        instance_count,
-    }
+    XyzFile { point_cloud }
 }

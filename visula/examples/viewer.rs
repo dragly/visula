@@ -3,7 +3,7 @@ use std::path::Path;
 use structopt::StructOpt;
 use winit::event::{KeyboardInput, VirtualKeyCode, WindowEvent};
 
-use visula::{DropEvent, InstancedPipeline, MeshPipeline, Pipeline};
+use visula::{DropEvent, MeshPipeline, Pipeline, Spheres};
 
 #[derive(StructOpt)]
 struct Cli {
@@ -18,7 +18,7 @@ enum RenderMode {
 
 struct Simulation {
     render_mode: RenderMode,
-    points: InstancedPipeline,
+    spheres: Spheres,
     mesh: MeshPipeline,
 }
 
@@ -27,15 +27,13 @@ impl Simulation {
     pub fn handle_zdf(&mut self, application: &mut visula::Application, path: &Path) {
         let visula::io::zdf::ZdfFile {
             camera_center,
-            instance_buffer,
-            instance_count,
+            point_cloud,
             mesh_vertex_buf,
             mesh_vertex_count,
         } = visula::io::zdf::read_zdf(path, &mut application.device);
 
         application.camera_controller.center = camera_center;
-        self.points.instance_buffer = instance_buffer;
-        self.points.instance_count = instance_count;
+        self.spheres.update(application, point_cloud);
         self.mesh.vertex_buf = mesh_vertex_buf;
         self.mesh.vertex_count = mesh_vertex_count;
     }
@@ -45,13 +43,10 @@ impl Simulation {
         application: &mut visula::Application,
         DropEvent { text, .. }: &DropEvent,
     ) {
-        let visula::io::xyz::XyzFile {
-            instance_buffer,
-            instance_count,
-        } = visula::io::xyz::read_xyz(text, &mut application.device);
+        let visula::io::xyz::XyzFile { point_cloud } =
+            visula::io::xyz::read_xyz(text, &mut application.device);
 
-        self.points.instance_buffer = instance_buffer;
-        self.points.instance_count = instance_count;
+        self.spheres.update(application, point_cloud);
     }
 }
 
@@ -62,11 +57,11 @@ impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
         let args = Cli::from_args();
-        let points = visula::create_spheres_pipeline(application).unwrap();
+        let points = Spheres::new(application).unwrap();
         let mesh = visula::create_mesh_pipeline(application).unwrap();
         let mut simulation = Simulation {
             render_mode: RenderMode::Points,
-            points,
+            spheres: points,
             mesh,
         };
         if let Some(filename) = &args.load_zdf {
@@ -81,7 +76,7 @@ impl visula::Simulation for Simulation {
     fn render<'a>(&'a mut self, render_pass: &mut wgpu::RenderPass<'a>) {
         match self.render_mode {
             RenderMode::Mesh => self.mesh.render(render_pass),
-            RenderMode::Points => self.points.render(render_pass),
+            RenderMode::Points => self.spheres.render(render_pass),
         };
     }
 

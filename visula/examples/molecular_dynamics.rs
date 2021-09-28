@@ -2,9 +2,8 @@ use cgmath::InnerSpace;
 use itertools_num::linspace;
 use num::clamp;
 use structopt::StructOpt;
-use wgpu::util::DeviceExt;
 
-use visula::{InstancedPipeline, Pipeline, Sphere, Vector3};
+use visula::{Sphere, Spheres, Vector3};
 
 #[derive(StructOpt)]
 struct Cli {
@@ -106,7 +105,7 @@ struct Error {}
 
 struct Simulation {
     particles: Vec<Particle>,
-    points: InstancedPipeline,
+    spheres: Spheres,
 }
 
 impl visula::Simulation for Simulation {
@@ -114,9 +113,9 @@ impl visula::Simulation for Simulation {
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
         let cli = Cli::from_args();
         let count = cli.count.unwrap_or(6);
-        let points = visula::create_spheres_pipeline(application).unwrap();
+        let spheres = Spheres::new(application).unwrap();
         let particles = generate(count);
-        Ok(Simulation { particles, points })
+        Ok(Simulation { particles, spheres })
     }
 
     fn update(&mut self, application: &visula::Application) {
@@ -153,34 +152,20 @@ impl visula::Simulation for Simulation {
             LennardJones::default(),
             0.01,
         );
-        let points_data: Vec<Sphere> = self
-            .particles
-            .iter()
-            .map(|particle| Sphere {
-                position: [
-                    particle.position.x,
-                    particle.position.y,
-                    particle.position.z,
-                ],
-                color: [1.0, 0.8, 0.2],
-                radius: 1.0,
-            })
-            .collect();
-        let instance_buffer =
-            application
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Instance buffer"),
-                    contents: bytemuck::cast_slice(&points_data),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
-        self.points.instance_buffer = instance_buffer;
-        self.points.instance_count = points_data.len();
-        application.window.request_redraw();
+        let sphere_iterator = self.particles.iter().map(|particle| Sphere {
+            position: [
+                particle.position.x,
+                particle.position.y,
+                particle.position.z,
+            ],
+            color: [1.0, 0.8, 0.2],
+            radius: 1.0,
+        });
+        self.spheres.update(application, sphere_iterator);
     }
 
     fn render<'a>(&'a mut self, render_pass: &mut wgpu::RenderPass<'a>) {
-        self.points.render(render_pass);
+        self.spheres.render(render_pass);
     }
 }
 
