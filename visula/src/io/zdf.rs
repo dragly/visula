@@ -11,8 +11,7 @@ use crate::Vector3;
 #[cfg(not(target_arch = "wasm32"))]
 pub struct ZdfFile {
     pub camera_center: Vector3,
-    pub instance_buffer: wgpu::Buffer,
-    pub instance_count: usize,
+    pub point_cloud: Vec<Sphere>,
     pub mesh_vertex_buf: wgpu::Buffer,
     pub mesh_vertex_count: usize,
 }
@@ -100,7 +99,7 @@ pub fn read_zdf(path: &Path, device: &mut wgpu::Device) -> ZdfFile {
     let colors_shape = (colors.shape()[0] * colors.shape()[1], colors.shape()[2]);
     let points_flat = points.into_shape(points_shape).unwrap();
     let colors_flat = colors.into_shape(colors_shape).unwrap();
-    let instance_data: Vec<Sphere> = points_flat
+    let point_cloud: Vec<Sphere> = points_flat
         .outer_iter()
         .zip(colors_flat.outer_iter())
         .filter_map(|(point, color)| {
@@ -123,15 +122,8 @@ pub fn read_zdf(path: &Path, device: &mut wgpu::Device) -> ZdfFile {
             })
         })
         .collect();
-    let instance_count = instance_data.len();
 
-    let camera_center = (mean_position / instance_count as f32).to_vec();
-
-    let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Instance buffer"),
-        contents: bytemuck::cast_slice(&instance_data),
-        usage: wgpu::BufferUsages::VERTEX,
-    });
+    let camera_center = (mean_position / point_cloud.len() as f32).to_vec();
 
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Mesh buffer"),
@@ -140,8 +132,7 @@ pub fn read_zdf(path: &Path, device: &mut wgpu::Device) -> ZdfFile {
     });
 
     ZdfFile {
-        instance_buffer,
-        instance_count,
+        point_cloud,
         mesh_vertex_buf: vertex_buffer,
         mesh_vertex_count: vertices.len(),
         camera_center,
