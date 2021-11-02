@@ -48,7 +48,7 @@ impl InstanceField {
                     binding_builder.bindings[&self.buffer_handle].fields[self.field_index]
                         .function_argument,
                 ),
-                Span::Unknown,
+                Span::default(),
             )
     }
 }
@@ -73,7 +73,7 @@ impl UniformField {
         module: &mut Module,
         binding_builder: &BindingBuilder,
     ) -> Handle<Expression> {
-        module.entry_points[binding_builder.entry_point_index]
+        let access_index = module.entry_points[binding_builder.entry_point_index]
             .function
             .expressions
             .append(
@@ -81,7 +81,16 @@ impl UniformField {
                     index: self.field_index as u32,
                     base: binding_builder.uniforms[&self.buffer_handle].expression,
                 },
-                Span::Unknown,
+                Span::default(),
+            );
+        module.entry_points[binding_builder.entry_point_index]
+            .function
+            .expressions
+            .append(
+                Expression::Load {
+                    pointer: access_index,
+                },
+                Span::default(),
             )
     }
 }

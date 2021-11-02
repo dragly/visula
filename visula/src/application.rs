@@ -105,12 +105,12 @@ impl Application {
     where
         S: Simulation,
     {
-        let frame = match self.surface.get_current_frame() {
+        let frame = match self.surface.get_current_texture() {
             Ok(frame) => frame,
             Err(_) => {
                 self.surface.configure(&self.device, &self.config);
                 self.surface
-                    .get_current_frame()
+                    .get_current_texture()
                     .expect("Failed to acquire next swap chain texture!")
             }
         };
@@ -132,7 +132,6 @@ impl Application {
 
         {
             let view = frame
-                .output
                 .texture
                 .create_view(&wgpu::TextureViewDescriptor::default());
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -162,8 +161,10 @@ impl Application {
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
 
             simulation.render(&mut render_pass);
+
         }
         self.queue.submit(Some(encoder.finish()));
+        frame.present();
     }
 
     pub fn create_buffer_handle(&mut self) -> u64 {

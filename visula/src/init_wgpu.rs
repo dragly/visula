@@ -21,6 +21,7 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
         .request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::default(),
             compatible_surface: Some(&surface),
+            force_fallback_adapter: false,
         })
         .await
         .expect("Failed to find an appropriate adapter");
