@@ -2216,7 +2216,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
- "wgpu",
 ]
 
 [[package]]
