@@ -39,9 +39,10 @@ pub fn import_buffer_data(document: &gltf::Document, mut blob: Option<Vec<u8>>) 
             gltf::buffer::Source::Uri(_) => panic!("Unsupported URI buffer"),
             gltf::buffer::Source::Bin => blob.take().unwrap(),
         };
-        if data.len() < buffer.length() {
-            panic!("Data len less than buffer len");
-        }
+        assert!(
+            data.len() >= buffer.length(),
+            "Data length is less than buffer length"
+        );
         while data.len() % 4 != 0 {
             data.push(0);
         }

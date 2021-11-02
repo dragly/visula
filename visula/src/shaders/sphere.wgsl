@@ -20,58 +20,56 @@ struct VertexOutput {
     [[location(4)]] instance_color: vec3<f32>;
 };
 
-[[stage(vertex)]]
-fn vs_main(
-    [[location(0)]] position: vec3<f32>,
-    [[location(1)]] instance_position: vec3<f32>,
-    [[location(2)]] instance_radius: f32,
-    [[location(3)]] instance_color: vec3<f32>,
+struct Sphere {
+    position: vec3<f32>;
+    radius: f32;
+    color: vec3<f32>;
+};
+
+fn spheres(
+    vertex_offset_pre_transform: vec4<f32>,
+    sphere: Sphere,
 ) -> VertexOutput {
-    var out: VertexOutput;
-    //let viewMatrix: mat3x3<f32> = mat3x3<f32>(
-    //    u_globals.view_matrix[0].x, u_globals.view_matrix[1].x, u_globals.view_matrix[2].x,
-    //    u_globals.view_matrix[0].y, u_globals.view_matrix[1].y, u_globals.view_matrix[2].y,
-    //    u_globals.view_matrix[0].z, u_globals.view_matrix[1].z, u_globals.view_matrix[2].z
-    //);
-    //let viewMatrix: mat3x3<f32> = mat3x3<f32>(
-    //    vec3<f32>(0.0, 0.0, 0.0),
-    //    vec3<f32>(0.0, 0.0, 0.0),
-    //    vec3<f32>(0.0, 0.0, 0.0)
-    //);
+    var output: VertexOutput;
     let viewMatrix: mat3x3<f32> = mat3x3<f32>(
         (vec4<f32>(1.0, 0.0, 0.0, 0.0) * u_globals.view_matrix).xyz,
         (vec4<f32>(0.0, 1.0, 0.0, 0.0) * u_globals.view_matrix).xyz,
         (vec4<f32>(0.0, 0.0, 1.0, 0.0) * u_globals.view_matrix).xyz,
     );
 
-    //let cameraRight: vec3<f32> = vec3<f32>(viewMatrix[0].x, viewMatrix[1].x, viewMatrix[2].x);
-    //let cameraUp: vec3<f32> = vec3<f32>(viewMatrix[0].y, viewMatrix[1].y, viewMatrix[2].y);
-    //let cameraView: vec3<f32> = vec3<f32>(viewMatrix[0].z, viewMatrix[1].z, viewMatrix[2].z);
     let cameraRight: vec3<f32> = vec3<f32>(1.0, 0.0, 0.0);
     let cameraUp: vec3<f32> = vec3<f32>(0.0, 1.0, 0.0);
     let cameraView: vec3<f32> = vec3<f32>(0.0, 0.0, 1.0);
 
-    let view: vec3<f32> = normalize(instance_position - u_globals.camera_position.xyz);
+    let view: vec3<f32> = normalize(sphere.position - u_globals.camera_position.xyz);
     let right: vec3<f32> = normalize(cross(view, cameraUp));
     let up: vec3<f32> = normalize(cross(right, view));
 
     let transform: mat3x3<f32> = mat3x3<f32>(right, up, view);
 
-    let vertexOffset: vec3<f32> = transform * position;
+    let vertexOffset: vec3<f32> = sphere.radius * (transform * vertex_offset_pre_transform.xyz);
 
-    let vertexPosition: vec3<f32> = vertexOffset + instance_position;
+    let vertexPosition: vec3<f32> = vertexOffset + sphere.position;
 
-    out.proj_position = u_globals.transform * vec4<f32>(vertexPosition, 1.0);
-    out.plane_coord = position.xy;
-    out.radius = instance_radius;
-    out.vertex_position = vertexPosition;
-    out.instance_position = instance_position;
-    out.instance_color = instance_color;
+    output.proj_position = u_globals.transform * vec4<f32>(vertexPosition, 1.0);
+    output.plane_coord = vertex_offset_pre_transform.xy;
+    output.radius = sphere.radius;
+    output.vertex_position = vertexPosition;
+    output.instance_position = sphere.position;
+    output.instance_color = sphere.color;
 
-    return out;
+    return output;
 }
 
-// fragment shader
+[[stage(vertex)]]
+fn vs_main(
+    [[location(0)]] vertex_offset_pre_transform: vec4<f32>,
+) -> VertexOutput {
+    var sphere: Sphere;
+    // modification happens here
+    return spheres(vertex_offset_pre_transform, sphere);
+}
+
 [[stage(fragment)]]
 fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     let rayDirection: vec3<f32> = normalize(in.vertex_position - u_globals.camera_position.xyz);
@@ -114,10 +112,11 @@ fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     let normal: vec3<f32> = normalize(sphereIntersection);
     let normalDotCamera: f32 = dot(normal, -normalize(rayDirection));
 
-    let position: vec3<f32> = in.instance_position + sphereIntersection;
+    let intersection_position: vec3<f32> = in.instance_position + sphereIntersection;
 
-    let color: vec3<f32> = in.instance_color;
-    let projectedPoint: vec4<f32> = u_globals.transform * vec4<f32>(position, 1.0);
+    // let color: vec3<f32> = in.instance_color;
+    let color: vec3<f32> = vec3<f32>(1.0, 0.0, 1.0);
+    let projectedPoint: vec4<f32> = u_globals.transform * vec4<f32>(intersection_position, 1.0);
 
     // TODO fix frag depth
     // gl_FragDepth = projectedPoint.z / projectedPoint.w;

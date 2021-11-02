@@ -1,9 +1,5 @@
 use crate::camera::controller::CameraController;
-use crate::camera::uniforms::CameraUniforms;
 use crate::custom_event::CustomEvent;
-use crate::vec_to_buffer::vec_to_buffer;
-
-use std::mem::size_of;
 
 use winit::{
     event::{Event, WindowEvent},
@@ -37,6 +33,8 @@ pub struct Application {
     pub draw_mode: DrawMode,
     pub camera_bind_group: wgpu::BindGroup,
     pub camera_bind_group_layout: wgpu::BindGroupLayout,
+    // TODO make private
+    pub next_buffer_handle: u64,
 }
 
 impl Application {
@@ -125,20 +123,10 @@ impl Application {
             let model_view_projection_matrix = self
                 .camera_controller
                 .model_view_projection_matrix(self.config.width as f32 / self.config.height as f32);
-
-            let model_view_projection_matrix_ref = model_view_projection_matrix.as_ref();
-
-            let temp_buf = vec_to_buffer(
-                &self.device,
-                &model_view_projection_matrix_ref.to_vec(),
-                wgpu::BufferUsages::COPY_SRC,
-            );
-            encoder.copy_buffer_to_buffer(
-                &temp_buf,
-                0,
+            self.queue.write_buffer(
                 &self.camera_uniform_buffer,
                 0,
-                size_of::<CameraUniforms>() as u64,
+                bytemuck::cast_slice(&[model_view_projection_matrix]),
             );
         }
 
@@ -176,5 +164,11 @@ impl Application {
             simulation.render(&mut render_pass);
         }
         self.queue.submit(Some(encoder.finish()));
+    }
+
+    pub fn create_buffer_handle(&mut self) -> u64 {
+        let handle = self.next_buffer_handle;
+        self.next_buffer_handle += 1;
+        handle
     }
 }

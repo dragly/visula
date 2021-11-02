@@ -1,9 +1,18 @@
+use bytemuck::{Pod, Zeroable};
+use wgpu::BufferUsages;
+
 use cgmath::InnerSpace;
 use itertools_num::linspace;
-use num::clamp;
+use naga::{Binding, Expression, FunctionArgument, ResourceBinding, Span, StructMember, TypeInner};
 use structopt::StructOpt;
 
-use visula::{Sphere, Spheres, Vector3};
+use visula::{
+    BindingBuilder, Buffer, BufferBinding, BufferBindingField, Instance, InstanceBinding,
+    InstanceField, InstanceHandle, LineDelegate, Lines, NagaType, SphereDelegate, Spheres, Uniform,
+    UniformBinding, UniformField, UniformHandle, Vector3, VertexAttrFormat,
+    VertexBufferLayoutBuilder,
+};
+use visula_derive::{delegate, Instance, Uniform};
 
 #[derive(StructOpt)]
 struct Cli {
@@ -17,6 +26,13 @@ struct Particle {
     velocity: Vector3,
     acceleration: Vector3,
     mass: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Instance, Pod, Zeroable)]
+struct ParticleData {
+    position: [f32; 3],
+    radius: f32,
 }
 
 trait TwoBodyForce {
@@ -52,7 +68,6 @@ impl TwoBodyForce for LennardJones {
 fn integrate<F: TwoBodyForce>(
     out_state: &mut Vec<Particle>,
     in_state: &[Particle],
-    _cells: &[Vec<usize>],
     two_body: F,
     dt: f32,
 ) {
@@ -103,9 +118,20 @@ fn generate(count: usize) -> Vec<Particle> {
 #[derive(Debug)]
 struct Error {}
 
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Pod, Uniform, Zeroable)]
+struct Settings {
+    radius: f32,
+    width: f32,
+}
+
 struct Simulation {
     particles: Vec<Particle>,
     spheres: Spheres,
+    particle_buffer: Buffer<ParticleData>,
+    lines: Lines,
+    settings: Settings,
+    settings_buffer: Buffer<Settings>,
 }
 
 impl visula::Simulation for Simulation {
@@ -113,59 +139,78 @@ impl visula::Simulation for Simulation {
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
         let cli = Cli::from_args();
         let count = cli.count.unwrap_or(6);
-        let spheres = Spheres::new(application).unwrap();
         let particles = generate(count);
-        Ok(Simulation { particles, spheres })
+
+        // TODO split into UniformBuffer and InstanceBuffer to avoid having UNIFORM usage on all
+        let particle_buffer = Buffer::<ParticleData>::new(
+            application,
+            BufferUsages::UNIFORM | BufferUsages::VERTEX | BufferUsages::COPY_DST,
+            "particle",
+        );
+        let particle = particle_buffer.instance();
+        let settings_data = Settings {
+            radius: 1.0,
+            width: 0.3,
+        };
+        let settings_buffer = Buffer::new_with_init(
+            application,
+            BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+            &[settings_data],
+            "settings",
+        );
+        let settings = settings_buffer.uniform();
+        let spheres = Spheres::new(
+            application,
+            &SphereDelegate {
+                position: delegate!(particle.position),
+                radius: delegate!(settings.radius),
+            },
+        )
+        .unwrap();
+
+        let lines = Lines::new(
+            application,
+            &LineDelegate {
+                start: delegate!(particle.position),
+                end: delegate!(1.4 * particle.position),
+                width: delegate!(settings.width),
+            },
+        )
+        .unwrap();
+
+        Ok(Simulation {
+            particles,
+            spheres,
+            particle_buffer,
+            lines,
+            settings: settings_data,
+            settings_buffer,
+        })
     }
 
     fn update(&mut self, application: &visula::Application) {
         let previous_particles = self.particles.clone();
-        let minimum = -2.0;
-        let maximum = 2.0;
-        let side_length = maximum - minimum;
-        let cell_count = 10;
-        let mut cells = vec![Vec::new(); 1000];
-        for (particle_index, particle) in previous_particles.iter().enumerate() {
-            let i: usize = clamp(
-                (cell_count as f32 * (particle.position.x - minimum) / side_length) as usize,
-                0,
-                cell_count - 1,
-            );
-            let j: usize = clamp(
-                (cell_count as f32 * (particle.position.y - minimum) / side_length) as usize,
-                0,
-                cell_count - 1,
-            );
-            let k: usize = clamp(
-                (cell_count as f32 * (particle.position.z - minimum) / side_length) as usize,
-                0,
-                cell_count - 1,
-            );
-
-            let cell_index = i * cell_count * cell_count + j * cell_count + k;
-            cells[cell_index].push(particle_index);
-        }
         integrate(
             &mut self.particles,
             &previous_particles,
-            &cells,
             LennardJones::default(),
             0.01,
         );
-        let sphere_iterator = self.particles.iter().map(|particle| Sphere {
-            position: [
-                particle.position.x,
-                particle.position.y,
-                particle.position.z,
-            ],
-            color: [1.0, 0.8, 0.2],
-            radius: 1.0,
-        });
-        self.spheres.update(application, sphere_iterator);
+        let particle_data: Vec<ParticleData> = self
+            .particles
+            .iter()
+            .map(|particle| ParticleData {
+                position: particle.position.into(),
+                radius: particle.mass,
+            })
+            .collect();
+        self.particle_buffer.update(application, &particle_data);
     }
 
     fn render<'a>(&'a mut self, render_pass: &mut wgpu::RenderPass<'a>) {
-        self.spheres.render(render_pass);
+        let bindings: &[&dyn InstanceBinding] = &[&self.particle_buffer, &self.settings_buffer];
+        self.spheres.render(render_pass, &bindings);
+        self.lines.render(render_pass, &bindings);
     }
 }
 

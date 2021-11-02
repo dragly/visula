@@ -1,36 +1,35 @@
-use crate::BindingBuilder;
-use crate::{Application, InstanceBinding};
+use crate::{Application, BindingBuilder, InstanceBinding};
 use bytemuck::{Pod, Zeroable};
 use naga::{valid::ValidationFlags, Block, Handle, Statement};
 use std::collections::HashMap;
 use std::mem::size_of;
 use visula_derive::define_delegate;
-use wgpu::util::DeviceExt;
-use wgpu::{BindGroupLayout, BufferUsages};
+use wgpu::BufferUsages;
+use wgpu::{util::DeviceExt, BindGroupLayout};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct Vertex {
-    _pos: [f32; 3],
-    _tex_coord: [f32; 2],
+    length_weight: f32,
+    width_weight: f32,
 }
 
 unsafe impl Pod for Vertex {}
 unsafe impl Zeroable for Vertex {}
 
-fn vertex(pos: [i8; 3], tc: [i8; 2]) -> Vertex {
+fn vertex(length_weight: f32, width_weight: f32) -> Vertex {
     Vertex {
-        _pos: [pos[0] as f32, pos[1] as f32, pos[2] as f32],
-        _tex_coord: [tc[0] as f32, tc[1] as f32],
+        length_weight,
+        width_weight,
     }
 }
 
 fn create_vertices() -> (Vec<Vertex>, Vec<u16>) {
     let vertex_data = [
-        vertex([-1, -1, -1], [0, 0]),
-        vertex([1, -1, -1], [1, 0]),
-        vertex([1, 1, -1], [1, 1]),
-        vertex([-1, 1, -1], [0, 1]),
+        vertex(0.0, 0.0),
+        vertex(0.0, 1.0),
+        vertex(1.0, 1.0),
+        vertex(1.0, 0.0),
     ];
 
     let index_data: &[u16] = &[0, 1, 2, 2, 3, 0];
@@ -38,7 +37,7 @@ fn create_vertices() -> (Vec<Vertex>, Vec<u16>) {
     (vertex_data.to_vec(), index_data.to_vec())
 }
 
-pub struct Spheres {
+pub struct Lines {
     pub render_pipeline: wgpu::RenderPipeline,
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
@@ -47,41 +46,42 @@ pub struct Spheres {
 }
 
 define_delegate! {
-    pub struct SphereDelegate {
-        pub position: vec3,
-        pub radius: vec3,
+    pub struct LineDelegate {
+        pub start: vec3,
+        pub end: vec3,
+        pub width: f32,
     }
 }
 
-impl Spheres {
+impl Lines {
     pub fn new(
         application: &Application,
-        delegate: &SphereDelegate,
+        delegate: &LineDelegate,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let Application {
             device,
             camera_bind_group_layout,
             ..
         } = application;
-
         let mut module =
-            naga::front::wgsl::parse_str(include_str!("../shaders/sphere.wgsl")).unwrap();
+            naga::front::wgsl::parse_str(include_str!("../shaders/line.wgsl")).unwrap();
         let entry_point_index = module
             .entry_points
             .iter()
             .position(|entry_point| entry_point.name == "vs_main")
             .unwrap();
-
         let mut binding_builder = BindingBuilder {
             bindings: HashMap::new(),
             uniforms: HashMap::new(),
             bind_groups: HashMap::new(),
             entry_point_index,
-            shader_location_offset: 1,
+            shader_location_offset: 2,
             current_slot: 1,
             current_bind_group: 1,
         };
-        delegate.inject("sphere", &mut module, &mut binding_builder);
+
+        log::info!("Injecting line shader delegate");
+        delegate.inject("line_input", &mut module, &mut binding_builder);
 
         let vertex_size = size_of::<Vertex>();
         let (vertex_data, index_data) = create_vertices();
@@ -99,13 +99,12 @@ impl Spheres {
             usage: wgpu::BufferUsages::INDEX | BufferUsages::COPY_DST,
         });
 
-        log::debug!("Validating generated spheres shader");
         let info =
             naga::valid::Validator::new(ValidationFlags::empty(), naga::valid::Capabilities::all())
                 .validate(&module)
                 .unwrap();
         let output_str = naga::back::wgsl::write_string(&module, &info).unwrap();
-        log::debug!("Resulting spheres shader code:\n{}", output_str);
+        log::debug!("Resulting lines shader code:\n{}", output_str);
 
         let shader_module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
             label: None,
@@ -134,11 +133,18 @@ impl Spheres {
         let vertex_buffer_layout = wgpu::VertexBufferLayout {
             array_stride: vertex_size as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[wgpu::VertexAttribute {
-                format: wgpu::VertexFormat::Float32x4,
-                offset: 0,
-                shader_location: 0,
-            }],
+            attributes: &[
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32,
+                    offset: 0,
+                    shader_location: 0,
+                },
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32,
+                    offset: 4,
+                    shader_location: 1,
+                },
+            ],
         };
         let mut layouts = binding_builder
             .bindings
@@ -177,7 +183,7 @@ impl Spheres {
             }),
             multisample: wgpu::MultisampleState::default(),
         });
-        Ok(Spheres {
+        Ok(Lines {
             render_pipeline,
             vertex_buffer,
             index_buffer,
@@ -185,15 +191,13 @@ impl Spheres {
             binding_builder,
         })
     }
-}
 
-impl Spheres {
     pub fn render<'a>(
-        &'a self,
+        &'a mut self,
         render_pass: &mut wgpu::RenderPass<'a>,
         bindings: &[&'a dyn InstanceBinding<'a>],
     ) {
-        log::debug!("Rendering spheres");
+        log::debug!("Rendering lines");
         render_pass.set_pipeline(&self.render_pipeline);
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
@@ -218,7 +222,6 @@ impl Spheres {
                 render_pass.set_bind_group(1, binding.bind_group(), &[]);
             }
         }
-        log::debug!("Drawing {} instances", instance_count);
         render_pass.draw_indexed(0..self.index_count as u32, 0, 0..instance_count);
     }
 }

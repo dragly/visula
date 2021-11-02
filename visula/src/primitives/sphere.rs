@@ -1,14 +1,12 @@
-use crate::VertexAttrFormat;
+use crate::{NagaType, VertexAttrFormat};
 use bytemuck::{Pod, Zeroable};
-use vertex_attr_derive::*;
+use visula_derive::*;
 
 #[repr(C)]
-#[derive(Clone, Copy, VertexAttr)]
+#[derive(Clone, Copy, Instance, Pod, Zeroable)]
 pub struct Sphere {
     pub position: [f32; 3],
     pub radius: f32,
     pub color: [f32; 3],
+    pub padding: f32,
 }
-
-unsafe impl Pod for Sphere {}
-unsafe impl Zeroable for Sphere {}
