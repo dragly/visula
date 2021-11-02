@@ -13,7 +13,7 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
 
     // TODO remove this when https://github.com/gfx-rs/wgpu/issues/1492 is resolved
     #[cfg(target_arch = "wasm32")]
-    let instance = wgpu::Instance::new(wgpu::BackendBit::all());
+    let instance = wgpu::Instance::new(wgpu::Backends::all());
     #[cfg(not(target_arch = "wasm32"))]
     let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
     let surface = unsafe { instance.create_surface(&window) };
@@ -31,6 +31,9 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
             &wgpu::DeviceDescriptor {
                 label: None,
                 features: wgpu::Features::empty(),
+                #[cfg(target_arch="wasm32")]
+                limits: wgpu::Limits::downlevel_webgl2_defaults(),
+                #[cfg(not(target_arch="wasm32"))]
                 limits: wgpu::Limits::default(),
             },
             None,
