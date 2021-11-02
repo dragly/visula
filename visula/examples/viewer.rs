@@ -1,9 +1,15 @@
 use std::path::Path;
 
 use structopt::StructOpt;
+use visula::InstanceBinding;
+use visula::SphereDelegate;
+use visula_derive::delegate;
+use wgpu::BufferUsages;
 use winit::event::{KeyboardInput, VirtualKeyCode, WindowEvent};
 
-use visula::{DropEvent, MeshPipeline, Pipeline, Spheres};
+use visula::{
+    BindingBuilder, Buffer, DropEvent, InstanceHandle, MeshPipeline, Pipeline, Sphere, Spheres,
+};
 
 #[derive(StructOpt)]
 struct Cli {
@@ -19,6 +25,7 @@ enum RenderMode {
 struct Simulation {
     render_mode: RenderMode,
     spheres: Spheres,
+    sphere_buffer: Buffer<Sphere>,
     mesh: MeshPipeline,
 }
 
@@ -33,7 +40,7 @@ impl Simulation {
         } = visula::io::zdf::read_zdf(path, &mut application.device);
 
         application.camera_controller.center = camera_center;
-        self.spheres.update(application, point_cloud);
+        self.sphere_buffer.update(application, &point_cloud[..]);
         self.mesh.vertex_buf = mesh_vertex_buf;
         self.mesh.vertex_count = mesh_vertex_count;
     }
@@ -46,7 +53,7 @@ impl Simulation {
         let visula::io::xyz::XyzFile { point_cloud } =
             visula::io::xyz::read_xyz(text, &mut application.device);
 
-        self.spheres.update(application, point_cloud);
+        self.sphere_buffer.update(application, &point_cloud[..]);
     }
 }
 
@@ -57,10 +64,24 @@ impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
         let args = Cli::from_args();
-        let points = Spheres::new(application).unwrap();
+        let sphere_buffer = Buffer::<Sphere>::new(
+            application,
+            BufferUsages::UNIFORM | BufferUsages::VERTEX | BufferUsages::COPY_DST,
+            "point",
+        );
+        let sphere = sphere_buffer.instance();
+        let points = Spheres::new(
+            application,
+            &SphereDelegate {
+                position: delegate!(sphere.position),
+                radius: delegate!(0.1),
+            },
+        )
+        .unwrap();
         let mesh = visula::create_mesh_pipeline(application).unwrap();
         let mut simulation = Simulation {
             render_mode: RenderMode::Points,
+            sphere_buffer,
             spheres: points,
             mesh,
         };
@@ -74,9 +95,10 @@ impl visula::Simulation for Simulation {
     fn update(&mut self, _: &visula::Application) {}
 
     fn render<'a>(&'a mut self, render_pass: &mut wgpu::RenderPass<'a>) {
+        let bindings: &[&dyn InstanceBinding] = &[&self.sphere_buffer];
         match self.render_mode {
             RenderMode::Mesh => self.mesh.render(render_pass),
-            RenderMode::Points => self.spheres.render(render_pass),
+            RenderMode::Points => self.spheres.render(render_pass, bindings),
         };
     }
 

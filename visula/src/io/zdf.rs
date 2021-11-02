@@ -119,6 +119,7 @@ pub fn read_zdf(path: &Path, device: &mut wgpu::Device) -> ZdfFile {
                 position: position.into(),
                 radius,
                 color: color.into(),
+                padding: 0.0,
             })
         })
         .collect();

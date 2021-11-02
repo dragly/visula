@@ -32,6 +32,7 @@ pub fn read_xyz(text: &[u8], _device: &mut wgpu::Device) -> XyzFile {
                 position: p.into(),
                 radius,
                 color: color.into(),
+                padding: 0.0,
             })
         })
         .collect();

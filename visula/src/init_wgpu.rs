@@ -109,6 +109,7 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
         draw_mode: DrawMode::default(),
         camera_bind_group_layout,
         camera_bind_group,
+        next_buffer_handle: 0,
     }));
     if event_result.is_err() {
         println!("ERROR: Could not send event! Is the event loop closed?")

@@ -4,12 +4,16 @@ use winit::{
 };
 
 pub mod application;
+pub mod bindings;
+pub mod buffer;
 pub mod camera;
 pub mod custom_event;
 pub mod drop_event;
 pub mod error;
 pub mod init_wgpu;
+pub mod instances;
 pub mod io;
+pub mod naga_type;
 pub mod pipelines;
 pub mod primitives;
 pub mod simulation;
@@ -26,8 +30,12 @@ pub mod setup_other;
 pub mod setup_wasm;
 
 pub use application::Application;
+pub use bindings::*;
+pub use buffer::Buffer;
 pub use custom_event::CustomEvent;
 pub use drop_event::DropEvent;
+pub use instances::*;
+pub use naga_type::NagaType;
 pub use pipelines::*;
 pub use primitives::*;
 pub use simulation::Simulation;
