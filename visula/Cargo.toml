@@ -10,7 +10,7 @@ winit = { version = "0.26" }
 wgpu = { version = "0.12.0", features = ["webgl"] }
 futures = "0.3"
 wasm-bindgen-futures = "0.4"
-wasm-bindgen = "=0.2.76"
+wasm-bindgen = "=0.2.78"
 cgmath = "0.17.0"
 bytemuck = { version = "1.4", features = ["derive"] }
 js-sys = "0.3"
