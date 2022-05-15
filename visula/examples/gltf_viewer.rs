@@ -50,11 +50,11 @@ impl visula::Simulation for Simulation {
         } = gltf_file
             .scenes
             .into_iter()
-            .nth(0)
+            .next()
             .unwrap()
             .meshes
             .into_iter()
-            .nth(0)
+            .next()
             .unwrap();
         mesh.vertex_count = index_count;
         mesh.vertex_buf = vertex_buffer;

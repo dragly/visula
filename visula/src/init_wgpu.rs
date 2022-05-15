@@ -88,7 +88,7 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
 
     let camera_uniform_buffer = vec_to_buffer(
         &device,
-        &model_view_projection_matrix.to_vec(),
+        model_view_projection_matrix.as_ref(),
         wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
     );
 

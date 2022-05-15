@@ -3,7 +3,7 @@ use wgpu::BufferUsages;
 
 use cgmath::InnerSpace;
 use itertools_num::linspace;
-use naga::{Binding, Expression, FunctionArgument, ResourceBinding, Span, StructMember, TypeInner};
+use naga::{ResourceBinding, StructMember, TypeInner};
 use structopt::StructOpt;
 
 use visula::{
@@ -66,7 +66,7 @@ impl TwoBodyForce for LennardJones {
 }
 
 fn integrate<F: TwoBodyForce>(
-    out_state: &mut Vec<Particle>,
+    out_state: &mut [Particle],
     in_state: &[Particle],
     two_body: F,
     dt: f32,
@@ -78,7 +78,7 @@ fn integrate<F: TwoBodyForce>(
     for particle in out_state.iter_mut() {
         particle.acceleration = Vector3::new(0.0, 0.0, 0.0);
     }
-    let intermediate_state = out_state.clone();
+    let intermediate_state = out_state.to_vec();
     for i in 0..in_state.len() {
         for j in 0..in_state.len() {
             if i == j {
@@ -130,7 +130,6 @@ struct Simulation {
     spheres: Spheres,
     particle_buffer: Buffer<ParticleData>,
     lines: Lines,
-    settings: Settings,
     settings_buffer: Buffer<Settings>,
 }
 
@@ -183,7 +182,6 @@ impl visula::Simulation for Simulation {
             spheres,
             particle_buffer,
             lines,
-            settings: settings_data,
             settings_buffer,
         })
     }
@@ -209,8 +207,8 @@ impl visula::Simulation for Simulation {
 
     fn render<'a>(&'a mut self, render_pass: &mut wgpu::RenderPass<'a>) {
         let bindings: &[&dyn InstanceBinding] = &[&self.particle_buffer, &self.settings_buffer];
-        self.spheres.render(render_pass, &bindings);
-        self.lines.render(render_pass, &bindings);
+        self.spheres.render(render_pass, bindings);
+        self.lines.render(render_pass, bindings);
     }
 }
 
