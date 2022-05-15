@@ -417,7 +417,6 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                     naga::Type {
                         name: Some("Settings".into()),
                         inner: TypeInner::Struct {
-                            top_level: true,
                             members: vec![
                                 #(#uniform_fields),*
                             ],

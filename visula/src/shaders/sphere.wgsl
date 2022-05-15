@@ -1,4 +1,3 @@
-[[block]]
 struct Globals {
     view_matrix: mat4x4<f32>;
     transform: mat4x4<f32>;
