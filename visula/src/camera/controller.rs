@@ -62,10 +62,7 @@ impl CameraController {
             WindowEvent::MouseWheel { delta, .. } => {
                 let diff = match delta {
                     LineDelta(_x, y) => *y,
-                    PixelDelta(delta) => {
-                        log::warn!("PixelDelta not tested");
-                        delta.y as f32
-                    }
+                    PixelDelta(delta) => 0.04 * delta.y as f32,
                 };
                 let factor = 1.0 + 0.1 * diff.abs();
                 if diff > 0.0 {
