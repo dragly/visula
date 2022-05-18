@@ -118,11 +118,12 @@ fn generate(count: usize) -> Vec<Particle> {
 #[derive(Debug)]
 struct Error {}
 
-#[repr(C)]
+#[repr(C, align(16))]
 #[derive(Copy, Clone, Debug, Pod, Uniform, Zeroable)]
 struct Settings {
     radius: f32,
     width: f32,
+    _padding: [f32; 2],
 }
 
 struct Simulation {
@@ -150,6 +151,7 @@ impl visula::Simulation for Simulation {
         let settings_data = Settings {
             radius: 1.0,
             width: 0.3,
+            _padding: [0.0; 2],
         };
         let settings_buffer = Buffer::new_with_init(
             application,

@@ -415,12 +415,12 @@ pub fn uniform(input: TokenStream) -> TokenStream {
 
                 let uniform_type = module.types.insert(
                     naga::Type {
-                        name: Some("Settings".into()),
+                        name: Some(stringify!(#uniform_struct_name).into()),
                         inner: TypeInner::Struct {
                             members: vec![
                                 #(#uniform_fields),*
                             ],
-                            span: 8,
+                            span: ::std::mem::size_of::<#uniform_struct_name>() as u32,
                         },
                     },
                     ::naga::Span::default(),
