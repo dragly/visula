@@ -188,7 +188,7 @@ impl visula::Simulation for Simulation {
         let settings_data = Settings {
             radius: 0.5,
             width: 0.1,
-            speed: 8,
+            speed: 1,
             _padding: 0.0
         };
         let settings_buffer = Buffer::new_with_init(
@@ -263,6 +263,13 @@ impl visula::Simulation for Simulation {
                 &[&self.bond_buffer, &self.settings_buffer];
             self.lines.render(render_pass, bond_bindings);
         }
+    }
+
+    fn gui(&mut self, context: &egui::Context) {
+        egui::Window::new("Settings").show(context, |ui| {
+            ui.label("Simulation speed");
+            ui.add(egui::Slider::new(&mut self.settings.speed, 0..=20));
+        });
     }
 }
 

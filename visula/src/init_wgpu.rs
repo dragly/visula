@@ -2,6 +2,10 @@ use crate::application::{Application, DrawMode};
 use crate::camera::controller::CameraController;
 use crate::camera::uniforms::CameraUniforms;
 use crate::custom_event::CustomEvent;
+use std::time::Instant;
+use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
+use egui::FontDefinitions;
+use egui_winit_platform::{Platform, PlatformDescriptor};
 
 use crate::vec_to_buffer::vec_to_buffer;
 
@@ -101,6 +105,17 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
         }],
     });
 
+    let platform = Platform::new(PlatformDescriptor {
+        physical_width: size.width as u32,
+        physical_height: size.height as u32,
+        scale_factor: window.scale_factor(),
+        font_definitions: FontDefinitions::default(),
+        style: Default::default(),
+    });
+
+    let start_time = Instant::now();
+    let egui_rpass = RenderPass::new(&device, config.format, 1);
+
     let event_result = proxy.send_event(CustomEvent::Ready(Application {
         camera_uniform_buffer,
         device,
@@ -114,6 +129,9 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
         camera_bind_group_layout,
         camera_bind_group,
         next_buffer_handle: 0,
+        platform,
+        start_time,
+        egui_rpass,
     }));
     if event_result.is_err() {
         println!("ERROR: Could not send event! Is the event loop closed?")

@@ -26,6 +26,10 @@ naga = { version = "0.8", features = ["wgsl-out"] }
 syn = { version = "1.0.80", features = ["parsing"] }
 quote = "1.0.10"
 proc-macro2 = "1.0.29"
+egui = "0.17"
+egui_wgpu_backend = "0.17"
+egui_winit_platform = "0.14"
+epi = "0.17"
 
 [dependencies.web-sys]
 version = "0.3"

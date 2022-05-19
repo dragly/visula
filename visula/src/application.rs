@@ -1,11 +1,17 @@
+use std::time::Instant;
+
 use crate::camera::controller::CameraController;
 use crate::custom_event::CustomEvent;
 
+use egui::FullOutput;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::ControlFlow,
     window::Window,
 };
+
+use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
+use egui_winit_platform::{Platform, PlatformDescriptor};
 
 use crate::Simulation;
 
@@ -35,10 +41,17 @@ pub struct Application {
     pub camera_bind_group_layout: wgpu::BindGroupLayout,
     // TODO make private
     pub next_buffer_handle: u64,
+    pub platform: Platform,
+    pub start_time: Instant,
+    pub egui_rpass: RenderPass,
 }
 
 impl Application {
     pub fn handle_event(&mut self, event: &Event<CustomEvent>, control_flow: &mut ControlFlow) {
+        self.platform.handle_event(event);
+        if self.platform.captures_event(event) {
+            return;
+        }
         match event {
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
@@ -107,6 +120,12 @@ impl Application {
     {
         let frame = match self.surface.get_current_texture() {
             Ok(frame) => frame,
+            Err(wgpu::SurfaceError::Outdated) => {
+                // This error occurs when the app is minimized on Windows.
+                // Silently return here to prevent spamming the console with:
+                // "The underlying surface has changed, and therefore the swap chain must be updated"
+                return;
+            }
             Err(_) => {
                 self.surface.configure(&self.device, &self.config);
                 self.surface
@@ -131,6 +150,7 @@ impl Application {
         }
 
         {
+            // visualization
             let view = frame
                 .texture
                 .create_view(&wgpu::TextureViewDescriptor::default());
@@ -161,8 +181,53 @@ impl Application {
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
 
             simulation.render(&mut render_pass);
-
         }
+
+        {
+
+            // GUI
+            self.platform.update_time(self.start_time.elapsed().as_secs_f64());
+
+            let output_view = frame
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor::default());
+
+            // Begin to draw the UI frame.
+            self.platform.begin_frame();
+
+            let mut iterations: i32 = 10;
+            let egui_ctx = self.platform.context();
+            simulation.gui(&egui_ctx);
+
+            // End the UI frame. We could now handle the output and draw the UI with the backend.
+            let full_output = self.platform.end_frame(Some(&self.window));
+            let paint_jobs = self.platform.context().tessellate(full_output.shapes);
+
+            //let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                //label: Some("encoder"),
+            //});
+
+            // Upload all resources for the GPU.
+            let screen_descriptor = ScreenDescriptor {
+                physical_width: self.config.width,
+                physical_height: self.config.height,
+                scale_factor: self.window.scale_factor() as f32,
+            };
+            self.egui_rpass.add_textures(&self.device, &self.queue, &full_output.textures_delta).unwrap();
+            self.egui_rpass.update_buffers(&self.device, &self.queue, &paint_jobs, &screen_descriptor);
+
+            // Record all render passes.
+            self.egui_rpass
+                .execute(
+                    &mut encoder,
+                    &output_view,
+                    &paint_jobs,
+                    &screen_descriptor,
+                    None,
+                )
+                .unwrap();
+        }
+
         self.queue.submit(Some(encoder.finish()));
         frame.present();
     }
