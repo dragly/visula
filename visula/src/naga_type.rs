@@ -12,16 +12,6 @@ macro_rules! add_naga_type {
     };
 }
 
-add_naga_type! {
-   f32, naga::Type {
-        name: None,
-        inner: naga::TypeInner::Scalar {
-            kind: naga::ScalarKind::Float,
-            width: 4,
-        },
-    }
-}
-
 macro_rules! add_naga_float_vector {
     ($size:expr, $vector_size:expr) => {
         add_naga_type! {
@@ -35,6 +25,26 @@ macro_rules! add_naga_float_vector {
             }
         }
     };
+}
+
+add_naga_type! {
+   f32, naga::Type {
+        name: None,
+        inner: naga::TypeInner::Scalar {
+            kind: naga::ScalarKind::Float,
+            width: 4,
+        },
+    }
+}
+
+add_naga_type! {
+   i32, naga::Type {
+        name: None,
+        inner: naga::TypeInner::Scalar {
+            kind: naga::ScalarKind::Sint,
+            width: 4,
+        },
+    }
 }
 
 add_naga_float_vector! {2, naga::VectorSize::Bi}

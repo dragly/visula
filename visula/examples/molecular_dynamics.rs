@@ -149,7 +149,8 @@ struct Error {}
 struct Settings {
     radius: f32,
     width: f32,
-    _padding: [f32; 2],
+    speed: i32,
+    _padding: f32,
 }
 
 struct Simulation {
@@ -157,6 +158,7 @@ struct Simulation {
     spheres: Spheres,
     particle_buffer: Buffer<ParticleData>,
     lines: Lines,
+    settings: Settings,
     settings_buffer: Buffer<Settings>,
     bond_buffer: Buffer<BondData>,
 }
@@ -186,7 +188,8 @@ impl visula::Simulation for Simulation {
         let settings_data = Settings {
             radius: 0.5,
             width: 0.1,
-            _padding: [0.0; 2],
+            speed: 8,
+            _padding: 0.0
         };
         let settings_buffer = Buffer::new_with_init(
             application,
@@ -220,13 +223,14 @@ impl visula::Simulation for Simulation {
             particle_buffer,
             bond_buffer,
             lines,
+            settings: settings_data,
             settings_buffer,
         })
     }
 
     fn update(&mut self, application: &visula::Application) {
         let mut bond_data = Vec::new();
-        for _ in 0..10 {
+        for _ in 0..self.settings.speed {
             let previous_particles = self.particles.clone();
             bond_data = integrate(
                 &mut self.particles,
