@@ -114,6 +114,10 @@ impl Application {
         }
     }
 
+    pub fn update(&mut self) {
+        self.camera_controller.update();
+    }
+
     pub fn render<S>(&mut self, simulation: &mut S)
     where
         S: Simulation,

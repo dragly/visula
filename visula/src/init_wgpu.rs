@@ -16,10 +16,8 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
     let size = window.inner_size();
 
     // TODO remove this when https://github.com/gfx-rs/wgpu/issues/1492 is resolved
-    #[cfg(target_arch = "wasm32")]
-    let instance = wgpu::Instance::new(wgpu::Backends::all());
-    #[cfg(not(target_arch = "wasm32"))]
-    let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
+    let backend = wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all);
+    let instance = wgpu::Instance::new(backend);
     let surface = unsafe { instance.create_surface(&window) };
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {

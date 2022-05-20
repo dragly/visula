@@ -47,6 +47,22 @@ impl CameraController {
         }
     }
 
+    pub fn update(&mut self) {
+        if !self.left_pressed && !self.right_pressed {
+            let up = self.up.normalize();
+            let forward = self.forward.normalize();
+            let right = Vector3::cross(forward, up).normalize();
+            let offset_up = up * 0.0;
+            let offset_right = -right * 1.0;
+            let offset = offset_up + offset_right;
+            let axis = Vector3::cross(offset, forward).normalize();
+            let rotation =
+                cgmath::Quaternion::from_axis_angle(axis, cgmath::Rad(self.rotational_speed * 1.0));
+            let new_forward = (rotation * self.forward).normalize();
+            self.forward = new_forward;
+        }
+    }
+
     pub fn handle_event(&mut self, window_event: &WindowEvent) -> bool {
         let mut needs_redraw = false;
 

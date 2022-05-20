@@ -88,6 +88,7 @@ pub fn run<S: 'static + Simulation>() {
                             app.render(sim);
                         }
                         Event::MainEventsCleared => {
+                            app.update();
                             sim.update(app);
                         }
                         event => {
