@@ -588,8 +588,7 @@ dependencies = [
 [[package]]
 name = "egui_wgpu_backend"
 version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa894f8ab489b81dd50499ea745996221b5ebfbb7d2c805483be9b9cb083e366"
+source = "git+https://github.com/hasenbanck/egui_wgpu_backend?rev=b2d3e7967351690c6425f37cd6d4ffb083a7e8e6#b2d3e7967351690c6425f37cd6d4ffb083a7e8e6"
 dependencies = [
  "bytemuck",
  "egui",

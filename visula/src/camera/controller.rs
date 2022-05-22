@@ -33,13 +33,27 @@ impl Default for CameraController {
 
 impl CameraController {
     pub fn new() -> CameraController {
+        let up = Vector3::unit_y();
+        let forward = Vector3::unit_z();
+        let right = Vector3::cross(forward, up).normalize();
+        let offset_up = up * 0.3;
+        let offset_right = -right * 0.4;
+        let offset = offset_up + offset_right;
+        let axis = Vector3::cross(offset, forward).normalize();
+        let rotation = cgmath::Quaternion::from_axis_angle(
+            axis,
+            cgmath::Rad(
+                0.4,
+            ),
+        );
+        let new_forward = (rotation * forward).normalize();
         CameraController {
             left_pressed: false,
             right_pressed: false,
             control_pressed: false,
-            forward: Vector3::unit_y(),
-            up: Vector3::unit_z(),
-            distance: 100.0,
+            forward: new_forward,
+            up,
+            distance: 200.0,
             center: Vector3::new(0.0, 0.0, 0.0),
             previous_postion: None,
             rotational_speed: 0.005,
@@ -47,21 +61,7 @@ impl CameraController {
         }
     }
 
-    pub fn update(&mut self) {
-        if !self.left_pressed && !self.right_pressed {
-            let up = self.up.normalize();
-            let forward = self.forward.normalize();
-            let right = Vector3::cross(forward, up).normalize();
-            let offset_up = up * 0.0;
-            let offset_right = -right * 1.0;
-            let offset = offset_up + offset_right;
-            let axis = Vector3::cross(offset, forward).normalize();
-            let rotation =
-                cgmath::Quaternion::from_axis_angle(axis, cgmath::Rad(self.rotational_speed * 1.0));
-            let new_forward = (rotation * self.forward).normalize();
-            self.forward = new_forward;
-        }
-    }
+    pub fn update(&mut self) {}
 
     pub fn handle_event(&mut self, window_event: &WindowEvent) -> bool {
         let mut needs_redraw = false;

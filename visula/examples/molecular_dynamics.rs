@@ -117,33 +117,36 @@ fn integrate<F: TwoBodyForce>(
         }
     }
     for particle in out_state.iter_mut() {
-        let wall_attractiveness = 10.0;
+        let wall_attractiveness = 2.0;
 
         let mut flipped_xp = particle.position.clone();
         flipped_xp.x = bounding_box.max.x + (bounding_box.max.x - particle.position.x);
-        particle.acceleration += wall_attractiveness * two_body.force(&particle.position, &flipped_xp);
+        particle.acceleration +=
+            wall_attractiveness * two_body.force(&particle.position, &flipped_xp);
         let mut flipped_xm = particle.position.clone();
         flipped_xm.x = bounding_box.min.x + (bounding_box.min.x - particle.position.x);
-        particle.acceleration += wall_attractiveness * two_body.force(&particle.position, &flipped_xm);
+        particle.acceleration +=
+            wall_attractiveness * two_body.force(&particle.position, &flipped_xm);
 
         let mut flipped_yp = particle.position.clone();
         flipped_yp.y = bounding_box.max.y + (bounding_box.max.y - particle.position.y);
         particle.acceleration += two_body.force(&particle.position, &flipped_yp);
         let mut flipped_ym = particle.position.clone();
         flipped_ym.y = bounding_box.min.y + (bounding_box.min.y - particle.position.y);
-        particle.acceleration += wall_attractiveness * two_body.force(&particle.position, &flipped_ym);
+        particle.acceleration +=
+            wall_attractiveness * two_body.force(&particle.position, &flipped_ym);
 
         let mut flipped_zp = particle.position.clone();
         flipped_zp.z = bounding_box.max.z + (bounding_box.max.z - particle.position.z);
-        particle.acceleration += wall_attractiveness * two_body.force(&particle.position, &flipped_zp);
+        particle.acceleration +=
+            wall_attractiveness * two_body.force(&particle.position, &flipped_zp);
         let mut flipped_zm = particle.position.clone();
         flipped_zm.z = bounding_box.min.z + (bounding_box.min.z - particle.position.z);
-        particle.acceleration += wall_attractiveness * two_body.force(&particle.position, &flipped_zm);
+        particle.acceleration +=
+            wall_attractiveness * two_body.force(&particle.position, &flipped_zm);
 
-        particle.acceleration += -1000.0
-            * particle.velocity
-            * (particle.velocity.magnitude() - target_temperature)
-            * dt;
+        particle.acceleration +=
+            -1000.0 * particle.velocity * (particle.velocity.magnitude() - target_temperature) * dt;
 
         particle.velocity += 0.5 * particle.acceleration * dt;
     }
@@ -180,7 +183,7 @@ struct Settings {
     radius: f32,
     width: f32,
     speed: i32,
-    target_temperature: f32,
+    _padding: f32,
 }
 
 struct BoundingBox {
@@ -197,6 +200,14 @@ struct Simulation {
     settings_buffer: Buffer<Settings>,
     bond_buffer: Buffer<BondData>,
     bounding_box: BoundingBox,
+    count: usize,
+    target_temperature: f32,
+}
+
+impl Simulation {
+    fn reset(&mut self) {
+        self.particles = generate(self.count);
+    }
 }
 
 impl visula::Simulation for Simulation {
@@ -224,8 +235,8 @@ impl visula::Simulation for Simulation {
         let settings_data = Settings {
             radius: 0.5,
             width: 0.1,
-            speed: 1,
-            target_temperature: 1.0,
+            speed: 4,
+            _padding: 0.0,
         };
         let settings_buffer = Buffer::new_with_init(
             application,
@@ -266,19 +277,21 @@ impl visula::Simulation for Simulation {
                 min: Point3::new(-bound, -bound, -bound),
                 max: Point3::new(bound, bound, bound),
             },
+            count,
+            target_temperature: 10.0,
         })
     }
 
     fn update(&mut self, application: &visula::Application) {
         let mut bond_data = Vec::new();
-        for _ in 0..self.settings.speed {
+        for _ in 1..self.settings.speed {
             let previous_particles = self.particles.clone();
             bond_data = integrate(
                 &mut self.particles,
                 &previous_particles,
                 LennardJones::default(),
                 0.005,
-                self.settings.target_temperature,
+                self.target_temperature,
                 &self.bounding_box,
             );
         }
@@ -314,9 +327,13 @@ impl visula::Simulation for Simulation {
             ui.add(egui::Slider::new(&mut self.settings.speed, 0..=20));
             ui.label("Target temperature");
             ui.add(egui::Slider::new(
-                &mut self.settings.target_temperature,
+                &mut self.target_temperature,
                 0.0..=20.0,
             ));
+
+            if ui.button("Reset").clicked() {
+                self.reset();
+            }
         });
     }
 }

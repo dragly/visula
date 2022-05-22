@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use crate::camera::controller::CameraController;
 use crate::custom_event::CustomEvent;
 
@@ -42,7 +40,6 @@ pub struct Application {
     // TODO make private
     pub next_buffer_handle: u64,
     pub platform: Platform,
-    pub start_time: Instant,
     pub egui_rpass: RenderPass,
 }
 
@@ -190,7 +187,7 @@ impl Application {
         {
 
             // GUI
-            self.platform.update_time(self.start_time.elapsed().as_secs_f64());
+            //self.platform.update_time(self.start_time.elapsed().as_secs_f64());
 
             let output_view = frame
                 .texture

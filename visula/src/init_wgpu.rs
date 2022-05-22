@@ -111,7 +111,6 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
         style: Default::default(),
     });
 
-    let start_time = Instant::now();
     let egui_rpass = RenderPass::new(&device, config.format, 1);
 
     let event_result = proxy.send_event(CustomEvent::Ready(Application {
@@ -128,7 +127,6 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
         camera_bind_group,
         next_buffer_handle: 0,
         platform,
-        start_time,
         egui_rpass,
     }));
     if event_result.is_err() {
