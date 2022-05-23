@@ -40,7 +40,8 @@ struct ParticleData {
 struct BondData {
     position_a: [f32; 3],
     position_b: [f32; 3],
-    _padding: [f32; 2],
+    strength: f32,
+    _padding: f32,
 }
 
 trait TwoBodyForce {
@@ -105,13 +106,15 @@ fn integrate<F: TwoBodyForce>(
             out_state[i].acceleration +=
                 two_body.force(position_i, position_j) / intermediate_state[i].mass;
 
-            if (intermediate_state[i].position - intermediate_state[j].position).magnitude2()
-                < two_body.bond_magnitude2()
-            {
+            let distance = (intermediate_state[i].position - intermediate_state[j].position).magnitude2();
+            let strength = (two_body.bond_magnitude2() - distance) / two_body.bond_magnitude2();
+
+            if strength > 0.0 {
                 bonds.push(BondData {
                     position_a: (*position_i).into(),
                     position_b: (*position_j).into(),
-                    _padding: [0.0; 2],
+                    strength,
+                    _padding: 0.0,
                 });
             }
         }
@@ -260,6 +263,7 @@ impl visula::Simulation for Simulation {
                 start: delegate!(bond.position_a),
                 end: delegate!(bond.position_b),
                 width: delegate!(settings.width),
+                alpha: delegate!(bond.strength),
             },
         )
         .unwrap();

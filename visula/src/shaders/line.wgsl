@@ -12,12 +12,14 @@ var<uniform> u_globals: Globals;
 
 struct VertexOutput {
     [[builtin(position)]] projected_position: vec4<f32>;
+    [[location(0)]] alpha: f32;
 };
 
 struct Line {
     start: vec3<f32>;
     end: vec3<f32>;
     width: f32;
+    alpha: f32;
 };
 
 fn line(
@@ -26,6 +28,7 @@ fn line(
     line: Line,
 ) -> VertexOutput {
     var output: VertexOutput;
+    output.alpha = line.alpha;
 
     let width_half = line.width / 2.0;
 
@@ -67,5 +70,5 @@ fn vs_main(
 
 [[stage(fragment)]]
 fn fs_main(input: VertexOutput) -> [[location(0)]] vec4<f32> {
-    return vec4<f32>(0.8, 0.7, 0.6, 1.0);
+    return vec4<f32>(0.8, 0.7, 0.6, input.alpha);
 }
