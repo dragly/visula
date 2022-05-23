@@ -3,9 +3,8 @@ use crate::camera::controller::CameraController;
 use crate::camera::uniforms::CameraUniforms;
 use crate::custom_event::CustomEvent;
 use egui::FontDefinitions;
-use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
+use egui_wgpu_backend::RenderPass;
 use egui_winit_platform::{Platform, PlatformDescriptor};
-use std::time::Instant;
 
 use crate::vec_to_buffer::vec_to_buffer;
 

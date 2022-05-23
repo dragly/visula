@@ -109,8 +109,8 @@ fn integrate<F: TwoBodyForce>(
                 < two_body.bond_magnitude2()
             {
                 bonds.push(BondData {
-                    position_a: position_i.clone().into(),
-                    position_b: position_j.clone().into(),
+                    position_a: (*position_i).into(),
+                    position_b: (*position_j).into(),
                     _padding: [0.0; 2],
                 });
             }
@@ -119,28 +119,28 @@ fn integrate<F: TwoBodyForce>(
     for particle in out_state.iter_mut() {
         let wall_attractiveness = 2.0;
 
-        let mut flipped_xp = particle.position.clone();
+        let mut flipped_xp = particle.position;
         flipped_xp.x = bounding_box.max.x + (bounding_box.max.x - particle.position.x);
         particle.acceleration +=
             wall_attractiveness * two_body.force(&particle.position, &flipped_xp);
-        let mut flipped_xm = particle.position.clone();
+        let mut flipped_xm = particle.position;
         flipped_xm.x = bounding_box.min.x + (bounding_box.min.x - particle.position.x);
         particle.acceleration +=
             wall_attractiveness * two_body.force(&particle.position, &flipped_xm);
 
-        let mut flipped_yp = particle.position.clone();
+        let mut flipped_yp = particle.position;
         flipped_yp.y = bounding_box.max.y + (bounding_box.max.y - particle.position.y);
         particle.acceleration += two_body.force(&particle.position, &flipped_yp);
-        let mut flipped_ym = particle.position.clone();
+        let mut flipped_ym = particle.position;
         flipped_ym.y = bounding_box.min.y + (bounding_box.min.y - particle.position.y);
         particle.acceleration +=
             wall_attractiveness * two_body.force(&particle.position, &flipped_ym);
 
-        let mut flipped_zp = particle.position.clone();
+        let mut flipped_zp = particle.position;
         flipped_zp.z = bounding_box.max.z + (bounding_box.max.z - particle.position.z);
         particle.acceleration +=
             wall_attractiveness * two_body.force(&particle.position, &flipped_zp);
-        let mut flipped_zm = particle.position.clone();
+        let mut flipped_zm = particle.position;
         flipped_zm.z = bounding_box.min.z + (bounding_box.min.z - particle.position.z);
         particle.acceleration +=
             wall_attractiveness * two_body.force(&particle.position, &flipped_zm);

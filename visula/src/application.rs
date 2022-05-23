@@ -1,7 +1,6 @@
 use crate::camera::controller::CameraController;
 use crate::custom_event::CustomEvent;
 
-use egui::FullOutput;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::ControlFlow,
@@ -9,7 +8,7 @@ use winit::{
 };
 
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
-use egui_winit_platform::{Platform, PlatformDescriptor};
+use egui_winit_platform::Platform;
 
 use crate::Simulation;
 
@@ -195,7 +194,6 @@ impl Application {
             // Begin to draw the UI frame.
             self.platform.begin_frame();
 
-            let mut iterations: i32 = 10;
             let egui_ctx = self.platform.context();
             simulation.gui(&egui_ctx);
 
