@@ -70,6 +70,7 @@ pub fn create_mesh_pipeline(
             bias: wgpu::DepthBiasState::default(),
         }),
         multisample: wgpu::MultisampleState::default(),
+        multiview: None,
     });
 
     let vertex_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

@@ -1,5 +1,6 @@
 use crate::{Application, BindingBuilder, InstanceBinding};
 use bytemuck::{Pod, Zeroable};
+use naga::back::wgsl::WriterFlags;
 use naga::{valid::ValidationFlags, Block, Handle, Statement};
 use std::collections::HashMap;
 use std::mem::size_of;
@@ -103,7 +104,8 @@ impl Lines {
             naga::valid::Validator::new(ValidationFlags::empty(), naga::valid::Capabilities::all())
                 .validate(&module)
                 .unwrap();
-        let output_str = naga::back::wgsl::write_string(&module, &info).unwrap();
+        let output_str =
+            naga::back::wgsl::write_string(&module, &info, WriterFlags::all()).unwrap();
         log::debug!("Resulting lines shader code:\n{}", output_str);
 
         let shader_module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
@@ -182,6 +184,7 @@ impl Lines {
                 bias: wgpu::DepthBiasState::default(),
             }),
             multisample: wgpu::MultisampleState::default(),
+            multiview: None,
         });
         Ok(Lines {
             render_pipeline,

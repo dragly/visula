@@ -81,10 +81,14 @@ pub fn run<S: 'static + Simulation>() {
             event => {
                 if let (Some(app), Some(sim)) = (&mut application, &mut simulation) {
                     match event {
+                        Event::RedrawEventsCleared => {
+                            app.window.request_redraw();
+                        }
                         Event::RedrawRequested(_) => {
                             app.render(sim);
                         }
                         Event::MainEventsCleared => {
+                            app.update();
                             sim.update(app);
                         }
                         event => {

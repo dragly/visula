@@ -140,7 +140,6 @@ impl<T: Pod> Buffer<T> {
                     });
             self.count = data.len();
         }
-        application.window.request_redraw();
     }
 }
 

@@ -33,19 +33,30 @@ impl Default for CameraController {
 
 impl CameraController {
     pub fn new() -> CameraController {
+        let up = Vector3::unit_y();
+        let forward = Vector3::unit_z();
+        let right = Vector3::cross(forward, up).normalize();
+        let offset_up = up * 0.3;
+        let offset_right = -right * 0.4;
+        let offset = offset_up + offset_right;
+        let axis = Vector3::cross(offset, forward).normalize();
+        let rotation = cgmath::Quaternion::from_axis_angle(axis, cgmath::Rad(0.4));
+        let new_forward = (rotation * forward).normalize();
         CameraController {
             left_pressed: false,
             right_pressed: false,
             control_pressed: false,
-            forward: Vector3::unit_y(),
-            up: Vector3::unit_z(),
-            distance: 1000.0,
+            forward: new_forward,
+            up,
+            distance: 100.0,
             center: Vector3::new(0.0, 0.0, 0.0),
             previous_postion: None,
             rotational_speed: 0.005,
             roll_speed: 0.005,
         }
     }
+
+    pub fn update(&mut self) {}
 
     pub fn handle_event(&mut self, window_event: &WindowEvent) -> bool {
         let mut needs_redraw = false;
@@ -62,10 +73,7 @@ impl CameraController {
             WindowEvent::MouseWheel { delta, .. } => {
                 let diff = match delta {
                     LineDelta(_x, y) => *y,
-                    PixelDelta(delta) => {
-                        log::warn!("PixelDelta not tested");
-                        delta.y as f32
-                    }
+                    PixelDelta(delta) => 0.04 * delta.y as f32,
                 };
                 let factor = 1.0 + 0.1 * diff.abs();
                 if diff > 0.0 {
@@ -178,7 +186,7 @@ fn create_model_view_projection(
     }: &CameraController,
 ) -> CameraUniforms {
     let view_vector = forward * *distance;
-    let projection_matrix = cgmath::perspective(cgmath::Deg(45f32), aspect_ratio, 10.0, 10000.0);
+    let projection_matrix = cgmath::perspective(cgmath::Deg(40f32), aspect_ratio, 10.0, 10000.0);
     let position = Point3::new(
         center.x - view_vector.x,
         center.y - view_vector.y,

@@ -9,7 +9,6 @@ edition = "2018"
 [dependencies]
 syn = {version = "1.0", features=['full']}
 quote = "1.0"
-wgpu = { version = "0.10.1", features = ["webgl"] }
 proc-macro2 = "1.0.24"
 proc-macro-crate = "1.0.0"
 

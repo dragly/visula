@@ -36,12 +36,12 @@ fn parse(input: &Expr, setup: &mut Vec<proc_macro2::TokenStream>) -> proc_macro2
                             value: naga::ScalarValue::Float(#lit),
                         },
                     },
-                    ::naga::Span::Unknown,
+                    ::naga::Span::default(),
                 );
                 let #expression_current = module.entry_points[entry_point_index]
                     .function
                     .expressions
-                    .append(::naga::Expression::Constant(#constant_current), ::naga::Span::Unknown);
+                    .append(::naga::Expression::Constant(#constant_current), ::naga::Span::default());
             });
             quote! { #expression_current }
         }
@@ -73,7 +73,7 @@ fn parse(input: &Expr, setup: &mut Vec<proc_macro2::TokenStream>) -> proc_macro2
                         left: #parsed_left,
                         right: #parsed_right,
                     },
-                    naga::Span::Unknown,
+                    naga::Span::default(),
                 );
             });
             quote! { #expression_current }
@@ -124,7 +124,7 @@ pub fn define_delegate(input: TokenStream) -> TokenStream {
                                             index: #index as u32,
                                             base: variable_expression,
                                         },
-                                        ::naga::Span::Unknown,
+                                        ::naga::Span::default(),
                                     );
                                 Statement::Store {
                                     pointer: access_index,
@@ -169,7 +169,7 @@ pub fn define_delegate(input: TokenStream) -> TokenStream {
                                 statement.clone(),
                                 match span {
                                     Some(s) => s.clone(),
-                                    None => ::naga::Span::Unknown,
+                                    None => ::naga::Span::default(),
                                 },
                             );
                         }
@@ -225,7 +225,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
                             };
                             module_fields.push(quote! {
                                 {
-                                    let field_type = module.types.append(#naga_type, naga::Span::Unknown);
+                                    let field_type = module.types.insert(#naga_type, naga::Span::default());
                                     module.entry_points[entry_point_index]
                                         .function
                                         .arguments
@@ -359,7 +359,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                             };
                             let field_type_declaration = format_ident!("{}_type", field_name);
                             uniform_field_types_init.push(quote! {
-                                let #field_type_declaration = module.types.append(#naga_type, ::naga::Span::Unknown);
+                                let #field_type_declaration = module.types.insert(#naga_type, ::naga::Span::default());
                             });
                             let offset = quote! {
                                 0 #(+ #sizes)*
@@ -413,18 +413,17 @@ pub fn uniform(input: TokenStream) -> TokenStream {
 
                 #(#uniform_field_types_init)*
 
-                let uniform_type = module.types.append(
+                let uniform_type = module.types.insert(
                     naga::Type {
-                        name: Some("Settings".into()),
+                        name: Some(stringify!(#uniform_struct_name).into()),
                         inner: TypeInner::Struct {
-                            top_level: true,
                             members: vec![
                                 #(#uniform_fields),*
                             ],
-                            span: 8,
+                            span: ::std::mem::size_of::<#uniform_struct_name>() as u32,
                         },
                     },
-                    ::naga::Span::Unknown,
+                    ::naga::Span::default(),
                 );
                 let uniform_variable = module.global_variables.append(
                     naga::GlobalVariable {
@@ -437,12 +436,12 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                         ty: uniform_type,
                         init: None,
                     },
-                    ::naga::Span::Unknown,
+                    ::naga::Span::default(),
                 );
                 let settings_expression = module.entry_points[entry_point_index]
                     .function
                     .expressions
-                    .append(::naga::Expression::GlobalVariable(uniform_variable), ::naga::Span::Unknown);
+                    .append(::naga::Expression::GlobalVariable(uniform_variable), ::naga::Span::default());
 
                 binding_builder.uniforms.insert(self.handle, UniformBinding {
                     expression: settings_expression,

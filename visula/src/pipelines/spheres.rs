@@ -1,7 +1,7 @@
 use crate::BindingBuilder;
 use crate::{Application, InstanceBinding};
 use bytemuck::{Pod, Zeroable};
-use naga::{valid::ValidationFlags, Block, Handle, Statement};
+use naga::{back::wgsl::WriterFlags, valid::ValidationFlags, Block, Handle, Statement};
 use std::collections::HashMap;
 use std::mem::size_of;
 use visula_derive::define_delegate;
@@ -104,7 +104,8 @@ impl Spheres {
             naga::valid::Validator::new(ValidationFlags::empty(), naga::valid::Capabilities::all())
                 .validate(&module)
                 .unwrap();
-        let output_str = naga::back::wgsl::write_string(&module, &info).unwrap();
+        let output_str =
+            naga::back::wgsl::write_string(&module, &info, WriterFlags::all()).unwrap();
         log::debug!("Resulting spheres shader code:\n{}", output_str);
 
         let shader_module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
@@ -176,6 +177,7 @@ impl Spheres {
                 bias: wgpu::DepthBiasState::default(),
             }),
             multisample: wgpu::MultisampleState::default(),
+            multiview: None,
         });
         Ok(Spheres {
             render_pipeline,

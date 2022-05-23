@@ -2,6 +2,9 @@ use crate::application::{Application, DrawMode};
 use crate::camera::controller::CameraController;
 use crate::camera::uniforms::CameraUniforms;
 use crate::custom_event::CustomEvent;
+use egui::FontDefinitions;
+use egui_wgpu_backend::RenderPass;
+use egui_winit_platform::{Platform, PlatformDescriptor};
 
 use crate::vec_to_buffer::vec_to_buffer;
 
@@ -12,15 +15,14 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
     let size = window.inner_size();
 
     // TODO remove this when https://github.com/gfx-rs/wgpu/issues/1492 is resolved
-    #[cfg(target_arch = "wasm32")]
-    let instance = wgpu::Instance::new(wgpu::BackendBit::all());
-    #[cfg(not(target_arch = "wasm32"))]
-    let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
+    let backend = wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all);
+    let instance = wgpu::Instance::new(backend);
     let surface = unsafe { instance.create_surface(&window) };
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::default(),
             compatible_surface: Some(&surface),
+            force_fallback_adapter: false,
         })
         .await
         .expect("Failed to find an appropriate adapter");
@@ -30,6 +32,9 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
             &wgpu::DeviceDescriptor {
                 label: None,
                 features: wgpu::Features::empty(),
+                #[cfg(target_arch = "wasm32")]
+                limits: wgpu::Limits::downlevel_webgl2_defaults(),
+                #[cfg(not(target_arch = "wasm32"))]
                 limits: wgpu::Limits::default(),
             },
             None,
@@ -84,7 +89,7 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
 
     let camera_uniform_buffer = vec_to_buffer(
         &device,
-        &model_view_projection_matrix.to_vec(),
+        model_view_projection_matrix.as_ref(),
         wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
     );
 
@@ -96,6 +101,16 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
             resource: camera_uniform_buffer.as_entire_binding(),
         }],
     });
+
+    let platform = Platform::new(PlatformDescriptor {
+        physical_width: size.width as u32,
+        physical_height: size.height as u32,
+        scale_factor: window.scale_factor(),
+        font_definitions: FontDefinitions::default(),
+        style: Default::default(),
+    });
+
+    let egui_rpass = RenderPass::new(&device, config.format, 1);
 
     let event_result = proxy.send_event(CustomEvent::Ready(Application {
         camera_uniform_buffer,
@@ -110,6 +125,8 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
         camera_bind_group_layout,
         camera_bind_group,
         next_buffer_handle: 0,
+        platform,
+        egui_rpass,
     }));
     if event_result.is_err() {
         println!("ERROR: Could not send event! Is the event loop closed?")

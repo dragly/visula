@@ -16,7 +16,7 @@ jobs:
           - false
         rust:
           - stable
-          - 1.52.0  # Minimum supported Rust version
+          - 1.60.0  # Minimum supported Rust version
         include:
           - rust: beta
             experimental: true
@@ -57,6 +57,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
+          args: --examples
       - name: Test
         uses: actions-rs/cargo@v1
         with:

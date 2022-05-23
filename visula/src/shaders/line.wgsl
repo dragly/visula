@@ -1,4 +1,3 @@
-[[block]]
 struct Globals {
     view_matrix: mat4x4<f32>;
     transform: mat4x4<f32>;
@@ -68,5 +67,5 @@ fn vs_main(
 
 [[stage(fragment)]]
 fn fs_main(input: VertexOutput) -> [[location(0)]] vec4<f32> {
-    return vec4<f32>(1.0, 0.0, 1.0, 1.0);
+    return vec4<f32>(0.8, 0.7, 0.6, 1.0);
 }
