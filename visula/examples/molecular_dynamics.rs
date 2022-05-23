@@ -326,10 +326,7 @@ impl visula::Simulation for Simulation {
             ui.label("Simulation speed");
             ui.add(egui::Slider::new(&mut self.settings.speed, 1..=20));
             ui.label("Target temperature");
-            ui.add(egui::Slider::new(
-                &mut self.target_temperature,
-                0.0..=20.0,
-            ));
+            ui.add(egui::Slider::new(&mut self.target_temperature, 0.0..=20.0));
 
             if ui.button("Reset").clicked() {
                 self.reset();

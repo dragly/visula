@@ -40,12 +40,7 @@ impl CameraController {
         let offset_right = -right * 0.4;
         let offset = offset_up + offset_right;
         let axis = Vector3::cross(offset, forward).normalize();
-        let rotation = cgmath::Quaternion::from_axis_angle(
-            axis,
-            cgmath::Rad(
-                0.4,
-            ),
-        );
+        let rotation = cgmath::Quaternion::from_axis_angle(axis, cgmath::Rad(0.4));
         let new_forward = (rotation * forward).normalize();
         CameraController {
             left_pressed: false,

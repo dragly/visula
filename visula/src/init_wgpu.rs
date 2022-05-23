@@ -2,10 +2,10 @@ use crate::application::{Application, DrawMode};
 use crate::camera::controller::CameraController;
 use crate::camera::uniforms::CameraUniforms;
 use crate::custom_event::CustomEvent;
-use std::time::Instant;
-use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui::FontDefinitions;
+use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit_platform::{Platform, PlatformDescriptor};
+use std::time::Instant;
 
 use crate::vec_to_buffer::vec_to_buffer;
 
@@ -33,9 +33,9 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
             &wgpu::DeviceDescriptor {
                 label: None,
                 features: wgpu::Features::empty(),
-                #[cfg(target_arch="wasm32")]
+                #[cfg(target_arch = "wasm32")]
                 limits: wgpu::Limits::downlevel_webgl2_defaults(),
-                #[cfg(not(target_arch="wasm32"))]
+                #[cfg(not(target_arch = "wasm32"))]
                 limits: wgpu::Limits::default(),
             },
             None,

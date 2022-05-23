@@ -185,7 +185,6 @@ impl Application {
         }
 
         {
-
             // GUI
             //self.platform.update_time(self.start_time.elapsed().as_secs_f64());
 
@@ -205,7 +204,7 @@ impl Application {
             let paint_jobs = self.platform.context().tessellate(full_output.shapes);
 
             //let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                //label: Some("encoder"),
+            //label: Some("encoder"),
             //});
 
             // Upload all resources for the GPU.
@@ -214,8 +213,15 @@ impl Application {
                 physical_height: self.config.height,
                 scale_factor: self.window.scale_factor() as f32,
             };
-            self.egui_rpass.add_textures(&self.device, &self.queue, &full_output.textures_delta).unwrap();
-            self.egui_rpass.update_buffers(&self.device, &self.queue, &paint_jobs, &screen_descriptor);
+            self.egui_rpass
+                .add_textures(&self.device, &self.queue, &full_output.textures_delta)
+                .unwrap();
+            self.egui_rpass.update_buffers(
+                &self.device,
+                &self.queue,
+                &paint_jobs,
+                &screen_descriptor,
+            );
 
             // Record all render passes.
             self.egui_rpass

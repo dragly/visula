@@ -104,7 +104,8 @@ impl Lines {
             naga::valid::Validator::new(ValidationFlags::empty(), naga::valid::Capabilities::all())
                 .validate(&module)
                 .unwrap();
-        let output_str = naga::back::wgsl::write_string(&module, &info, WriterFlags::all()).unwrap();
+        let output_str =
+            naga::back::wgsl::write_string(&module, &info, WriterFlags::all()).unwrap();
         log::debug!("Resulting lines shader code:\n{}", output_str);
 
         let shader_module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
