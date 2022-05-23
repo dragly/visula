@@ -214,7 +214,7 @@ impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
         let cli = Cli::from_args();
-        let count = cli.count.unwrap_or(6);
+        let count = cli.count.unwrap_or(5);
         let particles = generate(count);
 
         // TODO split into UniformBuffer and InstanceBuffer to avoid having UNIFORM usage on all
