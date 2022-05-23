@@ -100,6 +100,7 @@ impl Lines {
             usage: wgpu::BufferUsages::INDEX | BufferUsages::COPY_DST,
         });
 
+        log::debug!("Validating line shader\n{:#?}", module);
         let info =
             naga::valid::Validator::new(ValidationFlags::empty(), naga::valid::Capabilities::all())
                 .validate(&module)
