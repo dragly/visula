@@ -56,7 +56,8 @@ jobs:
       - name: Build
         uses: actions-rs/cargo@v1
         with:
-          command: build -- examples
+          command: build
+          args: --examples
       - name: Test
         uses: actions-rs/cargo@v1
         with:
