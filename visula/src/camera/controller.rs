@@ -53,7 +53,7 @@ impl CameraController {
             control_pressed: false,
             forward: new_forward,
             up,
-            distance: 200.0,
+            distance: 100.0,
             center: Vector3::new(0.0, 0.0, 0.0),
             previous_postion: None,
             rotational_speed: 0.005,
@@ -191,7 +191,7 @@ fn create_model_view_projection(
     }: &CameraController,
 ) -> CameraUniforms {
     let view_vector = forward * *distance;
-    let projection_matrix = cgmath::perspective(cgmath::Deg(20f32), aspect_ratio, 10.0, 10000.0);
+    let projection_matrix = cgmath::perspective(cgmath::Deg(40f32), aspect_ratio, 10.0, 10000.0);
     let position = Point3::new(
         center.x - view_vector.x,
         center.y - view_vector.y,
