@@ -284,7 +284,7 @@ impl visula::Simulation for Simulation {
 
     fn update(&mut self, application: &visula::Application) {
         let mut bond_data = Vec::new();
-        for _ in 1..self.settings.speed {
+        for _ in 0..self.settings.speed {
             let previous_particles = self.particles.clone();
             bond_data = integrate(
                 &mut self.particles,
@@ -324,7 +324,7 @@ impl visula::Simulation for Simulation {
     fn gui(&mut self, context: &egui::Context) {
         egui::Window::new("Settings").show(context, |ui| {
             ui.label("Simulation speed");
-            ui.add(egui::Slider::new(&mut self.settings.speed, 0..=20));
+            ui.add(egui::Slider::new(&mut self.settings.speed, 1..=20));
             ui.label("Target temperature");
             ui.add(egui::Slider::new(
                 &mut self.target_temperature,
