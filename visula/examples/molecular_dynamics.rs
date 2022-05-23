@@ -234,7 +234,7 @@ impl visula::Simulation for Simulation {
 
         let settings_data = Settings {
             radius: 0.5,
-            width: 0.1,
+            width: 0.2,
             speed: 4,
             _padding: 0.0,
         };
