@@ -19,8 +19,6 @@ pub fn setup_wasm(
     console_log::init().expect("could not initialize logger");
     log::info!("Start");
     use winit::platform::web::WindowExtWebSys;
-    // On wasm, append the canvas to the document body
-    log::info!("Canvas ready!");
     let drag_enter = Closure::wrap(Box::new(|event: &web_sys::Event| {
         event.prevent_default();
         log::info!("Drag enter!");
@@ -79,9 +77,9 @@ pub fn setup_wasm(
             win.set_ondrop(Some(JsCast::unchecked_from_js_ref(drop_callback.as_ref())));
             win.document()
         })
-        .and_then(|doc| doc.body())
-        .and_then(|body| body.append_child(&canvas).ok())
-        .expect("couldn't append canvas to document body");
+        //.and_then(|doc| doc.body())
+        //.and_then(|body| body.append_child(&canvas).ok())
+        .expect("could not set up window");
 
     wasm_bindgen_futures::spawn_local(init(proxy, window));
 
