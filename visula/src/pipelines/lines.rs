@@ -51,6 +51,7 @@ define_delegate! {
         pub start: vec3,
         pub end: vec3,
         pub width: f32,
+        pub alpha: f32,
     }
 }
 
@@ -71,6 +72,7 @@ impl Lines {
             .iter()
             .position(|entry_point| entry_point.name == "vs_main")
             .unwrap();
+
         let mut binding_builder = BindingBuilder {
             bindings: HashMap::new(),
             uniforms: HashMap::new(),
@@ -100,6 +102,7 @@ impl Lines {
             usage: wgpu::BufferUsages::INDEX | BufferUsages::COPY_DST,
         });
 
+        log::debug!("Validating line shader\n{:#?}", module);
         let info =
             naga::valid::Validator::new(ValidationFlags::empty(), naga::valid::Capabilities::all())
                 .validate(&module)
@@ -169,7 +172,11 @@ impl Lines {
             fragment: Some(wgpu::FragmentState {
                 module: &shader_module,
                 entry_point: "fs_main",
-                targets: &[application.config.format.into()],
+                targets: &[wgpu::ColorTargetState {
+                    format: application.config.format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                }],
             }),
             primitive: wgpu::PrimitiveState {
                 front_face: wgpu::FrontFace::Ccw,
