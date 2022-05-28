@@ -173,7 +173,7 @@ impl Lines {
                 module: &shader_module,
                 entry_point: "fs_main",
                 targets: &[wgpu::ColorTargetState {
-                    format: application.config.format.into(),
+                    format: application.config.format,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 }],

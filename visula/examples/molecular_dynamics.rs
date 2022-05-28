@@ -106,7 +106,8 @@ fn integrate<F: TwoBodyForce>(
             out_state[i].acceleration +=
                 two_body.force(position_i, position_j) / intermediate_state[i].mass;
 
-            let distance = (intermediate_state[i].position - intermediate_state[j].position).magnitude2();
+            let distance =
+                (intermediate_state[i].position - intermediate_state[j].position).magnitude2();
             let strength = (two_body.bond_magnitude2() - distance) / two_body.bond_magnitude2();
 
             if strength > 0.0 {

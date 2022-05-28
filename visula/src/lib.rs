@@ -1,11 +1,15 @@
-use web_sys::HtmlCanvasElement;
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsCast;
-use winit::{
-    event::Event,
-    event_loop::{ControlFlow, EventLoop}, dpi::LogicalSize,
-};
+#[cfg(target_arch = "wasm32")]
+use web_sys::HtmlCanvasElement;
+#[cfg(target_arch = "wasm32")]
+use winit::dpi::LogicalSize;
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::WindowBuilderExtWebSys;
+use winit::{
+    event::Event,
+    event_loop::{ControlFlow, EventLoop},
+};
 
 pub mod application;
 pub mod bindings;
@@ -59,8 +63,15 @@ pub fn run<S: 'static + Simulation>() {
         let window = web_sys::window().expect("no global `window` exists");
         let document = window.document().expect("should have a document on window");
         let body = document.body().expect("document should have a body");
-        let canvas = document.get_element_by_id("glcanvas").unwrap().dyn_into::<HtmlCanvasElement>().unwrap();
-        builder = builder.with_inner_size(LogicalSize::new(canvas.client_width(), canvas.client_height()));
+        let canvas = document
+            .get_element_by_id("glcanvas")
+            .unwrap()
+            .dyn_into::<HtmlCanvasElement>()
+            .unwrap();
+        builder = builder.with_inner_size(LogicalSize::new(
+            canvas.client_width(),
+            canvas.client_height(),
+        ));
         builder = builder.with_canvas(Some(canvas));
     }
     let window = builder.build(&event_loop).unwrap();
