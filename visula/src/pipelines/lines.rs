@@ -2,7 +2,6 @@ use crate::{Application, BindingBuilder, InstanceBinding};
 use bytemuck::{Pod, Zeroable};
 use naga::back::wgsl::WriterFlags;
 use naga::{valid::ValidationFlags, Block, Handle, Statement};
-use std::collections::HashMap;
 use std::mem::size_of;
 use visula_derive::define_delegate;
 use wgpu::BufferUsages;
@@ -67,21 +66,7 @@ impl Lines {
         } = application;
         let mut module =
             naga::front::wgsl::parse_str(include_str!("../shaders/line.wgsl")).unwrap();
-        let entry_point_index = module
-            .entry_points
-            .iter()
-            .position(|entry_point| entry_point.name == "vs_main")
-            .unwrap();
-
-        let mut binding_builder = BindingBuilder {
-            bindings: HashMap::new(),
-            uniforms: HashMap::new(),
-            bind_groups: HashMap::new(),
-            entry_point_index,
-            shader_location_offset: 2,
-            current_slot: 1,
-            current_bind_group: 1,
-        };
+        let mut binding_builder = BindingBuilder::new(&module, "vs_main", 1);
 
         log::info!("Injecting line shader delegate");
         delegate.inject("line_input", &mut module, &mut binding_builder);
