@@ -22,6 +22,16 @@ struct Line {
     alpha: f32;
 };
 
+fn offset(pos: vec3<f32>, direction: vec3<f32>, unit_offset: vec3<f32>) -> vec3<f32> {
+    let view: vec3<f32> = normalize(pos - u_globals.camera_position.xyz);
+    let right: vec3<f32> = normalize(cross(direction, view));
+    let up: vec3<f32> = normalize(cross(right, view));
+
+    let transform: mat3x3<f32> = mat3x3<f32>(right, up, view);
+
+    return transform * unit_offset;
+}
+
 fn line(
     length_weight: f32,
     width_weight: f32,
@@ -31,16 +41,13 @@ fn line(
     output.alpha = line.alpha;
 
     let width_half = line.width / 2.0;
-
-    let view_start: vec3<f32> = normalize(line.start - u_globals.camera_position.xyz);
-    let view_end: vec3<f32> = normalize(line.end - u_globals.camera_position.xyz);
-    let right_start: vec3<f32> = normalize(cross(view_start, u_globals.camera_up.xyz));
-    let right_end: vec3<f32> = normalize(cross(view_end, u_globals.camera_up.xyz));
-
-    let offset_left_start = -right_start * width_half;
-    let offset_right_start = right_start * width_half;
-    let offset_left_end = -right_end * width_half;
-    let offset_right_end = right_end * width_half;
+    let left = vec3<f32>(-width_half, 0.0, 0.0);
+    let right = vec3<f32>(width_half, 0.0, 0.0);
+    let direction = line.end - line.start;
+    let offset_left_start = offset(line.start, direction, left);
+    let offset_right_start = offset(line.start, direction, right);
+    let offset_left_end = offset(line.end, direction, left);
+    let offset_right_end = offset(line.end, direction, right);
 
     let offset_left = (1.0 - length_weight) * offset_left_start + length_weight * offset_left_end;
     let offset_right = (1.0 - length_weight) * offset_right_start + length_weight * offset_right_end;
