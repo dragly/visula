@@ -52,7 +52,10 @@ impl Application {
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..
-            } => *control_flow = ControlFlow::Exit,
+            } => {
+                *control_flow = ControlFlow::Exit;
+                println!("{}", crude_profiler::report());
+            }
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),
                 ..
