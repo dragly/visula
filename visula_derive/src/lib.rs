@@ -2,8 +2,8 @@ use proc_macro::TokenStream;
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::{format_ident, quote};
 use syn::{
-    parse_macro_input, BinOp, Data, DeriveInput, Expr, ExprBinary, ExprField, Field, Fields,
-    FieldsNamed, ItemStruct,
+    parse_macro_input, BinOp, Data, DeriveInput, Expr, ExprBinary, ExprCall, ExprField, ExprPath,
+    Field, Fields, FieldsNamed, ItemStruct, Path,
 };
 
 type TokenStream2 = proc_macro2::TokenStream;
@@ -78,7 +78,75 @@ fn parse(input: &Expr, setup: &mut Vec<proc_macro2::TokenStream>) -> proc_macro2
             });
             quote! { #expression_current }
         }
-        other => unimplemented!("Support for {:#?} is not yet implemented", other),
+        Expr::Call(ExprCall { func, args, .. }) => match func.as_ref() {
+            Expr::Path(ExprPath {
+                path: Path { segments, .. },
+                ..
+            }) => {
+                if segments.len() > 1 {
+                    unimplemented!("Only segments of length 1 are supported. Found {segments:#?}")
+                } else {
+                    let ident = &segments[0].ident;
+                    match ident.to_string().as_ref() {
+                        "vec3" => {
+                            let components: Vec<proc_macro2::TokenStream> =
+                                args.iter().enumerate().map(|(index, arg)| {
+                                    let constant_name = format_ident! {"constant_{current}_{index}"};
+                                    setup.push(quote!{
+                                        let #constant_name = module.constants.append(
+                                            naga::Constant {
+                                                name: None,
+                                                specialization: None,
+                                                inner: naga::ConstantInner::Scalar {
+                                                    width: 4,
+                                                    value: naga::ScalarValue::Float(#arg),
+                                                },
+                                            },
+                                            ::naga::Span::default(),
+                                        );
+                                    });
+                                    quote!{ #constant_name }
+                                }).collect();
+                            let components = quote! { vec![#(#components,)*] };
+                            setup.push(quote! {
+                                let naga_type = naga::Type {
+                                    name: None,
+                                    inner: naga::TypeInner::Vector {
+                                        kind: naga::ScalarKind::Float,
+                                        width: 4,
+                                        size: naga::VectorSize::Tri,
+                                    },
+                                };
+                                let field_type = module.types.insert(naga_type, naga::Span::default());
+                                let #constant_current = module.constants.append(
+                                    naga::Constant {
+                                        name: None,
+                                        specialization: None,
+                                        inner: naga::ConstantInner::Composite {
+                                            ty: field_type,
+                                            components: #components,
+                                        },
+                                    },
+                                    ::naga::Span::default(),
+                                );
+                                let #expression_current = module.entry_points[entry_point_index]
+                                    .function
+                                    .expressions
+                                    .append(::naga::Expression::Constant(#constant_current), ::naga::Span::default());
+                            });
+                            quote! { #expression_current }
+                        }
+                        other => {
+                            unimplemented!("Unknown function {other}")
+                        }
+                    }
+                }
+            }
+            other => {
+                unimplemented! {"Support is not yet implemented for {other:#?}"}
+            }
+        },
+        other => unimplemented!("Support is not yet implemented for {:#?}", other),
     }
 }
 
