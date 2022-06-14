@@ -89,10 +89,13 @@ fn parse(input: &Expr, setup: &mut Vec<proc_macro2::TokenStream>) -> proc_macro2
                     let ident = &segments[0].ident;
                     match ident.to_string().as_ref() {
                         "vec3" => {
-                            let components: Vec<proc_macro2::TokenStream> =
-                                args.iter().enumerate().map(|(index, arg)| {
-                                    let constant_name = format_ident! {"constant_{current}_{index}"};
-                                    setup.push(quote!{
+                            let components: Vec<proc_macro2::TokenStream> = args
+                                .iter()
+                                .enumerate()
+                                .map(|(index, arg)| {
+                                    let constant_name =
+                                        format_ident! {"constant_{current}_{index}"};
+                                    setup.push(quote! {
                                         let #constant_name = module.constants.append(
                                             naga::Constant {
                                                 name: None,
@@ -105,8 +108,9 @@ fn parse(input: &Expr, setup: &mut Vec<proc_macro2::TokenStream>) -> proc_macro2
                                             ::naga::Span::default(),
                                         );
                                     });
-                                    quote!{ #constant_name }
-                                }).collect();
+                                    quote! { #constant_name }
+                                })
+                                .collect();
                             let components = quote! { vec![#(#components,)*] };
                             setup.push(quote! {
                                 let naga_type = naga::Type {
