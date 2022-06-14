@@ -75,6 +75,7 @@ impl visula::Simulation for Simulation {
             &SphereDelegate {
                 position: delegate!(sphere.position),
                 radius: delegate!(0.1),
+                color: delegate!(sphere.color),
             },
         )
         .unwrap();
