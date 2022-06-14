@@ -48,7 +48,8 @@ pub struct Spheres {
 define_delegate! {
     pub struct SphereDelegate {
         pub position: vec3,
-        pub radius: vec3,
+        pub radius: f32,
+        pub color: vec3,
     }
 }
 
