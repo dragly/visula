@@ -1,5 +1,5 @@
-use crate::camera::controller::CameraController;
 use crate::custom_event::CustomEvent;
+use crate::{camera::controller::CameraController, simulation::SimulationRenderInfo};
 
 use winit::{
     event::{Event, WindowEvent},
@@ -157,33 +157,12 @@ impl Application {
             let view = frame
                 .texture
                 .create_view(&wgpu::TextureViewDescriptor::default());
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("render"),
-                color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.2,
-                            b: 0.3,
-                            a: 1.0,
-                        }),
-                        store: true,
-                    },
-                }],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth_texture,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: true,
-                    }),
-                    stencil_ops: None,
-                }),
+            simulation.render(&mut SimulationRenderInfo {
+                encoder: &mut encoder,
+                view: &view,
+                depth: &self.depth_texture,
+                camera_bind_group: &self.camera_bind_group,
             });
-            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
-
-            simulation.render(&mut render_pass);
         }
 
         {

@@ -7,10 +7,10 @@ use naga::{ResourceBinding, StructMember, TypeInner};
 use structopt::StructOpt;
 
 use visula::{
-    BindingBuilder, Buffer, BufferBinding, BufferBindingField, Instance, InstanceBinding,
-    InstanceField, InstanceHandle, LineDelegate, Lines, NagaType, SphereDelegate, Spheres, Uniform,
-    UniformBinding, UniformField, UniformHandle, Vector3, VertexAttrFormat,
-    VertexBufferLayoutBuilder,
+    simulation::SimulationRenderInfo, BindingBuilder, Buffer, BufferBinding, BufferBindingField,
+    Instance, InstanceBinding, InstanceField, InstanceHandle, LineDelegate, Lines, NagaType,
+    SphereDelegate, Spheres, Uniform, UniformBinding, UniformField, UniformHandle, Vector3,
+    VertexAttrFormat, VertexBufferLayoutBuilder,
 };
 use visula_derive::{delegate, Instance, Uniform};
 
@@ -314,17 +314,51 @@ impl visula::Simulation for Simulation {
         self.particle_buffer.update(application, &particle_data);
     }
 
-    fn render<'a>(&'a mut self, render_pass: &mut wgpu::RenderPass<'a>) {
+    fn render(&mut self, info: &mut SimulationRenderInfo) {
+        let SimulationRenderInfo {
+            encoder,
+            view,
+            depth,
+            camera_bind_group,
+        } = info;
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("render"),
+                color_attachments: &[wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.1,
+                            g: 0.2,
+                            b: 0.3,
+                            a: 1.0,
+                        }),
+                        store: true,
+                    },
+                }],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: depth,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: true,
+                    }),
+                    stencil_ops: None,
+                }),
+            });
+            render_pass.set_bind_group(0, camera_bind_group, &[]);
+        }
+
         {
             let particle_bindings: &[&dyn InstanceBinding] =
                 &[&self.particle_buffer, &self.settings_buffer];
-            self.spheres.render(render_pass, particle_bindings);
+            self.spheres.render(info, particle_bindings);
         }
-        if self.bond_buffer.count != 0 {
-            let bond_bindings: &[&dyn InstanceBinding] =
-                &[&self.bond_buffer, &self.settings_buffer];
-            self.lines.render(render_pass, bond_bindings);
-        }
+        //if self.bond_buffer.count != 0 {
+        //let bond_bindings: &[&dyn InstanceBinding] =
+        //&[&self.bond_buffer, &self.settings_buffer];
+        //self.lines.render(info, bond_bindings);
+        //}
     }
 
     fn gui(&mut self, context: &egui::Context) {
