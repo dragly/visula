@@ -1,8 +1,8 @@
 use naga::{Expression, Handle, Module, Span};
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 use wgpu::{BindGroupLayout, BufferAddress, VertexAttribute, VertexBufferLayout, VertexStepMode};
 
-use crate::BindingBuilder;
+use crate::{BindingBuilder, BufferInner};
 
 pub struct VertexBufferLayoutBuilder {
     pub array_stride: BufferAddress,
@@ -20,26 +20,31 @@ impl VertexBufferLayoutBuilder {
     }
 }
 
-pub trait InstanceHandle {
-    fn integrate(&self, module: &mut Module, binding_builder: &mut BindingBuilder);
-}
+pub trait InstanceHandle {}
 
 pub trait Instance {
     type Type: InstanceHandle;
-    fn instance(handle: u64) -> Self::Type;
+    fn instance(inner: Rc<RefCell<BufferInner>>) -> Self::Type;
 }
+
+type IntegrateBuffer = fn(&Rc<RefCell<BufferInner>>, u64, &mut naga::Module, &mut BindingBuilder);
 
 pub struct InstanceField {
     pub buffer_handle: u64,
     pub field_index: usize,
+    pub inner: Rc<RefCell<BufferInner>>,
+    pub integrate_buffer: IntegrateBuffer,
 }
 
 impl InstanceField {
     pub fn integrate(
         &self,
         module: &mut Module,
-        binding_builder: &BindingBuilder,
+        binding_builder: &mut BindingBuilder,
     ) -> Handle<Expression> {
+        if !binding_builder.bindings.contains_key(&self.buffer_handle) {
+            (self.integrate_buffer)(&self.inner, self.buffer_handle, module, binding_builder);
+        }
         module.entry_points[binding_builder.entry_point_index]
             .function
             .expressions
@@ -55,24 +60,43 @@ impl InstanceField {
 
 pub trait Uniform {
     type Type;
-    fn uniform(handle: u64, bind_group_layout: Rc<BindGroupLayout>) -> Self::Type;
+    fn uniform(inner: Rc<RefCell<BufferInner>>) -> Self::Type;
 }
+
+type IntegrateUniform = fn(
+    &Rc<RefCell<BufferInner>>,
+    u64,
+    &mut naga::Module,
+    &mut BindingBuilder,
+    &Rc<BindGroupLayout>,
+);
 
 pub struct UniformField {
+    pub bind_group_layout: std::rc::Rc<wgpu::BindGroupLayout>,
     pub buffer_handle: u64,
     pub field_index: usize,
+    pub inner: Rc<RefCell<BufferInner>>,
+    pub integrate_buffer: IntegrateUniform,
 }
 
-pub trait UniformHandle {
-    fn integrate(&self, module: &mut Module, binding_builder: &mut BindingBuilder);
-}
+pub trait UniformHandle {}
 
 impl UniformField {
     pub fn integrate(
         &self,
         module: &mut Module,
-        binding_builder: &BindingBuilder,
+        binding_builder: &mut BindingBuilder,
     ) -> Handle<Expression> {
+        let inner = self.inner.borrow();
+        if !binding_builder.bindings.contains_key(&self.buffer_handle) {
+            (self.integrate_buffer)(
+                &self.inner,
+                self.buffer_handle,
+                module,
+                binding_builder,
+                &inner.bind_group_layout,
+            );
+        }
         let access_index = module.entry_points[binding_builder.entry_point_index]
             .function
             .expressions

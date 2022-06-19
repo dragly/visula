@@ -1,12 +1,12 @@
-use std::marker::PhantomData;
 use std::rc::Rc;
+use std::{cell::RefCell, marker::PhantomData};
 
 use bytemuck::Pod;
 use wgpu::{util::DeviceExt, BufferUsages};
 
-use crate::{Application, Instance, InstanceBinding, Uniform};
+use crate::{Application, Instance, Uniform};
 
-pub struct Buffer<T: Pod> {
+pub struct BufferInner {
     pub label: String,
     pub buffer: wgpu::Buffer,
     pub bind_group: wgpu::BindGroup,
@@ -14,6 +14,10 @@ pub struct Buffer<T: Pod> {
     pub count: usize,
     pub handle: u64,
     usage: BufferUsages,
+}
+
+pub struct Buffer<T: Pod> {
+    pub inner: Rc<RefCell<BufferInner>>,
     phantom: PhantomData<T>,
 }
 
@@ -57,14 +61,16 @@ impl<T: Pod> Buffer<T> {
             });
 
         Buffer {
-            label: label.into(),
-            buffer,
-            count: 0,
-            usage,
-            handle,
+            inner: Rc::new(RefCell::new(BufferInner {
+                label: label.into(),
+                buffer,
+                count: 0,
+                usage,
+                handle,
+                bind_group,
+                bind_group_layout: Rc::new(bind_group_layout),
+            })),
             phantom: PhantomData {},
-            bind_group,
-            bind_group_layout: Rc::new(bind_group_layout),
         }
     }
 
@@ -112,33 +118,36 @@ impl<T: Pod> Buffer<T> {
             });
 
         Buffer {
-            label: label.into(),
-            buffer,
-            count: data.len(),
-            usage,
-            handle,
+            inner: Rc::new(RefCell::new(BufferInner {
+                label: label.into(),
+                buffer,
+                count: data.len(),
+                usage,
+                handle,
+                bind_group,
+                bind_group_layout: Rc::new(bind_group_layout),
+            })),
             phantom: PhantomData {},
-            bind_group,
-            bind_group_layout: Rc::new(bind_group_layout),
         }
     }
 
     pub fn update(&mut self, application: &Application, data: &[T]) {
-        log::debug!("Update buffer '{}' with length {}", self.label, data.len());
-        if data.len() == self.count {
+        let mut inner = self.inner.borrow_mut();
+        log::debug!("Update buffer '{}' with length {}", inner.label, data.len());
+        if data.len() == inner.count {
             application
                 .queue
-                .write_buffer(&self.buffer, 0, bytemuck::cast_slice(data));
+                .write_buffer(&inner.buffer, 0, bytemuck::cast_slice(data));
         } else {
-            self.buffer =
+            inner.buffer =
                 application
                     .device
                     .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                         label: Some("Instance buffer"),
                         contents: bytemuck::cast_slice(data),
-                        usage: self.usage,
+                        usage: inner.usage,
                     });
-            self.count = data.len();
+            inner.count = data.len();
         }
     }
 }
@@ -146,28 +155,13 @@ impl<T: Pod> Buffer<T> {
 impl<T: Instance + Pod> Buffer<T> {
     // TODO move T to Buffer<T>
     pub fn instance(&self) -> T::Type {
-        T::instance(self.handle)
+        T::instance(self.inner.clone())
     }
 }
 
 impl<T: Uniform + Pod> Buffer<T> {
     // TODO move T to Buffer<T>
     pub fn uniform(&self) -> T::Type {
-        T::uniform(self.handle, self.bind_group_layout.clone())
-    }
-}
-
-impl<'a, T: Pod> InstanceBinding<'a> for Buffer<T> {
-    fn handle(&self) -> u64 {
-        self.handle
-    }
-    fn buffer(&'a self) -> &'a wgpu::Buffer {
-        &self.buffer
-    }
-    fn count(&self) -> u32 {
-        self.count as u32
-    }
-    fn bind_group(&'a self) -> &'a wgpu::BindGroup {
-        &self.bind_group
+        T::uniform(self.inner.clone())
     }
 }

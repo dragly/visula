@@ -11,9 +11,10 @@ use naga::{ResourceBinding, StructMember, TypeInner};
 use structopt::StructOpt;
 
 use visula::{
-    BindingBuilder, Buffer, BufferBinding, BufferBindingField, Instance, InstanceBinding,
-    InstanceField, InstanceHandle, NagaType, SphereDelegate, Spheres, Uniform, UniformBinding,
-    UniformField, UniformHandle, Vector3, VertexAttrFormat, VertexBufferLayoutBuilder,
+    BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Instance,
+    InstanceField, InstanceHandle, NagaType, SimulationRenderData, SphereDelegate, Spheres,
+    Uniform, UniformBinding, UniformField, UniformHandle, Vector3, VertexAttrFormat,
+    VertexBufferLayoutBuilder,
 };
 use visula_derive::{delegate, Instance, Uniform};
 
@@ -227,8 +228,6 @@ fn integrate<F: TwoBodyForce>(
         }
     }
 
-    let mut interactions = 0;
-    let mut iterations = 0;
     let mut queue: VecDeque<Rc<RefCell<SphereTree>>> = VecDeque::new();
     g.replace("tree iteration");
     for (intermediate_particle, out_particle) in intermediate_state.iter().zip(out_state.iter_mut())
@@ -236,7 +235,6 @@ fn integrate<F: TwoBodyForce>(
         queue.push_front(sphere_tree.clone());
         let mut current_node;
         loop {
-            iterations += 1;
             current_node = match queue.pop_back() {
                 Some(node) => node,
                 None => {
@@ -252,7 +250,6 @@ fn integrate<F: TwoBodyForce>(
                         out_particle.acceleration += two_body
                             .force(&intermediate_particle.position, position)
                             / intermediate_particle.mass;
-                        interactions += 1;
                     }
                 }
                 SphereTree::Branch { left, right, .. } => {
@@ -331,7 +328,6 @@ struct Simulation {
     particles: Vec<Particle>,
     spheres: Spheres,
     particle_buffer: Buffer<ParticleData>,
-    settings_buffer: Buffer<Settings>,
 }
 
 impl visula::Simulation for Simulation {
@@ -373,12 +369,10 @@ impl visula::Simulation for Simulation {
             particles,
             spheres,
             particle_buffer,
-            settings_buffer,
         })
     }
 
     fn update(&mut self, application: &visula::Application) {
-        //for _ in 0..4 {
         let previous_particles = self.particles.clone();
         integrate(
             &mut self.particles,
@@ -386,7 +380,6 @@ impl visula::Simulation for Simulation {
             LennardJones::default(),
             0.01,
         );
-        //}
         let particle_data: Vec<ParticleData> = self
             .particles
             .iter()
@@ -398,9 +391,8 @@ impl visula::Simulation for Simulation {
         self.particle_buffer.update(application, &particle_data);
     }
 
-    fn render<'a>(&'a mut self, render_pass: &mut wgpu::RenderPass<'a>) {
-        let bindings: &[&dyn InstanceBinding] = &[&self.particle_buffer, &self.settings_buffer];
-        self.spheres.render(render_pass, bindings);
+    fn render(&mut self, data: &mut SimulationRenderData) {
+        self.spheres.render(data);
     }
 }
 

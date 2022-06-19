@@ -1,7 +1,10 @@
-use crate::{Application, BindingBuilder, InstanceBinding};
+use crate::{
+    Application, BindingBuilder, BufferBinding, DefaultRenderPassDescriptor, SimulationRenderData,
+};
 use bytemuck::{Pod, Zeroable};
 use naga::back::wgsl::WriterFlags;
 use naga::{valid::ValidationFlags, Block, Handle, Statement};
+use std::cell::Ref;
 use std::mem::size_of;
 use visula_derive::define_delegate;
 use wgpu::BufferUsages;
@@ -187,36 +190,74 @@ impl Lines {
         })
     }
 
-    pub fn render<'a>(
-        &'a mut self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        bindings: &[&'a dyn InstanceBinding<'a>],
+    pub fn render(
+        &self,
+        SimulationRenderData {
+            encoder,
+            view,
+            depth_texture,
+            camera_bind_group,
+            ..
+        }: &mut SimulationRenderData,
     ) {
         log::debug!("Rendering lines");
-        render_pass.set_pipeline(&self.render_pipeline);
-        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        let mut instance_count = 0;
-        for binding in bindings {
-            if self
-                .binding_builder
-                .bindings
-                .contains_key(&binding.handle())
-            {
-                let slot = self.binding_builder.bindings[&binding.handle()].slot;
-                log::debug!("Setting vertex buffer {}", slot);
-                render_pass.set_vertex_buffer(slot, binding.buffer().slice(..));
-                instance_count = instance_count.max(binding.count());
+        let mut count = None;
+        for binding in self.binding_builder.bindings.values() {
+            let other = binding.inner.borrow().count;
+            if other == 0 {
+                count = None;
+                break;
             }
-            if self
-                .binding_builder
-                .uniforms
-                .contains_key(&binding.handle())
-            {
-                log::debug!("Setting bind group {}", 1);
-                render_pass.set_bind_group(1, binding.bind_group(), &[]);
+            count = match count {
+                None => Some(other),
+                Some(old) => {
+                    if other != old {
+                        None
+                    } else {
+                        Some(old)
+                    }
+                }
             }
         }
-        render_pass.draw_indexed(0..self.index_count as u32, 0, 0..instance_count);
+        log::debug!("Line count {count:#?}");
+        if count == None {
+            log::debug!("Empty line buffer detected. Aborting render of lines.");
+            return;
+        }
+
+        let bindings: Vec<(&BufferBinding, Ref<wgpu::Buffer>)> = self
+            .binding_builder
+            .bindings
+            .values()
+            .map(|v| (v, Ref::map(v.inner.borrow(), |v| &v.buffer)))
+            .collect();
+        let uniforms: Vec<Ref<wgpu::BindGroup>> = self
+            .binding_builder
+            .uniforms
+            .values()
+            .map(|v| Ref::map(v.inner.borrow(), |m| &m.bind_group))
+            .collect();
+        {
+            let default_render_pass =
+                DefaultRenderPassDescriptor::new("lines", view, depth_texture);
+            let mut render_pass = encoder.begin_render_pass(&default_render_pass.build());
+            render_pass.set_bind_group(0, camera_bind_group, &[]);
+
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            let mut instance_count = 0;
+            for (binding, buffer) in bindings.iter() {
+                let slot = binding.slot;
+                log::debug!("Setting vertex buffer {}", slot);
+                render_pass.set_vertex_buffer(slot, buffer.slice(..));
+                instance_count = instance_count.max(binding.inner.borrow().count);
+            }
+            for bind_group in uniforms.iter() {
+                log::debug!("Setting bind group {}", 1);
+                render_pass.set_bind_group(1, bind_group, &[]);
+            }
+            render_pass.draw_indexed(0..self.index_count as u32, 0, 0..instance_count as u32);
+        }
     }
 }

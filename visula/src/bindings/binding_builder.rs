@@ -1,6 +1,7 @@
-use crate::VertexBufferLayoutBuilder;
+use crate::{BufferInner, VertexBufferLayoutBuilder};
 use naga::Module;
 use naga::{Expression, Handle};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use wgpu::{BindGroup, BindGroupLayout};
@@ -13,11 +14,13 @@ pub struct BufferBinding {
     pub slot: u32,
     pub fields: Vec<BufferBindingField>,
     pub layout: VertexBufferLayoutBuilder,
+    pub inner: Rc<RefCell<BufferInner>>,
 }
 
 pub struct UniformBinding {
     pub expression: Handle<Expression>,
     pub bind_group_layout: Rc<BindGroupLayout>,
+    pub inner: Rc<RefCell<BufferInner>>,
 }
 
 pub type BindingMap = HashMap<u64, BufferBinding>;

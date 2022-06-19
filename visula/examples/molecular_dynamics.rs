@@ -1,4 +1,6 @@
 use bytemuck::{Pod, Zeroable};
+use std::cell::RefCell;
+use std::rc::Rc;
 use wgpu::BufferUsages;
 
 use cgmath::{InnerSpace, Point3};
@@ -7,10 +9,10 @@ use naga::{ResourceBinding, StructMember, TypeInner};
 use structopt::StructOpt;
 
 use visula::{
-    BindingBuilder, Buffer, BufferBinding, BufferBindingField, Instance, InstanceBinding,
-    InstanceField, InstanceHandle, LineDelegate, Lines, NagaType, SphereDelegate, Spheres, Uniform,
-    UniformBinding, UniformField, UniformHandle, Vector3, VertexAttrFormat,
-    VertexBufferLayoutBuilder,
+    simulation::SimulationRenderData, BindingBuilder, Buffer, BufferBinding, BufferBindingField,
+    BufferInner, Instance, InstanceField, InstanceHandle, LineDelegate, Lines, NagaType,
+    SphereDelegate, Spheres, Uniform, UniformBinding, UniformField, UniformHandle, Vector3,
+    VertexAttrFormat, VertexBufferLayoutBuilder,
 };
 use visula_derive::{delegate, Instance, Uniform};
 
@@ -201,7 +203,6 @@ struct Simulation {
     particle_buffer: Buffer<ParticleData>,
     lines: Lines,
     settings: Settings,
-    settings_buffer: Buffer<Settings>,
     bond_buffer: Buffer<BondData>,
     bounding_box: BoundingBox,
     count: usize,
@@ -249,10 +250,11 @@ impl visula::Simulation for Simulation {
             "settings",
         );
         let settings = settings_buffer.uniform();
+        let pos = &particle.position;
         let spheres = Spheres::new(
             application,
             &SphereDelegate {
-                position: delegate!(particle.position),
+                position: delegate!(pos),
                 radius: delegate!(settings.radius),
                 color: delegate!(particle.position / 40.0 + vec3::<f32>(0.5, 0.5, 0.5)),
             },
@@ -278,7 +280,6 @@ impl visula::Simulation for Simulation {
             bond_buffer,
             lines,
             settings: settings_data,
-            settings_buffer,
             bounding_box: BoundingBox {
                 min: Point3::new(-bound, -bound, -bound),
                 max: Point3::new(bound, bound, bound),
@@ -314,17 +315,9 @@ impl visula::Simulation for Simulation {
         self.particle_buffer.update(application, &particle_data);
     }
 
-    fn render<'a>(&'a mut self, render_pass: &mut wgpu::RenderPass<'a>) {
-        {
-            let particle_bindings: &[&dyn InstanceBinding] =
-                &[&self.particle_buffer, &self.settings_buffer];
-            self.spheres.render(render_pass, particle_bindings);
-        }
-        if self.bond_buffer.count != 0 {
-            let bond_bindings: &[&dyn InstanceBinding] =
-                &[&self.bond_buffer, &self.settings_buffer];
-            self.lines.render(render_pass, bond_bindings);
-        }
+    fn render(&mut self, data: &mut SimulationRenderData) {
+        self.spheres.render(data);
+        self.lines.render(data);
     }
 
     fn gui(&mut self, context: &egui::Context) {

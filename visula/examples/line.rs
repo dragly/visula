@@ -1,10 +1,12 @@
 use bytemuck::{Pod, Zeroable};
 use wgpu::BufferUsages;
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use visula::{
-    BindingBuilder, Buffer, BufferBinding, BufferBindingField, Instance, InstanceBinding,
-    InstanceField, InstanceHandle, LineDelegate, Lines, NagaType, VertexAttrFormat,
-    VertexBufferLayoutBuilder,
+    BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Instance,
+    InstanceField, InstanceHandle, LineDelegate, Lines, NagaType, SimulationRenderData,
+    VertexAttrFormat, VertexBufferLayoutBuilder,
 };
 use visula_derive::{delegate, Instance};
 
@@ -63,11 +65,8 @@ impl visula::Simulation for Simulation {
         self.line_buffer.update(application, &self.line_data);
     }
 
-    fn render<'a>(&'a mut self, render_pass: &mut wgpu::RenderPass<'a>) {
-        if self.line_buffer.count != 0 {
-            let line_bindings: &[&dyn InstanceBinding] = &[&self.line_buffer];
-            self.lines.render(render_pass, line_bindings);
-        }
+    fn render(&mut self, data: &mut SimulationRenderData) {
+        self.lines.render(data);
     }
 }
 

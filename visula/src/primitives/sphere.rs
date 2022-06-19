@@ -1,5 +1,7 @@
 use crate::{NagaType, VertexAttrFormat};
 use bytemuck::{Pod, Zeroable};
+use std::cell::RefCell;
+use std::rc::Rc;
 use visula_derive::*;
 
 #[repr(C)]

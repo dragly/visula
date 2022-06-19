@@ -5,7 +5,7 @@ use structopt::StructOpt;
 
 use visula::{
     io::gltf::{parse_gltf, GltfMesh},
-    MeshPipeline, Pipeline,
+    MeshPipeline, Pipeline, SimulationRenderData,
 };
 
 #[derive(StructOpt)]
@@ -64,8 +64,8 @@ impl visula::Simulation for Simulation {
 
     fn update(&mut self, _application: &visula::Application) {}
 
-    fn render<'a>(&'a mut self, render_pass: &mut wgpu::RenderPass<'a>) {
-        self.mesh.render(render_pass);
+    fn render(&mut self, data: &mut SimulationRenderData) {
+        self.mesh.render(data);
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::pipelines::pipeline::Pipeline;
+use crate::{pipelines::pipeline::Pipeline, DefaultRenderPassDescriptor, SimulationRenderData};
 
 pub struct InstancedPipeline {
     pub render_pipeline: wgpu::RenderPipeline,
@@ -10,7 +10,16 @@ pub struct InstancedPipeline {
 }
 
 impl Pipeline for InstancedPipeline {
-    fn render<'a>(&'a mut self, render_pass: &mut wgpu::RenderPass<'a>) {
+    fn render(&mut self, data: &mut SimulationRenderData) {
+        let SimulationRenderData {
+            encoder,
+            view,
+            depth_texture,
+            ..
+        } = data;
+        let default_render_pass =
+            DefaultRenderPassDescriptor::new("instanced", view, depth_texture);
+        let mut render_pass = encoder.begin_render_pass(&default_render_pass.build());
         render_pass.set_pipeline(&self.render_pipeline);
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));

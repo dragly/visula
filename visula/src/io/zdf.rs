@@ -13,6 +13,7 @@ pub struct ZdfFile {
     pub camera_center: Vector3,
     pub point_cloud: Vec<Sphere>,
     pub mesh_vertex_buf: wgpu::Buffer,
+    pub mesh_index_buf: wgpu::Buffer,
     pub mesh_vertex_count: usize,
 }
 
@@ -132,9 +133,18 @@ pub fn read_zdf(path: &Path, device: &mut wgpu::Device) -> ZdfFile {
         usage: wgpu::BufferUsages::VERTEX,
     });
 
+    let indices: Vec<u32> = (0..vertices.len()).map(|i| i as u32).collect();
+
+    let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Mesh buffer"),
+        contents: bytemuck::cast_slice(&indices),
+        usage: wgpu::BufferUsages::INDEX,
+    });
+
     ZdfFile {
         point_cloud,
         mesh_vertex_buf: vertex_buffer,
+        mesh_index_buf: index_buffer,
         mesh_vertex_count: vertices.len(),
         camera_center,
     }

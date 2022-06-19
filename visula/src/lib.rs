@@ -24,6 +24,7 @@ pub mod io;
 pub mod naga_type;
 pub mod pipelines;
 pub mod primitives;
+pub mod render_pass;
 pub mod simulation;
 pub mod vec_to_buffer;
 pub mod vertex_attr;
@@ -39,14 +40,15 @@ pub mod setup_wasm;
 
 pub use application::Application;
 pub use bindings::*;
-pub use buffer::Buffer;
+pub use buffer::*;
 pub use custom_event::CustomEvent;
 pub use drop_event::DropEvent;
 pub use instances::*;
 pub use naga_type::NagaType;
 pub use pipelines::*;
 pub use primitives::*;
-pub use simulation::Simulation;
+pub use render_pass::*;
+pub use simulation::*;
 
 pub type Vector2 = cgmath::Vector2<f32>;
 pub type Vector3 = cgmath::Vector3<f32>;
