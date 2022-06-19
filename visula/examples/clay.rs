@@ -364,6 +364,7 @@ impl visula::Simulation for Simulation {
             &SphereDelegate {
                 position: delegate!(particle.position),
                 radius: delegate!(settings.radius),
+                color: delegate!(vec3::<f32>(0.2, 0.8, 0.6)),
             },
         )
         .unwrap();

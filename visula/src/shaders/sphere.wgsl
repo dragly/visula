@@ -121,14 +121,10 @@ fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     let bound = 8.0;
     let bounds_min = vec3<f32>(-bound, -bound, -bound);
     let bounds_max = vec3<f32>(bound, bound, bound);
-    let red = clamp((in.vertex_position.x - bounds_min.x) / (bounds_max.x - bounds_min.x), 0.0, 1.0);
-    let green = clamp((in.vertex_position.y - bounds_min.y) / (bounds_max.y - bounds_min.y), 0.0, 1.0);
-    let blue = clamp((in.vertex_position.z - bounds_min.z) / (bounds_max.z - bounds_min.z), 0.0, 1.0);
-    let color: vec3<f32> = vec3<f32>(red, green, blue);
     let projectedPoint: vec4<f32> = u_globals.transform * vec4<f32>(intersection_position, 1.0);
 
     // TODO fix frag depth
     // gl_FragDepth = projectedPoint.z / projectedPoint.w;
 
-    return vec4<f32>(color * clamp(normalDotCamera + normalDotSun1 + normalDotSun2, 0.05, 1.0), 1.0);
+    return vec4<f32>(in.instance_color * clamp(normalDotCamera + normalDotSun1 + normalDotSun2, 0.05, 1.0), 1.0);
 }
