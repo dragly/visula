@@ -4,6 +4,7 @@ use wgpu::util::DeviceExt;
 
 use crate::pipelines::pipeline::Pipeline;
 use crate::primitives::mesh::MeshVertexAttributes;
+use crate::{DefaultRenderPassDescriptor, SimulationRenderData};
 
 pub struct MeshPipeline {
     pub render_pipeline: wgpu::RenderPipeline,
@@ -13,7 +14,18 @@ pub struct MeshPipeline {
 }
 
 impl Pipeline for MeshPipeline {
-    fn render<'a>(&'a mut self, render_pass: &mut wgpu::RenderPass<'a>) {
+    fn render(&mut self, data: &mut SimulationRenderData) {
+        let SimulationRenderData {
+            encoder,
+            view,
+            depth_texture,
+            camera_bind_group,
+            ..
+        } = data;
+        let default_render_pass = DefaultRenderPassDescriptor::new("mesh", view, depth_texture);
+        let mut render_pass = encoder.begin_render_pass(&default_render_pass.build());
+        render_pass.set_bind_group(0, camera_bind_group, &[]);
+
         render_pass.set_pipeline(&self.render_pipeline);
         render_pass.set_vertex_buffer(0, self.vertex_buf.slice(..));
         render_pass.set_index_buffer(self.index_buf.slice(..), wgpu::IndexFormat::Uint32);

@@ -23,7 +23,7 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput;
     out.position = u_globals.transform * vec4<f32>(position, 1.0);
-    out.color = vec4<f32>(abs(normal), 1.0);
+    out.color = color;
     return out;
 }
 

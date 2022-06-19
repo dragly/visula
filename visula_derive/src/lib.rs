@@ -23,34 +23,39 @@ fn visula_crate_name() -> TokenStream2 {
 fn parse(input: &Expr, setup: &mut Vec<proc_macro2::TokenStream>) -> proc_macro2::TokenStream {
     let current = setup.len();
     let expression_current = format_ident! {"expression_{}", current};
-    let constant_current = format_ident! {"constant_{}", current};
     match input {
         Expr::Lit(lit) => {
             setup.push(quote! {
-                let #constant_current = module.constants.append(
-                    naga::Constant {
-                        name: None,
-                        specialization: None,
-                        inner: naga::ConstantInner::Scalar {
-                            width: 4,
-                            value: naga::ScalarValue::Float(#lit),
+                let #expression_current = {
+                    // TODO handle non-float type
+                    let constant = module.constants.append(
+                        naga::Constant {
+                            name: None,
+                            specialization: None,
+                            inner: naga::ConstantInner::Scalar {
+                                width: 4,
+                                value: naga::ScalarValue::Float(#lit),
+                            },
                         },
-                    },
-                    ::naga::Span::default(),
-                );
-                let #expression_current = module.entry_points[entry_point_index]
-                    .function
-                    .expressions
-                    .append(::naga::Expression::Constant(#constant_current), ::naga::Span::default());
+                        ::naga::Span::default(),
+                    );
+                    module.entry_points[entry_point_index]
+                        .function
+                        .expressions
+                        .append(::naga::Expression::Constant(constant), ::naga::Span::default())
+                };
             });
             quote! { #expression_current }
         }
         Expr::Field(ExprField { base, member, .. }) => {
             setup.push(quote! {
-                if !binding_builder.bindings.contains_key(&#base.handle) {
-                    #base.integrate(module, binding_builder);
-                }
                 let #expression_current = #base.#member.integrate(module, binding_builder);
+            });
+            quote! { #expression_current }
+        }
+        Expr::Path(path) => {
+            setup.push(quote! {
+                let #expression_current = #path.integrate(module, binding_builder);
             });
             quote! { #expression_current }
         }
@@ -88,55 +93,32 @@ fn parse(input: &Expr, setup: &mut Vec<proc_macro2::TokenStream>) -> proc_macro2
                 } else {
                     let ident = &segments[0].ident;
                     match ident.to_string().as_ref() {
+                        // TODO handle vec2, vec4, etc.
+                        // TODO handle non-float type
+                        // TODO handle other functions
                         "vec3" => {
-                            let components: Vec<proc_macro2::TokenStream> = args
-                                .iter()
-                                .enumerate()
-                                .map(|(index, arg)| {
-                                    let constant_name =
-                                        format_ident! {"constant_{current}_{index}"};
-                                    setup.push(quote! {
-                                        let #constant_name = module.constants.append(
-                                            naga::Constant {
-                                                name: None,
-                                                specialization: None,
-                                                inner: naga::ConstantInner::Scalar {
-                                                    width: 4,
-                                                    value: naga::ScalarValue::Float(#arg),
-                                                },
-                                            },
-                                            ::naga::Span::default(),
-                                        );
-                                    });
-                                    quote! { #constant_name }
-                                })
-                                .collect();
+                            let components: Vec<proc_macro2::TokenStream> =
+                                args.iter().map(|arg| parse(arg, setup)).collect();
                             let components = quote! { vec![#(#components,)*] };
                             setup.push(quote! {
-                                let naga_type = naga::Type {
-                                    name: None,
-                                    inner: naga::TypeInner::Vector {
-                                        kind: naga::ScalarKind::Float,
-                                        width: 4,
-                                        size: naga::VectorSize::Tri,
-                                    },
-                                };
-                                let field_type = module.types.insert(naga_type, naga::Span::default());
-                                let #constant_current = module.constants.append(
-                                    naga::Constant {
+                                let #expression_current = {
+                                    let naga_type = naga::Type {
                                         name: None,
-                                        specialization: None,
-                                        inner: naga::ConstantInner::Composite {
+                                        inner: naga::TypeInner::Vector {
+                                            kind: naga::ScalarKind::Float,
+                                            width: 4,
+                                            size: naga::VectorSize::Tri,
+                                        },
+                                    };
+                                    let field_type = module.types.insert(naga_type, naga::Span::default());
+                                    module.entry_points[entry_point_index]
+                                        .function
+                                        .expressions
+                                        .append(::naga::Expression::Compose{
                                             ty: field_type,
                                             components: #components,
-                                        },
-                                    },
-                                    ::naga::Span::default(),
-                                );
-                                let #expression_current = module.entry_points[entry_point_index]
-                                    .function
-                                    .expressions
-                                    .append(::naga::Expression::Constant(#constant_current), ::naga::Span::default());
+                                        }, ::naga::Span::default())
+                                };
                             });
                             quote! { #expression_current }
                         }
@@ -271,6 +253,8 @@ pub fn instance(input: TokenStream) -> TokenStream {
     let mut instance_field_values = Vec::new();
     let mut binding_fields = Vec::new();
 
+    let instance_struct_name = format_ident!("{}Instance", name);
+
     match input.data {
         Data::Struct(ref data) => match data.fields {
             Fields::Named(ref fields) => {
@@ -314,8 +298,10 @@ pub fn instance(input: TokenStream) -> TokenStream {
                             });
                             instance_field_values.push(quote! {
                                 #field_name: #crate_name::InstanceField {
-                                    buffer_handle: handle,
+                                    buffer_handle: inner.borrow().handle,
+                                    inner: inner.clone(),
                                     field_index: #field_index,
+                                    integrate_buffer: #instance_struct_name::integrate,
                                 }
                             });
                             attributes.push(quote! {
@@ -343,17 +329,16 @@ pub fn instance(input: TokenStream) -> TokenStream {
         Data::Enum(_) | Data::Union(_) => unimplemented!(),
     }
 
-    let instance_struct_name = format_ident!("{}Instance", name);
-
     let expanded = quote! {
         pub struct #instance_struct_name {
             #(#instance_struct_fields,)*
             pub handle: u64,
         }
 
-        impl #crate_name::InstanceHandle for #instance_struct_name {
+        impl #instance_struct_name {
             fn integrate(
-                &self,
+                inner: &Rc<RefCell<#crate_name::BufferInner>>,
+                handle: u64,
                 module: &mut naga::Module,
                 binding_builder: &mut #crate_name::BindingBuilder,
             )
@@ -364,7 +349,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
 
                 #(#module_fields)*
 
-                binding_builder.bindings.insert(self.handle, #crate_name::BufferBinding {
+                binding_builder.bindings.insert(handle, #crate_name::BufferBinding {
                     layout: #crate_name::VertexBufferLayoutBuilder {
                         array_stride: std::mem::size_of::<#name>() as wgpu::BufferAddress,
                         step_mode: wgpu::VertexStepMode::Instance,
@@ -375,7 +360,8 @@ pub fn instance(input: TokenStream) -> TokenStream {
                     slot: binding_builder.current_slot,
                     fields: vec![
                         #(#binding_fields,)*
-                    ]
+                    ],
+                    inner: inner.clone(),
                 });
 
                 binding_builder.shader_location_offset += #shader_location;
@@ -384,9 +370,13 @@ pub fn instance(input: TokenStream) -> TokenStream {
 
         }
 
+        impl #crate_name::InstanceHandle for #instance_struct_name {
+        }
+
         impl #crate_name::Instance for #name {
             type Type = #instance_struct_name;
-            fn instance(handle: u64) -> Self::Type {
+            fn instance(inner: Rc<RefCell<#crate_name::BufferInner>>) -> Self::Type {
+                let handle = inner.borrow().handle;
                 Self::Type {
                     #(#instance_field_values,)*
                     handle,
@@ -411,6 +401,8 @@ pub fn uniform(input: TokenStream) -> TokenStream {
     let mut uniform_fields = Vec::new();
     let mut uniform_field_values = Vec::new();
     let mut field_index: usize = 0;
+
+    let uniform_struct_name = format_ident!("{}Uniform", name);
 
     match input.data {
         Data::Struct(ref data) => match data.fields {
@@ -446,8 +438,11 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                             });
                             uniform_field_values.push(quote! {
                                 #field_name: UniformField {
-                                    buffer_handle: handle,
+                                    buffer_handle: inner.borrow().handle,
+                                    inner: inner.clone(),
                                     field_index: #field_index,
+                                    bind_group_layout: inner.borrow().bind_group_layout.clone(),
+                                    integrate_buffer: #uniform_struct_name::integrate,
                                 }
                             });
                             field_index += 1;
@@ -462,20 +457,23 @@ pub fn uniform(input: TokenStream) -> TokenStream {
         Data::Enum(_) | Data::Union(_) => unimplemented!(),
     }
 
-    let uniform_struct_name = format_ident!("{}Uniform", name);
-
+    let crate_name = visula_crate_name();
     let expanded = quote! {
         struct #uniform_struct_name {
             #(#uniform_struct_fields,)*
             handle: u64,
-            bind_group_layout: std::rc::Rc<wgpu::BindGroupLayout>,
+            bind_group_layout: std::rc::Rc<::wgpu::BindGroupLayout>,
         }
 
         impl UniformHandle for #uniform_struct_name {
+        }
+        impl #uniform_struct_name {
             fn integrate(
-                &self,
+                inner: &std::rc::Rc<std::cell::RefCell<#crate_name::BufferInner>>,
+                handle: u64,
                 module: &mut naga::Module,
                 binding_builder: &mut visula::BindingBuilder,
+                bind_group_layout: &Rc<::wgpu::BindGroupLayout>,
             )
             {
                 let entry_point_index = binding_builder.entry_point_index;
@@ -515,9 +513,10 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                     .expressions
                     .append(::naga::Expression::GlobalVariable(uniform_variable), ::naga::Span::default());
 
-                binding_builder.uniforms.insert(self.handle, UniformBinding {
+                binding_builder.uniforms.insert(handle, UniformBinding {
                     expression: settings_expression,
-                    bind_group_layout: self.bind_group_layout.clone(),
+                    bind_group_layout: bind_group_layout.clone(),
+                    inner: inner.clone(),
                 });
                 binding_builder.current_bind_group += 1;
             }
@@ -526,11 +525,11 @@ pub fn uniform(input: TokenStream) -> TokenStream {
 
         impl Uniform for #name {
             type Type = #uniform_struct_name;
-            fn uniform(handle: u64, bind_group_layout: std::rc::Rc<wgpu::BindGroupLayout>) -> Self::Type {
+            fn uniform(inner: std::rc::Rc<std::cell::RefCell<#crate_name::BufferInner>>) -> Self::Type {
                 Self::Type {
                     #(#uniform_field_values,)*
-                    handle,
-                    bind_group_layout,
+                    handle: inner.borrow().handle,
+                    bind_group_layout: inner.borrow().bind_group_layout.clone(),
                 }
             }
         }

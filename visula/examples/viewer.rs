@@ -1,15 +1,13 @@
 use std::path::Path;
 
 use structopt::StructOpt;
-use visula::InstanceBinding;
+use visula::SimulationRenderData;
 use visula::SphereDelegate;
 use visula_derive::delegate;
 use wgpu::BufferUsages;
 use winit::event::{KeyboardInput, VirtualKeyCode, WindowEvent};
 
-use visula::{
-    BindingBuilder, Buffer, DropEvent, InstanceHandle, MeshPipeline, Pipeline, Sphere, Spheres,
-};
+use visula::{BindingBuilder, Buffer, DropEvent, MeshPipeline, Pipeline, Sphere, Spheres};
 
 #[derive(StructOpt)]
 struct Cli {
@@ -36,11 +34,13 @@ impl Simulation {
             camera_center,
             point_cloud,
             mesh_vertex_buf,
+            mesh_index_buf,
             mesh_vertex_count,
         } = visula::io::zdf::read_zdf(path, &mut application.device);
 
         application.camera_controller.center = camera_center;
         self.sphere_buffer.update(application, &point_cloud[..]);
+        self.mesh.index_buf = mesh_index_buf;
         self.mesh.vertex_buf = mesh_vertex_buf;
         self.mesh.vertex_count = mesh_vertex_count;
     }
@@ -95,11 +95,10 @@ impl visula::Simulation for Simulation {
 
     fn update(&mut self, _: &visula::Application) {}
 
-    fn render<'a>(&'a mut self, render_pass: &mut wgpu::RenderPass<'a>) {
-        let bindings: &[&dyn InstanceBinding] = &[&self.sphere_buffer];
+    fn render(&mut self, data: &mut SimulationRenderData) {
         match self.render_mode {
-            RenderMode::Mesh => self.mesh.render(render_pass),
-            RenderMode::Points => self.spheres.render(render_pass, bindings),
+            RenderMode::Mesh => self.mesh.render(data),
+            RenderMode::Points => self.spheres.render(data),
         };
     }
 
