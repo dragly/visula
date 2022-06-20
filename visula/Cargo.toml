@@ -12,6 +12,7 @@ futures = "0.3"
 wasm-bindgen-futures = "0.4"
 wasm-bindgen = "=0.2.78"
 cgmath = "0.17.0"
+glam = {version = "0.20", features = ["bytemuck"]}
 bytemuck = { version = "1.4", features = ["derive"] }
 js-sys = "0.3"
 trajan = "0.1.0"
