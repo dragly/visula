@@ -7,7 +7,6 @@ use wgpu::BufferUsages;
 
 use cgmath::InnerSpace;
 use itertools_num::linspace;
-use naga::{ResourceBinding, StructMember, TypeInner};
 use structopt::StructOpt;
 
 use visula::{

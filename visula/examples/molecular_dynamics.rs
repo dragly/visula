@@ -1,10 +1,7 @@
 use bytemuck::{Pod, Zeroable};
-use std::cell::RefCell;
-use std::rc::Rc;
 use wgpu::BufferUsages;
 
 use itertools_num::linspace;
-use naga::{ResourceBinding, StructMember, TypeInner};
 use structopt::StructOpt;
 
 use glam::Vec3;

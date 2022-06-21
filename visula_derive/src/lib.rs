@@ -432,7 +432,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                                 0 #(+ #sizes)*
                             };
                             uniform_fields.push(quote! {
-                                #crate_name::StructMember {
+                                ::naga::StructMember {
                                     name: Some(stringify!(#field_name).into()),
                                     ty: #field_type_declaration,
                                     binding: None,
