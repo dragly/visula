@@ -32,13 +32,6 @@ struct Particle {
     _padding: [f32; 2],
 }
 
-//#[repr(C, align(16))]
-//#[derive(Clone, Copy, Instance, Pod, Zeroable)]
-//struct ParticleData {
-//position: [f32; 3],
-//radius: f32,
-//}
-
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct BondData {
@@ -206,6 +199,7 @@ struct Simulation {
     particle_buffer: Buffer<Particle>,
     lines: Lines,
     settings: Settings,
+    settings_buffer: Buffer<Settings>,
     bond_buffer: Buffer<BondData>,
     bounding_box: BoundingBox,
     count: usize,
@@ -283,6 +277,7 @@ impl visula::Simulation for Simulation {
             bond_buffer,
             lines,
             settings: settings_data,
+            settings_buffer,
             bounding_box: BoundingBox {
                 min: Vec3::new(-bound, -bound, -bound),
                 max: Vec3::new(bound, bound, bound),
@@ -308,6 +303,7 @@ impl visula::Simulation for Simulation {
         self.bond_buffer.update(application, &bond_data);
 
         self.particle_buffer.update(application, &self.particles);
+        self.settings_buffer.update(application, &[self.settings]);
     }
 
     fn render(&mut self, data: &mut SimulationRenderData) {
@@ -321,6 +317,8 @@ impl visula::Simulation for Simulation {
             ui.add(egui::Slider::new(&mut self.settings.speed, 1..=20));
             ui.label("Target temperature");
             ui.add(egui::Slider::new(&mut self.target_temperature, 0.0..=20.0));
+            ui.label("Radius");
+            ui.add(egui::Slider::new(&mut self.settings.radius, 0.1..=2.0));
 
             if ui.button("Reset").clicked() {
                 self.reset();

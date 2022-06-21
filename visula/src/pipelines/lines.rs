@@ -118,7 +118,7 @@ impl Lines {
             uniforms
         };
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("pipeline"),
+            label: Some("lines pipeline layout"),
             bind_group_layouts: &uniforms,
             push_constant_ranges: &[],
         });
@@ -150,7 +150,7 @@ impl Lines {
             buffers
         };
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render pipeline"),
+            label: Some("lines render pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader_module,

@@ -1,10 +1,7 @@
-use crate::{NagaType, VertexAttrFormat};
 use bytemuck::{Pod, Zeroable};
-use std::cell::RefCell;
-use std::rc::Rc;
 use visula_derive::*;
 
-#[repr(C)]
+#[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 pub struct Sphere {
     pub position: [f32; 3],
