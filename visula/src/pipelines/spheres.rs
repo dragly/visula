@@ -115,7 +115,6 @@ impl Spheres {
             }
             uniforms
         };
-        println!("Uniforms {uniforms:#?}");
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("sphere pipeline layout"),
             bind_group_layouts: &uniforms,
@@ -141,7 +140,6 @@ impl Spheres {
             buffers.append(&mut layouts);
             buffers
         };
-        println!("Buffers {buffers:#?}");
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("spheres render pipeline"),
             layout: Some(&pipeline_layout),
