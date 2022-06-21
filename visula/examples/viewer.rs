@@ -17,9 +17,16 @@ struct Cli {
     load_zdf: Option<std::path::PathBuf>,
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
 enum RenderMode {
     Points,
     Mesh,
+}
+
+impl std::fmt::Display for RenderMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[repr(C, align(16))]
@@ -175,7 +182,16 @@ impl visula::Simulation for Simulation {
     fn gui(&mut self, context: &egui::Context) {
         egui::Window::new("Settings").show(context, |ui| {
             ui.label("Radius");
-            ui.add(egui::Slider::new(&mut self.settings.radius, 0.1..=10.0));
+            ui.add(egui::Slider::new(&mut self.settings.radius, 0.1..=2.5));
+            ui.label("Render mode");
+            for option in [RenderMode::Points, RenderMode::Mesh] {
+                if ui
+                    .selectable_label(self.render_mode == option, option.to_string())
+                    .clicked()
+                {
+                    self.render_mode = option;
+                }
+            }
         });
     }
 }
