@@ -118,14 +118,15 @@ pub fn run<S: 'static + Simulation>() {
                             sim.update(app);
                         }
                         event => {
-                            if let Event::WindowEvent {
-                                event: ref window_event,
-                                ..
-                            } = event
-                            {
-                                sim.handle_event(app, window_event);
+                            if !app.handle_event(&event, control_flow) {
+                                if let Event::WindowEvent {
+                                    event: ref window_event,
+                                    ..
+                                } = event
+                                {
+                                    sim.handle_event(app, window_event);
+                                }
                             }
-                            app.handle_event(&event, control_flow);
                         }
                     }
                 }

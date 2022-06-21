@@ -2,8 +2,8 @@ use proc_macro::TokenStream;
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::{format_ident, quote};
 use syn::{
-    parse_macro_input, BinOp, Data, DeriveInput, Expr, ExprBinary, ExprCall, ExprField, ExprPath,
-    Field, Fields, FieldsNamed, ItemStruct, Path,
+    parse_macro_input, BinOp, Data, DeriveInput, Expr, ExprBinary, ExprCall, ExprField, ExprParen,
+    ExprPath, Field, Fields, FieldsNamed, ItemStruct, Path,
 };
 
 type TokenStream2 = proc_macro2::TokenStream;
@@ -59,6 +59,7 @@ fn parse(input: &Expr, setup: &mut Vec<proc_macro2::TokenStream>) -> proc_macro2
             });
             quote! { #expression_current }
         }
+        Expr::Paren(ExprParen { expr, .. }) => parse(expr, setup),
         Expr::Binary(ExprBinary {
             left, right, op, ..
         }) => {
