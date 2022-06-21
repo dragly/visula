@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use bytemuck::{Pod, Zeroable};
-use naga::StructMember;
 use structopt::StructOpt;
 use wgpu::BufferUsages;
 use winit::event::{KeyboardInput, VirtualKeyCode, WindowEvent};

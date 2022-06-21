@@ -1,8 +1,6 @@
 use bytemuck::{Pod, Zeroable};
 use wgpu::BufferUsages;
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use visula::{
     BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Instance,
     InstanceField, InstanceHandle, LineDelegate, Lines, NagaType, SimulationRenderData,
