@@ -3,15 +3,15 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use wgpu::BufferUsages;
 
-use cgmath::{InnerSpace, Point3};
 use itertools_num::linspace;
 use naga::{ResourceBinding, StructMember, TypeInner};
 use structopt::StructOpt;
 
+use glam::Vec3;
 use visula::{
     simulation::SimulationRenderData, BindingBuilder, Buffer, BufferBinding, BufferBindingField,
     BufferInner, Instance, InstanceField, InstanceHandle, LineDelegate, Lines, NagaType,
-    SphereDelegate, Spheres, Uniform, UniformBinding, UniformField, UniformHandle, Vector3,
+    SphereDelegate, Spheres, Uniform, UniformBinding, UniformField, UniformHandle,
     VertexAttrFormat, VertexBufferLayoutBuilder,
 };
 use visula_derive::{delegate, Instance, Uniform};
@@ -22,20 +22,22 @@ struct Cli {
     count: Option<usize>,
 }
 
-#[derive(Clone, Debug)]
+#[repr(C, align(16))]
+#[derive(Clone, Copy, Debug, Instance, Pod, Zeroable)]
 struct Particle {
-    position: Vector3,
-    velocity: Vector3,
-    acceleration: Vector3,
+    position: glam::Vec3,
+    velocity: glam::Vec3,
+    acceleration: glam::Vec3,
     mass: f32,
+    _padding: [f32; 2],
 }
 
-#[repr(C, align(16))]
-#[derive(Clone, Copy, Instance, Pod, Zeroable)]
-struct ParticleData {
-    position: [f32; 3],
-    radius: f32,
-}
+//#[repr(C, align(16))]
+//#[derive(Clone, Copy, Instance, Pod, Zeroable)]
+//struct ParticleData {
+//position: [f32; 3],
+//radius: f32,
+//}
 
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
@@ -47,7 +49,7 @@ struct BondData {
 }
 
 trait TwoBodyForce {
-    fn force(&self, position_a: &Vector3, position_b: &Vector3) -> Vector3;
+    fn force(&self, position_a: &Vec3, position_b: &Vec3) -> Vec3;
     fn bond_magnitude2(&self) -> f32;
 }
 
@@ -66,10 +68,10 @@ impl Default for LennardJones {
 }
 
 impl TwoBodyForce for LennardJones {
-    fn force(&self, position_a: &Vector3, position_b: &Vector3) -> Vector3 {
+    fn force(&self, position_a: &Vec3, position_b: &Vec3) -> Vec3 {
         let Self { eps, sigma, .. } = self;
-        let r = position_a - position_b;
-        let r_l = r.magnitude();
+        let r = *position_a - *position_b;
+        let r_l = r.length();
 
         r / r_l.powi(2)
             * eps.powi(24)
@@ -94,7 +96,7 @@ fn integrate<F: TwoBodyForce>(
         out_particle.position += out_particle.velocity * dt;
     }
     for particle in out_state.iter_mut() {
-        particle.acceleration = Vector3::new(0.0, 0.0, 0.0);
+        particle.acceleration = glam::Vec3::new(0.0, 0.0, 0.0);
     }
     let intermediate_state = out_state.to_vec();
     let mut bonds = Vec::new();
@@ -109,7 +111,7 @@ fn integrate<F: TwoBodyForce>(
                 two_body.force(position_i, position_j) / intermediate_state[i].mass;
 
             let distance =
-                (intermediate_state[i].position - intermediate_state[j].position).magnitude2();
+                (intermediate_state[i].position - intermediate_state[j].position).length_squared();
             let strength = (two_body.bond_magnitude2() - distance) / two_body.bond_magnitude2();
 
             if strength > 0.0 {
@@ -152,7 +154,7 @@ fn integrate<F: TwoBodyForce>(
             wall_attractiveness * two_body.force(&particle.position, &flipped_zm);
 
         particle.acceleration +=
-            -1000.0 * particle.velocity * (particle.velocity.magnitude() - target_temperature) * dt;
+            -1000.0 * particle.velocity * (particle.velocity.length() - target_temperature) * dt;
 
         particle.velocity += 0.5 * particle.acceleration * dt;
     }
@@ -169,10 +171,11 @@ fn generate(count: usize) -> Vec<Particle> {
         for y in linspace(start, end, count) {
             for z in linspace(start, end, count) {
                 current_particles.push(Particle {
-                    position: Vector3::new(x, y, z),
-                    velocity: Vector3::new(0.0, 0.0, 0.0),
-                    acceleration: Vector3::new(0.0, 0.0, 0.0),
+                    position: Vec3::new(x, y, z),
+                    velocity: Vec3::new(0.0, 0.0, 0.0),
+                    acceleration: Vec3::new(0.0, 0.0, 0.0),
                     mass: 1.0,
+                    _padding: [0.0; 2],
                 })
             }
         }
@@ -193,14 +196,14 @@ struct Settings {
 }
 
 struct BoundingBox {
-    min: Point3<f32>,
-    max: Point3<f32>,
+    min: Vec3,
+    max: Vec3,
 }
 
 struct Simulation {
     particles: Vec<Particle>,
     spheres: Spheres,
-    particle_buffer: Buffer<ParticleData>,
+    particle_buffer: Buffer<Particle>,
     lines: Lines,
     settings: Settings,
     bond_buffer: Buffer<BondData>,
@@ -223,7 +226,7 @@ impl visula::Simulation for Simulation {
         let particles = generate(count);
 
         // TODO split into UniformBuffer and InstanceBuffer to avoid having UNIFORM usage on all
-        let particle_buffer = Buffer::<ParticleData>::new(
+        let particle_buffer = Buffer::<Particle>::new(
             application,
             BufferUsages::UNIFORM | BufferUsages::VERTEX | BufferUsages::COPY_DST,
             "particle",
@@ -281,8 +284,8 @@ impl visula::Simulation for Simulation {
             lines,
             settings: settings_data,
             bounding_box: BoundingBox {
-                min: Point3::new(-bound, -bound, -bound),
-                max: Point3::new(bound, bound, bound),
+                min: Vec3::new(-bound, -bound, -bound),
+                max: Vec3::new(bound, bound, bound),
             },
             count,
             target_temperature: 10.0,
@@ -304,15 +307,7 @@ impl visula::Simulation for Simulation {
         }
         self.bond_buffer.update(application, &bond_data);
 
-        let particle_data: Vec<ParticleData> = self
-            .particles
-            .iter()
-            .map(|particle| ParticleData {
-                position: particle.position.into(),
-                radius: particle.mass,
-            })
-            .collect();
-        self.particle_buffer.update(application, &particle_data);
+        self.particle_buffer.update(application, &self.particles);
     }
 
     fn render(&mut self, data: &mut SimulationRenderData) {
