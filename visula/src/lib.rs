@@ -44,7 +44,7 @@ pub use buffer::*;
 pub use custom_event::CustomEvent;
 pub use drop_event::DropEvent;
 pub use instances::*;
-pub use naga_type::NagaType;
+pub use naga_type::*;
 pub use pipelines::*;
 pub use primitives::*;
 pub use render_pass::*;

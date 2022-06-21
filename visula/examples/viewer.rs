@@ -1,13 +1,16 @@
 use std::path::Path;
 
+use bytemuck::{Pod, Zeroable};
+use naga::StructMember;
 use structopt::StructOpt;
-use visula::SimulationRenderData;
-use visula::SphereDelegate;
-use visula_derive::delegate;
 use wgpu::BufferUsages;
 use winit::event::{KeyboardInput, VirtualKeyCode, WindowEvent};
 
-use visula::{BindingBuilder, Buffer, DropEvent, MeshPipeline, Pipeline, Sphere, Spheres};
+use visula::{
+    BindingBuilder, Buffer, BufferInner, DropEvent, MeshPipeline, Pipeline, SimulationRenderData,
+    Sphere, SphereDelegate, Spheres, Uniform, UniformBinding, UniformField, UniformHandle,
+};
+use visula_derive::{delegate, Uniform};
 
 #[derive(StructOpt)]
 struct Cli {
@@ -20,10 +23,21 @@ enum RenderMode {
     Mesh,
 }
 
+#[repr(C, align(16))]
+#[derive(Clone, Copy, Debug, Pod, Uniform, Zeroable)]
+struct Settings {
+    radius: f32,
+    _padding: f32,
+    _padding2: f32,
+    _padding3: f32,
+}
+
 struct Simulation {
     render_mode: RenderMode,
     spheres: Spheres,
     sphere_buffer: Buffer<Sphere>,
+    settings: Settings,
+    settings_buffer: Buffer<Settings>,
     mesh: MeshPipeline,
 }
 
@@ -70,11 +84,24 @@ impl visula::Simulation for Simulation {
             "point",
         );
         let sphere = sphere_buffer.instance();
+        let settings_data = Settings {
+            radius: 0.5,
+            _padding: 0.0,
+            _padding2: 0.0,
+            _padding3: 0.0,
+        };
+        let settings_buffer = Buffer::new_with_init(
+            application,
+            BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+            &[settings_data],
+            "settings",
+        );
+        let settings = settings_buffer.uniform();
         let points = Spheres::new(
             application,
             &SphereDelegate {
                 position: delegate!(sphere.position),
-                radius: delegate!(0.1),
+                radius: delegate!(settings.radius),
                 color: delegate!(sphere.color),
             },
         )
@@ -85,6 +112,8 @@ impl visula::Simulation for Simulation {
             sphere_buffer,
             spheres: points,
             mesh,
+            settings: settings_data,
+            settings_buffer,
         };
         if let Some(filename) = &args.load_zdf {
             #[cfg(not(target_arch = "wasm32"))]
@@ -93,7 +122,9 @@ impl visula::Simulation for Simulation {
         Ok(simulation)
     }
 
-    fn update(&mut self, _: &visula::Application) {}
+    fn update(&mut self, application: &visula::Application) {
+        self.settings_buffer.update(application, &[self.settings]);
+    }
 
     fn render(&mut self, data: &mut SimulationRenderData) {
         match self.render_mode {
@@ -140,6 +171,13 @@ impl visula::Simulation for Simulation {
             }
             _ => {}
         }
+    }
+
+    fn gui(&mut self, context: &egui::Context) {
+        egui::Window::new("Settings").show(context, |ui| {
+            ui.label("Radius");
+            ui.add(egui::Slider::new(&mut self.settings.radius, 0.1..=10.0));
+        });
     }
 }
 

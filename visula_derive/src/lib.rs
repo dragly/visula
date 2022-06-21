@@ -29,12 +29,12 @@ fn parse(input: &Expr, setup: &mut Vec<proc_macro2::TokenStream>) -> proc_macro2
                 let #expression_current = {
                     // TODO handle non-float type
                     let constant = module.constants.append(
-                        naga::Constant {
+                        ::naga::Constant {
                             name: None,
                             specialization: None,
-                            inner: naga::ConstantInner::Scalar {
+                            inner: ::naga::ConstantInner::Scalar {
                                 width: 4,
-                                value: naga::ScalarValue::Float(#lit),
+                                value: ::naga::ScalarValue::Float(#lit),
                             },
                         },
                         ::naga::Span::default(),
@@ -65,10 +65,10 @@ fn parse(input: &Expr, setup: &mut Vec<proc_macro2::TokenStream>) -> proc_macro2
             let parsed_left = parse(left, setup);
             let parsed_right = parse(right, setup);
             let operator = match op {
-                BinOp::Add(_) => quote! { naga::BinaryOperator::Add },
-                BinOp::Mul(_) => quote! { naga::BinaryOperator::Multiply },
-                BinOp::Div(_) => quote! { naga::BinaryOperator::Divide },
-                BinOp::Sub(_) => quote! { naga::BinaryOperator::Subtract },
+                BinOp::Add(_) => quote! { ::naga::BinaryOperator::Add },
+                BinOp::Mul(_) => quote! { ::naga::BinaryOperator::Multiply },
+                BinOp::Div(_) => quote! { ::naga::BinaryOperator::Divide },
+                BinOp::Sub(_) => quote! { ::naga::BinaryOperator::Subtract },
                 other => unimplemented!("Not implemented: {:#?}", other),
             };
             setup.push(quote! {
@@ -78,7 +78,7 @@ fn parse(input: &Expr, setup: &mut Vec<proc_macro2::TokenStream>) -> proc_macro2
                         left: #parsed_left,
                         right: #parsed_right,
                     },
-                    naga::Span::default(),
+                    ::naga::Span::default(),
                 );
             });
             quote! { #expression_current }
@@ -102,15 +102,15 @@ fn parse(input: &Expr, setup: &mut Vec<proc_macro2::TokenStream>) -> proc_macro2
                             let components = quote! { vec![#(#components,)*] };
                             setup.push(quote! {
                                 let #expression_current = {
-                                    let naga_type = naga::Type {
+                                    let naga_type = ::naga::Type {
                                         name: None,
-                                        inner: naga::TypeInner::Vector {
-                                            kind: naga::ScalarKind::Float,
+                                        inner: ::naga::TypeInner::Vector {
+                                            kind: ::naga::ScalarKind::Float,
                                             width: 4,
-                                            size: naga::VectorSize::Tri,
+                                            size: ::naga::VectorSize::Tri,
                                         },
                                     };
-                                    let field_type = module.types.insert(naga_type, naga::Span::default());
+                                    let field_type = module.types.insert(naga_type, ::naga::Span::default());
                                     module.entry_points[entry_point_index]
                                         .function
                                         .expressions
@@ -142,7 +142,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
     let mut setup = vec![];
     let output = parse(&input, &mut setup);
     let result = quote! {
-        &|module: &mut naga::Module, binding_builder: &mut BindingBuilder| {
+        &|module: &mut ::naga::Module, binding_builder: &mut BindingBuilder| {
             let entry_point_index = binding_builder.entry_point_index;
             #(#setup)*
             #output
@@ -165,7 +165,7 @@ pub fn define_delegate(input: TokenStream) -> TokenStream {
                     for (index, field) in named.iter().enumerate() {
                         let Field { vis, ident, .. } = field;
                         field_delegates.push(quote! {
-                            #vis #ident: &'a dyn Fn(&mut naga::Module, &mut BindingBuilder) -> Handle<naga::Expression>,
+                            #vis #ident: &'a dyn Fn(&mut ::naga::Module, &mut BindingBuilder) -> Handle<naga::Expression>,
                         });
                         field_modifications.push(quote! {
                             {
@@ -196,7 +196,7 @@ pub fn define_delegate(input: TokenStream) -> TokenStream {
                 }
 
                 impl<'a> #ident<'a> {
-                    fn inject(&self, shader_variable_name: &str, module: &mut naga::Module, binding_builder: &mut BindingBuilder) {
+                    fn inject(&self, shader_variable_name: &str, module: &mut ::naga::Module, binding_builder: &mut BindingBuilder) {
                         let entry_point_index = binding_builder.entry_point_index;
                         let variable = module.entry_points[entry_point_index]
                             .function
@@ -270,18 +270,18 @@ pub fn instance(input: TokenStream) -> TokenStream {
                                 0 #(+ #sizes)*
                             };
                             let format = quote! {
-                                < #field_type >::vertex_attr_format()
+                                < #field_type as #crate_name::VertexAttrFormat >::vertex_attr_format()
                             };
                             instance_struct_fields.push(quote! {
                                 //#field_name: Handle<naga::Expression>
                                 pub #field_name: #crate_name::InstanceField
                             });
                             let naga_type = quote! {
-                                < #field_type >::naga_type()
+                                < #field_type as #crate_name::NagaType >::naga_type()
                             };
                             module_fields.push(quote! {
                                 {
-                                    let field_type = module.types.insert(#naga_type, naga::Span::default());
+                                    let field_type = module.types.insert(#naga_type, ::naga::Span::default());
                                     module.entry_points[entry_point_index]
                                         .function
                                         .arguments
@@ -337,9 +337,9 @@ pub fn instance(input: TokenStream) -> TokenStream {
 
         impl #instance_struct_name {
             fn integrate(
-                inner: &Rc<RefCell<#crate_name::BufferInner>>,
+                inner: &std::rc::Rc<std::cell::RefCell<#crate_name::BufferInner>>,
                 handle: u64,
-                module: &mut naga::Module,
+                module: &mut ::naga::Module,
                 binding_builder: &mut #crate_name::BindingBuilder,
             )
             {
@@ -375,7 +375,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
 
         impl #crate_name::Instance for #name {
             type Type = #instance_struct_name;
-            fn instance(inner: Rc<RefCell<#crate_name::BufferInner>>) -> Self::Type {
+            fn instance(inner: std::rc::Rc<std::cell::RefCell<#crate_name::BufferInner>>) -> Self::Type {
                 let handle = inner.borrow().handle;
                 Self::Type {
                     #(#instance_field_values,)*
@@ -391,6 +391,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(Uniform)]
 pub fn uniform(input: TokenStream) -> TokenStream {
+    let crate_name = visula_crate_name();
     let input = parse_macro_input!(input as DeriveInput);
 
     let name = input.ident;
@@ -413,13 +414,15 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                         Some(field_name) => {
                             let field_type = &field.ty;
                             uniform_struct_fields.push(quote! {
-                                #field_name: UniformField
+                                #field_name: #crate_name::UniformField
                             });
                             let size = quote! {
                                 (std::mem::size_of::<#field_type>() as u32)
                             };
+                            // TODO figure out why this cannot be #crate_name and needs to be
+                            // visula
                             let naga_type = quote! {
-                                < #field_type >::naga_type()
+                                < #field_type as visula::NagaType >::naga_type()
                             };
                             let field_type_declaration = format_ident!("{}_type", field_name);
                             uniform_field_types_init.push(quote! {
@@ -429,7 +432,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                                 0 #(+ #sizes)*
                             };
                             uniform_fields.push(quote! {
-                                StructMember {
+                                #crate_name::StructMember {
                                     name: Some(stringify!(#field_name).into()),
                                     ty: #field_type_declaration,
                                     binding: None,
@@ -437,7 +440,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                                 }
                             });
                             uniform_field_values.push(quote! {
-                                #field_name: UniformField {
+                                #field_name: #crate_name::UniformField {
                                     buffer_handle: inner.borrow().handle,
                                     inner: inner.clone(),
                                     field_index: #field_index,
@@ -465,15 +468,15 @@ pub fn uniform(input: TokenStream) -> TokenStream {
             bind_group_layout: std::rc::Rc<::wgpu::BindGroupLayout>,
         }
 
-        impl UniformHandle for #uniform_struct_name {
+        impl #crate_name::UniformHandle for #uniform_struct_name {
         }
         impl #uniform_struct_name {
             fn integrate(
                 inner: &std::rc::Rc<std::cell::RefCell<#crate_name::BufferInner>>,
                 handle: u64,
-                module: &mut naga::Module,
-                binding_builder: &mut visula::BindingBuilder,
-                bind_group_layout: &Rc<::wgpu::BindGroupLayout>,
+                module: &mut ::naga::Module,
+                binding_builder: &mut #crate_name::BindingBuilder,
+                bind_group_layout: &std::rc::Rc<::wgpu::BindGroupLayout>,
             )
             {
                 let entry_point_index = binding_builder.entry_point_index;
@@ -484,9 +487,9 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                 #(#uniform_field_types_init)*
 
                 let uniform_type = module.types.insert(
-                    naga::Type {
+                    ::naga::Type {
                         name: Some(stringify!(#uniform_struct_name).into()),
-                        inner: TypeInner::Struct {
+                        inner: ::naga::TypeInner::Struct {
                             members: vec![
                                 #(#uniform_fields),*
                             ],
@@ -496,13 +499,13 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                     ::naga::Span::default(),
                 );
                 let uniform_variable = module.global_variables.append(
-                    naga::GlobalVariable {
+                    ::naga::GlobalVariable {
                         name: Some(stringify!(#name).to_lowercase().into()),
-                        binding: Some(ResourceBinding {
+                        binding: Some(::naga::ResourceBinding {
                             group: bind_group,
                             binding: 0,
                         }),
-                        class: naga::StorageClass::Uniform,
+                        class: ::naga::StorageClass::Uniform,
                         ty: uniform_type,
                         init: None,
                     },
@@ -513,7 +516,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                     .expressions
                     .append(::naga::Expression::GlobalVariable(uniform_variable), ::naga::Span::default());
 
-                binding_builder.uniforms.insert(handle, UniformBinding {
+                binding_builder.uniforms.insert(handle, #crate_name::UniformBinding {
                     expression: settings_expression,
                     bind_group_layout: bind_group_layout.clone(),
                     inner: inner.clone(),
@@ -523,7 +526,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
 
         }
 
-        impl Uniform for #name {
+        impl #crate_name::Uniform for #name {
             type Type = #uniform_struct_name;
             fn uniform(inner: std::rc::Rc<std::cell::RefCell<#crate_name::BufferInner>>) -> Self::Type {
                 Self::Type {
@@ -540,6 +543,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(VertexAttr)]
 pub fn vertex_attr(input: TokenStream) -> TokenStream {
+    let crate_name = visula_crate_name();
     let input = parse_macro_input!(input as DeriveInput);
 
     let name = input.ident;
@@ -562,7 +566,7 @@ pub fn vertex_attr(input: TokenStream) -> TokenStream {
                         0 #(+ #sizes)*
                     };
                     let format = quote! {
-                        < #field_ident >::vertex_attr_format()
+                        < #field_ident as #crate_name::VertexAttrFormat >::vertex_attr_format()
                     };
                     attributes.push(quote! {
                         wgpu::VertexAttribute{
