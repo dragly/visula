@@ -43,8 +43,8 @@ pub fn setup_wasm(
                             log::info!("Processing file {i}");
                             let drop_proxy_ref = Rc::clone(&drop_proxy_main);
                             let name = file.name();
-                            let read_callback = Closure::wrap(Box::new(
-                                move |array_buffer: JsValue| {
+                            let read_callback =
+                                Closure::wrap(Box::new(move |array_buffer: JsValue| {
                                     let array = Uint8Array::new(&array_buffer);
                                     let bytes: Vec<u8> = array.to_vec();
                                     let event_result = (*drop_proxy_ref).borrow_mut().send_event(
@@ -57,12 +57,13 @@ pub fn setup_wasm(
                                     match event_result {
                                         Ok(_) => {}
                                         Err(_) => {
-                                            log::error!("Could not register drop event! Event loop closed?");
+                                            log::error!(
+                                                "Could not register drop event! Event loop closed?"
+                                            );
                                         }
                                     }
-                                },
-                            )
-                                as Box<dyn FnMut(JsValue)>);
+                                })
+                                    as Box<dyn FnMut(JsValue)>);
                             let _ = file.array_buffer().then(&read_callback);
                             read_callback.forget();
                         }

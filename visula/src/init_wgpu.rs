@@ -1,4 +1,4 @@
-use crate::application::{Application, DrawMode};
+use crate::application::Application;
 use crate::camera::controller::CameraController;
 use crate::camera::uniforms::CameraUniforms;
 use crate::custom_event::CustomEvent;
@@ -121,7 +121,6 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
         surface,
         window,
         depth_texture,
-        draw_mode: DrawMode::default(),
         camera_bind_group_layout,
         camera_bind_group,
         next_buffer_handle: 0,
