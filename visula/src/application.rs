@@ -1,3 +1,4 @@
+use crate::camera::controller::Response;
 use crate::custom_event::CustomEvent;
 use crate::{camera::controller::CameraController, simulation::SimulationRenderData};
 
@@ -43,10 +44,24 @@ pub struct Application {
 }
 
 impl Application {
-    pub fn handle_event(&mut self, event: &Event<CustomEvent>, control_flow: &mut ControlFlow) {
+    pub fn handle_event(
+        &mut self,
+        event: &Event<CustomEvent>,
+        control_flow: &mut ControlFlow,
+    ) -> bool {
         self.platform.handle_event(event);
         if self.platform.captures_event(event) {
-            return;
+            return true;
+        }
+        let Response {
+            needs_redraw,
+            captured_event,
+        } = self.camera_controller.handle_event(event);
+        if needs_redraw {
+            self.window.request_redraw();
+        }
+        if captured_event {
+            return true;
         }
         match event {
             Event::WindowEvent {
@@ -98,19 +113,12 @@ impl Application {
                 };
                 self.window.request_redraw();
             }
-            Event::WindowEvent {
-                event: window_event,
-                ..
-            } => {
-                if self.camera_controller.handle_event(window_event) {
-                    self.window.request_redraw();
-                }
-            }
             Event::MainEventsCleared => {
                 // handle logic updates, such as physics
             }
             _ => {}
         }
+        false
     }
 
     pub fn update(&mut self) {

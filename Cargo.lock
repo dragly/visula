@@ -2301,6 +2301,7 @@ dependencies = [
  "pollster",
  "proc-macro2",
  "quote",
+ "slotmap",
  "structopt",
  "syn",
  "trajan",
