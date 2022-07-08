@@ -1,4 +1,4 @@
-use crate::application::{Application, DrawMode};
+use crate::application::Application;
 use crate::camera::controller::CameraController;
 use crate::camera::uniforms::CameraUniforms;
 use crate::custom_event::CustomEvent;
@@ -112,7 +112,7 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
 
     let egui_rpass = RenderPass::new(&device, config.format, 1);
 
-    let event_result = proxy.send_event(CustomEvent::Ready(Application {
+    let event_result = proxy.send_event(CustomEvent::Ready(Box::new(Application {
         camera_uniform_buffer,
         device,
         queue,
@@ -121,13 +121,12 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
         surface,
         window,
         depth_texture,
-        draw_mode: DrawMode::default(),
         camera_bind_group_layout,
         camera_bind_group,
         next_buffer_handle: 0,
         platform,
         egui_rpass,
-    }));
+    })));
     if event_result.is_err() {
         println!("ERROR: Could not send event! Is the event loop closed?")
     }

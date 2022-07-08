@@ -6,14 +6,14 @@ use wgpu::BufferUsages;
 use glam::Vec3;
 use visula::{
     simulation::SimulationRenderData, BindingBuilder, Buffer, BufferBinding, BufferBindingField,
-    BufferInner, Instance, InstanceField, InstanceHandle, LineDelegate, Lines, NagaType,
-    SphereDelegate, Spheres, Uniform, UniformBinding, UniformField, UniformHandle,
+    BufferInner, CustomEvent, Instance, InstanceField, InstanceHandle, LineDelegate, Lines,
+    NagaType, SphereDelegate, Spheres, Uniform, UniformBinding, UniformField, UniformHandle,
     VertexAttrFormat, VertexBufferLayoutBuilder,
 };
 use visula_derive::{delegate, Instance, Uniform};
 use winit::{
     dpi::PhysicalPosition,
-    event::{ElementState, MouseButton, WindowEvent},
+    event::{ElementState, Event, MouseButton, WindowEvent},
 };
 
 #[repr(C, align(16))]
@@ -362,11 +362,15 @@ impl visula::Simulation for Simulation {
         });
     }
 
-    fn handle_event(&mut self, application: &mut visula::Application, event: &WindowEvent) {
+    fn handle_event(&mut self, application: &mut visula::Application, event: &Event<CustomEvent>) {
         match event {
-            WindowEvent::MouseInput {
-                state: ElementState::Released,
-                button: MouseButton::Left,
+            Event::WindowEvent {
+                event:
+                    WindowEvent::MouseInput {
+                        state: ElementState::Released,
+                        button: MouseButton::Left,
+                        ..
+                    },
                 ..
             } => {
                 let position = match self.mouse.position {
@@ -432,9 +436,13 @@ impl visula::Simulation for Simulation {
                     _padding: 0.0,
                 });
             }
-            WindowEvent::CursorMoved { position, .. } => {
+            Event::WindowEvent {
+                event: WindowEvent::CursorMoved { position, .. },
+                ..
+            } => {
                 self.mouse.position = Some(*position);
             }
+
             _ => {}
         }
     }

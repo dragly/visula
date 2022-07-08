@@ -13,18 +13,6 @@ use egui_winit_platform::Platform;
 
 use crate::Simulation;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum DrawMode {
-    Points,
-    Mesh,
-}
-
-impl Default for DrawMode {
-    fn default() -> Self {
-        DrawMode::Points
-    }
-}
-
 pub struct Application {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
@@ -34,7 +22,6 @@ pub struct Application {
     pub camera_controller: CameraController,
     pub camera_uniform_buffer: wgpu::Buffer,
     pub depth_texture: wgpu::TextureView,
-    pub draw_mode: DrawMode,
     pub camera_bind_group: wgpu::BindGroup,
     pub camera_bind_group_layout: wgpu::BindGroupLayout,
     // TODO make private
@@ -93,25 +80,6 @@ impl Application {
                 self.config.width = size.width;
                 self.config.height = size.height;
                 self.surface.configure(&self.device, &self.config);
-            }
-            Event::WindowEvent {
-                event:
-                    WindowEvent::KeyboardInput {
-                        input:
-                            winit::event::KeyboardInput {
-                                virtual_keycode: Some(winit::event::VirtualKeyCode::M),
-                                state: winit::event::ElementState::Pressed,
-                                ..
-                            },
-                        ..
-                    },
-                ..
-            } => {
-                self.draw_mode = match self.draw_mode {
-                    DrawMode::Mesh => DrawMode::Points,
-                    DrawMode::Points => DrawMode::Mesh,
-                };
-                self.window.request_redraw();
             }
             Event::MainEventsCleared => {
                 // handle logic updates, such as physics
