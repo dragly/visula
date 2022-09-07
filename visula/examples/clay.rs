@@ -10,12 +10,12 @@ use itertools_num::linspace;
 use structopt::StructOpt;
 
 use visula::{
-    BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Instance,
-    InstanceField, InstanceHandle, NagaType, SimulationRenderData, SphereDelegate, Spheres,
-    Uniform, UniformBinding, UniformField, UniformHandle, Vector3, VertexAttrFormat,
-    VertexBufferLayoutBuilder,
+    BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Expression,
+    ExpressionInner, Instance, InstanceField, InstanceHandle, NagaType, SimulationRenderData,
+    SphereDelegate, Spheres, Uniform, UniformBinding, UniformField, UniformHandle, Vector3,
+    VertexAttrFormat, VertexBufferLayoutBuilder,
 };
-use visula_derive::{delegate, Instance, Uniform};
+use visula_derive::{Instance, Uniform};
 
 #[derive(StructOpt)]
 struct Cli {
@@ -201,12 +201,9 @@ fn integrate<F: TwoBodyForce>(
                     }
                 }
             }
-            match new_node {
-                Some(node) => {
-                    *current_node.borrow_mut() = node;
-                    break;
-                }
-                None => {}
+            if let Some(node) = new_node {
+                *current_node.borrow_mut() = node;
+                break;
             }
             if let SphereTree::Branch {
                 left,
@@ -329,6 +326,12 @@ struct Simulation {
     particle_buffer: Buffer<ParticleData>,
 }
 
+macro_rules! delegate_vec {
+    ($($elements:expr),+) => {
+        Expression::new(ExpressionInner::Vector {components: vec![ $($elements.into()),+ ]})
+    }
+}
+
 impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
@@ -357,9 +360,9 @@ impl visula::Simulation for Simulation {
         let spheres = Spheres::new(
             application,
             &SphereDelegate {
-                position: delegate!(particle.position),
-                radius: delegate!(settings.radius),
-                color: delegate!(vec3::<f32>(0.2, 0.8, 0.6)),
+                position: particle.position,
+                radius: settings.radius,
+                color: delegate_vec![0.2, 0.8, 0.6],
             },
         )
         .unwrap();

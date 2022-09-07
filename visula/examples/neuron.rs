@@ -6,11 +6,11 @@ use wgpu::BufferUsages;
 use glam::Vec3;
 use visula::{
     simulation::SimulationRenderData, BindingBuilder, Buffer, BufferBinding, BufferBindingField,
-    BufferInner, CustomEvent, Instance, InstanceField, InstanceHandle, LineDelegate, Lines,
-    NagaType, SphereDelegate, Spheres, Uniform, UniformBinding, UniformField, UniformHandle,
-    VertexAttrFormat, VertexBufferLayoutBuilder,
+    BufferInner, CustomEvent, Expression, ExpressionInner, Instance, InstanceField, InstanceHandle,
+    LineDelegate, Lines, NagaType, SphereDelegate, Spheres, Uniform, UniformBinding, UniformField,
+    UniformHandle, VertexAttrFormat, VertexBufferLayoutBuilder,
 };
-use visula_derive::{delegate, Instance, Uniform};
+use visula_derive::{Instance, Uniform};
 use winit::{
     dpi::PhysicalPosition,
     event::{ElementState, Event, MouseButton, WindowEvent},
@@ -84,6 +84,12 @@ struct Simulation {
     mouse: Mouse,
 }
 
+macro_rules! delegate_vec {
+    ($($elements:expr),+) => {
+        Expression::new(ExpressionInner::Vector {components: vec![ $($elements.into()),+ ]})
+    }
+}
+
 impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
@@ -119,13 +125,13 @@ impl visula::Simulation for Simulation {
         let spheres = Spheres::new(
             application,
             &SphereDelegate {
-                position: delegate!(pos),
-                radius: delegate!(settings.radius),
-                color: delegate!(vec3::<f32>(
-                    0.1 + (particle.voltage + 10.0) / 120.0,
-                    0.2 + (particle.voltage + 10.0) / 120.0,
-                    0.3 + (particle.voltage + 10.0) / 120.0
-                )),
+                position: pos.clone(),
+                radius: settings.radius,
+                color: delegate_vec![
+                    0.1 + (particle.voltage.clone() + 10.0) / 120.0,
+                    0.2 + (particle.voltage.clone() + 10.0) / 120.0,
+                    0.3 + (particle.voltage.clone() + 10.0) / 120.0
+                ],
             },
         )
         .unwrap();
@@ -133,10 +139,10 @@ impl visula::Simulation for Simulation {
         let lines = Lines::new(
             application,
             &LineDelegate {
-                start: delegate!(bond.position_a),
-                end: delegate!(bond.position_b),
-                width: delegate!(settings.width),
-                alpha: delegate!(bond.strength),
+                start: bond.position_a,
+                end: bond.position_b,
+                width: settings.width,
+                alpha: bond.strength,
             },
         )
         .unwrap();
