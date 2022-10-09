@@ -7,11 +7,11 @@ use structopt::StructOpt;
 use glam::Vec3;
 use visula::{
     simulation::SimulationRenderData, BindingBuilder, Buffer, BufferBinding, BufferBindingField,
-    BufferInner, Instance, InstanceField, InstanceHandle, LineDelegate, Lines, NagaType,
-    SphereDelegate, Spheres, Uniform, UniformBinding, UniformField, UniformHandle,
-    VertexAttrFormat, VertexBufferLayoutBuilder,
+    BufferInner, Expression, ExpressionInner, Instance, InstanceField, InstanceHandle,
+    LineDelegate, Lines, NagaType, SphereDelegate, Spheres, Uniform, UniformBinding, UniformField,
+    UniformHandle, VertexAttrFormat, VertexBufferLayoutBuilder,
 };
-use visula_derive::{delegate, Instance, Uniform};
+use visula_derive::{Instance, Uniform};
 
 #[derive(StructOpt)]
 struct Cli {
@@ -209,6 +209,12 @@ impl Simulation {
     }
 }
 
+macro_rules! delegate_vec {
+    ($($elements:expr),+) => {
+        Expression::new(ExpressionInner::Vector {components: vec![ $($elements.into()),+ ]})
+    }
+}
+
 impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
@@ -244,13 +250,13 @@ impl visula::Simulation for Simulation {
             "settings",
         );
         let settings = settings_buffer.uniform();
-        let pos = &particle.position;
+        let pos = particle.position.clone();
         let spheres = Spheres::new(
             application,
             &SphereDelegate {
-                position: delegate!(pos),
-                radius: delegate!(settings.radius),
-                color: delegate!(particle.position / 40.0 + vec3::<f32>(0.5, 0.5, 0.5)),
+                position: pos,
+                radius: 1.0 + settings.radius,
+                color: particle.position / 40.0 + delegate_vec![0.1, 0.3, 0.8],
             },
         )
         .unwrap();
@@ -258,10 +264,10 @@ impl visula::Simulation for Simulation {
         let lines = Lines::new(
             application,
             &LineDelegate {
-                start: delegate!(bond.position_a),
-                end: delegate!(bond.position_b),
-                width: delegate!(settings.width),
-                alpha: delegate!(bond.strength),
+                start: bond.position_a,
+                end: bond.position_b,
+                width: settings.width,
+                alpha: bond.strength,
             },
         )
         .unwrap();

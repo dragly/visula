@@ -2,11 +2,11 @@ use bytemuck::{Pod, Zeroable};
 use wgpu::BufferUsages;
 
 use visula::{
-    BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Instance,
-    InstanceField, InstanceHandle, LineDelegate, Lines, NagaType, SimulationRenderData,
-    VertexAttrFormat, VertexBufferLayoutBuilder,
+    BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Expression,
+    ExpressionInner, Instance, InstanceField, InstanceHandle, LineDelegate, Lines, NagaType,
+    SimulationRenderData, VertexAttrFormat, VertexBufferLayoutBuilder,
 };
-use visula_derive::{delegate, Instance};
+use visula_derive::Instance;
 
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
@@ -38,10 +38,13 @@ impl visula::Simulation for Simulation {
         let lines = Lines::new(
             application,
             &LineDelegate {
-                start: delegate!(line.position_a),
-                end: delegate!(line.position_b),
-                width: delegate!(1.0),
-                alpha: delegate!(1.0),
+                start: line.position_a,
+                end: line.position_b,
+                width: {
+                    let a: Expression = 1.0.into();
+                    a + 1.0 + 2.0
+                },
+                alpha: 1.0.into(),
             },
         )
         .unwrap();

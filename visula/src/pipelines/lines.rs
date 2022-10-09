@@ -3,7 +3,7 @@ use crate::{
 };
 use bytemuck::{Pod, Zeroable};
 use naga::back::wgsl::WriterFlags;
-use naga::{valid::ValidationFlags, Block, Handle, Statement};
+use naga::{valid::ValidationFlags, Block, Statement};
 use std::cell::Ref;
 use std::mem::size_of;
 use visula_derive::define_delegate;
@@ -220,7 +220,7 @@ impl Lines {
             }
         }
         log::debug!("Line count {count:#?}");
-        if count == None {
+        if count.is_none() {
             log::debug!("Empty line buffer detected. Aborting render of lines.");
             return;
         }

@@ -7,11 +7,11 @@ use wgpu::BufferUsages;
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 use visula::{
-    BindingBuilder, Buffer, BufferInner, CustomEvent, DropEvent, MeshPipeline, Pipeline,
-    SimulationRenderData, Sphere, SphereDelegate, Spheres, Uniform, UniformBinding, UniformField,
-    UniformHandle,
+    BindingBuilder, Buffer, BufferInner, CustomEvent, DropEvent, Expression, ExpressionInner,
+    MeshPipeline, Pipeline, SimulationRenderData, Sphere, SphereDelegate, Spheres, Uniform,
+    UniformBinding, UniformField, UniformHandle,
 };
-use visula_derive::{delegate, Uniform};
+use visula_derive::Uniform;
 
 #[derive(StructOpt)]
 struct Cli {
@@ -103,9 +103,9 @@ impl visula::Simulation for Simulation {
         let points = Spheres::new(
             application,
             &SphereDelegate {
-                position: delegate!(sphere.position),
-                radius: delegate!(settings.radius),
-                color: delegate!(sphere.color),
+                position: sphere.position,
+                radius: settings.radius,
+                color: sphere.color,
             },
         )
         .unwrap();
@@ -145,7 +145,7 @@ impl visula::Simulation for Simulation {
             } => match window_event {
                 WindowEvent::DroppedFile(path) => {
                     log::info!("Dropped file {:?}", path);
-                    let bytes = std::fs::read(&path).unwrap();
+                    let bytes = std::fs::read(path).unwrap();
                     let drop_event = DropEvent {
                         name: path.to_str().unwrap().to_string(),
                         bytes,

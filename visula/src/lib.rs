@@ -29,6 +29,7 @@ pub mod pipelines;
 pub mod primitives;
 pub mod render_pass;
 pub mod simulation;
+pub mod value;
 pub mod vec_to_buffer;
 pub mod vertex_attr;
 pub mod vertex_attr_format;
@@ -52,6 +53,7 @@ pub use pipelines::*;
 pub use primitives::*;
 pub use render_pass::*;
 pub use simulation::*;
+pub use value::*;
 
 pub type Vector2 = cgmath::Vector2<f32>;
 pub type Vector3 = cgmath::Vector3<f32>;

@@ -2,7 +2,7 @@ use crate::simulation::SimulationRenderData;
 use crate::{Application, DefaultRenderPassDescriptor};
 use crate::{BindingBuilder, BufferBinding};
 use bytemuck::{Pod, Zeroable};
-use naga::{back::wgsl::WriterFlags, valid::ValidationFlags, Block, Handle, Statement};
+use naga::{back::wgsl::WriterFlags, valid::ValidationFlags, Block, Statement};
 use std::cell::Ref;
 use std::mem::size_of;
 use visula_derive::define_delegate;
@@ -209,7 +209,7 @@ impl Spheres {
             }
         }
         log::debug!("Line count {count:#?}");
-        if count == None {
+        if count.is_none() {
             log::debug!("Empty spheres buffer detected. Aborting render of spheres.");
             return;
         }
