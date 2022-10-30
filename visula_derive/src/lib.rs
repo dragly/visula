@@ -47,7 +47,7 @@ pub fn define_delegate(input: TokenStream) -> TokenStream {
                                         },
                                         ::naga::Span::default(),
                                     );
-                                Statement::Store {
+                                ::naga::Statement::Store {
                                     pointer: access_index,
                                     value: result_expression,
                                 }
@@ -63,7 +63,7 @@ pub fn define_delegate(input: TokenStream) -> TokenStream {
                 }
 
                 impl #ident {
-                    fn inject(&self, shader_variable_name: &str, module: &mut ::naga::Module, binding_builder: &mut BindingBuilder) {
+                    fn inject(&self, shader_variable_name: &str, module: &mut ::naga::Module, binding_builder: &mut #crate_name::BindingBuilder) {
                         let entry_point_index = binding_builder.entry_point_index;
                         let variable = module.entry_points[entry_point_index]
                             .function
@@ -78,7 +78,7 @@ pub fn define_delegate(input: TokenStream) -> TokenStream {
                                 _ => false,
                             })
                             .unwrap();
-                        let mut new_body = Block::from_vec(vec![
+                        let mut new_body = ::naga::Block::from_vec(vec![
                             #(#field_modifications)*
                         ]);
                         for (statement, span) in module.entry_points[entry_point_index]
@@ -163,7 +163,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
                                 }
                             });
                             instance_field_values.push(quote! {
-                                #field_name: Expression::new(#crate_name::ExpressionInner::InstanceField(#crate_name::InstanceField {
+                                #field_name: #crate_name::Expression::new(#crate_name::ExpressionInner::InstanceField(#crate_name::InstanceField {
                                     buffer_handle: inner.borrow().handle,
                                     inner: inner.clone(),
                                     field_index: #field_index,
@@ -261,6 +261,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     let name = input.ident;
+    let vis = input.vis;
 
     let mut sizes = Vec::new();
     let mut uniform_struct_fields = Vec::new();
@@ -279,8 +280,9 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                     match field_name {
                         Some(field_name) => {
                             let field_type = &field.ty;
+                            let field_vis = &field.vis;
                             uniform_struct_fields.push(quote! {
-                                #field_name: #crate_name::Expression
+                                #field_vis #field_name: #crate_name::Expression
                             });
                             let size = quote! {
                                 (std::mem::size_of::<#field_type>() as u32)
@@ -288,7 +290,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                             // TODO figure out why this cannot be #crate_name and needs to be
                             // visula
                             let naga_type = quote! {
-                                < #field_type as visula::NagaType >::naga_type()
+                                < #field_type as #crate_name::NagaType >::naga_type()
                             };
                             let field_type_declaration = format_ident!("{}_type", field_name);
                             uniform_field_types_init.push(quote! {
@@ -306,7 +308,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                                 }
                             });
                             uniform_field_values.push(quote! {
-                                #field_name: Expression::new(#crate_name::ExpressionInner::UniformField(#crate_name::UniformField {
+                                #field_name: #crate_name::Expression::new(#crate_name::ExpressionInner::UniformField(#crate_name::UniformField {
                                     buffer_handle: inner.borrow().handle,
                                     inner: inner.clone(),
                                     field_index: #field_index,
@@ -328,7 +330,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
 
     let crate_name = visula_crate_name();
     let expanded = quote! {
-        struct #uniform_struct_name {
+        #vis struct #uniform_struct_name {
             #(#uniform_struct_fields,)*
             handle: u64,
             bind_group_layout: std::rc::Rc<::wgpu::BindGroupLayout>,

@@ -8,7 +8,7 @@ use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 use visula::{
     BindingBuilder, Buffer, BufferInner, CustomEvent, DropEvent, Expression, ExpressionInner,
-    MeshPipeline, Pipeline, SimulationRenderData, Sphere, SphereDelegate, Spheres, Uniform,
+    Mesh, Pipeline, SimulationRenderData, Sphere, SphereDelegate, Spheres, Uniform,
     UniformBinding, UniformField, UniformHandle,
 };
 use visula_derive::Uniform;
@@ -46,7 +46,7 @@ struct Simulation {
     sphere_buffer: Buffer<Sphere>,
     settings: Settings,
     settings_buffer: Buffer<Settings>,
-    mesh: MeshPipeline,
+    mesh: Mesh,
 }
 
 impl Simulation {

@@ -1,10 +1,14 @@
+use bytemuck::Pod;
+use bytemuck::Zeroable;
+use visula_derive::Instance;
+use visula_derive::Uniform;
 use std::io::Read;
 use std::io::Seek;
 use wgpu::util::DeviceExt;
 
 use crate::error::Error;
 use crate::primitives::mesh::MeshVertexAttributes;
-use crate::Application;
+use crate::{Application, Buffer};
 
 impl From<gltf::Error> for Error {
     fn from(_: gltf::Error) -> Self {
@@ -20,6 +24,7 @@ impl From<std::io::Error> for Error {
 
 pub struct GltfFile {
     pub scenes: Vec<GltfScene>,
+    pub animations: Vec<GltfAnimation>,
 }
 
 pub struct GltfScene {
@@ -28,8 +33,28 @@ pub struct GltfScene {
 
 pub struct GltfMesh {
     pub vertex_buffer: wgpu::Buffer,
+    pub vertex_count: usize,
     pub index_buffer: wgpu::Buffer,
     pub index_count: usize,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Instance, Uniform, Zeroable)]
+pub struct Scale {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+
+pub struct GltfChannel {
+    pub target: usize,
+    pub property: gltf::animation::Property,
+    pub input_buffer: Buffer<f32>,
+    pub output_buffer: Buffer<Scale>,
+}
+
+pub struct GltfAnimation {
+    pub channels: Vec<GltfChannel>,
 }
 
 pub fn import_buffer_data(document: &gltf::Document, mut blob: Option<Vec<u8>>) -> Vec<Vec<u8>> {
@@ -53,7 +78,7 @@ pub fn import_buffer_data(document: &gltf::Document, mut blob: Option<Vec<u8>>) 
 
 pub fn parse_gltf(
     reader: &mut (impl Read + Seek),
-    application: &Application,
+    application: &mut Application,
 ) -> Result<GltfFile, Error> {
     let file = gltf::Gltf::from_reader(reader)?;
     let document = file.document;
@@ -61,6 +86,49 @@ pub fn parse_gltf(
     let buffers = import_buffer_data(&document, blob);
 
     let mut scenes = vec![];
+    let animations = document
+        .animations()
+        .map(|animation| {
+            let channels = animation
+                .channels()
+                .filter_map(|channel| {
+                    println!("{:#?}", channel.target().node().index());
+                    println!("{:#?}", channel.target().property());
+                    let reader = channel.reader(|buffer| Some(&buffers[buffer.index()]));
+                    let inputs: Vec<f32> = reader.read_inputs().unwrap().collect();
+                    let outputs: Vec<Scale> = match reader.read_outputs().unwrap() {
+                        gltf::animation::util::ReadOutputs::Scales(outs) => outs
+                            .map(|v| Scale {
+                                x: v[0],
+                                y: v[1],
+                                z: v[2],
+                            })
+                            .collect(),
+                        _ => return None,
+                    };
+                    let input_buffer = Buffer::new_with_init(
+                        application,
+                        wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::UNIFORM,
+                        &inputs,
+                        "Input buffer",
+                    );
+                    let output_buffer = Buffer::new_with_init(
+                        application,
+                        wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::UNIFORM,
+                        &outputs,
+                        "Output buffer",
+                    );
+                    Some(GltfChannel {
+                        input_buffer,
+                        output_buffer,
+                        property: channel.target().property(),
+                        target: channel.target().node().index(),
+                    })
+                })
+                .collect();
+            GltfAnimation { channels }
+        })
+        .collect();
     for scene in document.scenes() {
         let mut meshes = vec![];
         for node in scene.nodes() {
@@ -120,8 +188,9 @@ pub fn parse_gltf(
                                 usage: wgpu::BufferUsages::VERTEX,
                             });
                     meshes.push(GltfMesh {
-                        index_buffer,
                         vertex_buffer,
+                        vertex_count: vertices.len(),
+                        index_buffer,
                         index_count: indices.len(),
                     });
                 }
@@ -129,5 +198,5 @@ pub fn parse_gltf(
         }
         scenes.push(GltfScene { meshes });
     }
-    Ok(GltfFile { scenes })
+    Ok(GltfFile { scenes, animations })
 }

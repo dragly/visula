@@ -176,9 +176,7 @@ impl Spheres {
             binding_builder,
         })
     }
-}
 
-impl Spheres {
     pub fn render(
         &self,
         SimulationRenderData {
