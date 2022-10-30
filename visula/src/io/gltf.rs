@@ -1,9 +1,9 @@
 use bytemuck::Pod;
 use bytemuck::Zeroable;
-use visula_derive::Instance;
-use visula_derive::Uniform;
 use std::io::Read;
 use std::io::Seek;
+use visula_derive::Instance;
+use visula_derive::Uniform;
 use wgpu::util::DeviceExt;
 
 use crate::error::Error;
@@ -49,8 +49,8 @@ pub struct Scale {
 pub struct GltfChannel {
     pub target: usize,
     pub property: gltf::animation::Property,
-    pub input_buffer: Buffer<f32>,
-    pub output_buffer: Buffer<Scale>,
+    pub input_buffer: Vec<f32>,
+    pub output_buffer: Vec<Scale>,
 }
 
 pub struct GltfAnimation {
@@ -106,18 +106,8 @@ pub fn parse_gltf(
                             .collect(),
                         _ => return None,
                     };
-                    let input_buffer = Buffer::new_with_init(
-                        application,
-                        wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::UNIFORM,
-                        &inputs,
-                        "Input buffer",
-                    );
-                    let output_buffer = Buffer::new_with_init(
-                        application,
-                        wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::UNIFORM,
-                        &outputs,
-                        "Output buffer",
-                    );
+                    let input_buffer = inputs;
+                    let output_buffer = outputs;
                     Some(GltfChannel {
                         input_buffer,
                         output_buffer,

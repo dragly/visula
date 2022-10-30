@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::{fs::File, time::Instant};
 
 use std::io::BufReader;
 use structopt::StructOpt;
@@ -18,6 +18,11 @@ struct Cli {
 
 struct Simulation {
     mesh: Mesh,
+    scale_buffer: Buffer<Scale>,
+    scale_input: Vec<f32>,
+    scale_output: Vec<Scale>,
+    time: f32,
+    previous_time: Instant,
 }
 
 #[derive(Debug)]
@@ -65,7 +70,7 @@ impl visula::Simulation for Simulation {
             .next()
             .unwrap();
 
-        let scale_input = &gltf_file
+        let scale_input = gltf_file
             .animations
             .iter()
             .next()
@@ -74,8 +79,9 @@ impl visula::Simulation for Simulation {
             .iter()
             .next()
             .unwrap()
-            .input_buffer;
-        let scale_output = &gltf_file
+            .input_buffer
+            .clone();
+        let scale_output = gltf_file
             .animations
             .iter()
             .next()
@@ -84,7 +90,8 @@ impl visula::Simulation for Simulation {
             .iter()
             .next()
             .unwrap()
-            .output_buffer;
+            .output_buffer
+            .clone();
 
         let scale_data = Scale {
             x: 1.0,
@@ -113,10 +120,30 @@ impl visula::Simulation for Simulation {
         mesh.index_count = index_count;
         mesh.vertex_buf = vertex_buffer;
         mesh.index_buf = index_buffer;
-        Ok(Simulation { mesh })
+        Ok(Simulation {
+            mesh,
+            scale_buffer,
+            scale_input,
+            scale_output,
+            time: 0.0,
+            previous_time: Instant::now(),
+        })
     }
 
-    fn update(&mut self, _application: &visula::Application) {}
+    fn update(&mut self, application: &visula::Application) {
+        let current_time = Instant::now();
+        let delta = current_time - self.previous_time;
+        self.time += delta.as_secs_f32();
+
+        for (input, output) in self.scale_input.iter().zip(&self.scale_output) {
+            if *input > self.time {
+                self.scale_buffer.update(application, &[*output]);
+                break;
+            }
+        }
+
+        self.previous_time = current_time;
+    }
 
     fn render(&mut self, data: &mut SimulationRenderData) {
         self.mesh.render(data);

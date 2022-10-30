@@ -166,10 +166,10 @@ impl Mesh {
             }
         }
         log::debug!("Line count {count:#?}");
-        if count.is_none() {
-            log::debug!("Empty spheres buffer detected. Aborting render of spheres.");
-            return;
-        }
+        //if count.is_none() {
+            //log::debug!("Empty spheres buffer detected. Aborting render of spheres.");
+            //return;
+        //}
         let bindings: Vec<(&BufferBinding, Ref<wgpu::Buffer>)> = self
             .binding_builder
             .bindings
@@ -190,7 +190,7 @@ impl Mesh {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_vertex_buffer(0, self.vertex_buf.slice(..));
             render_pass.set_index_buffer(self.index_buf.slice(..), wgpu::IndexFormat::Uint32);
-            let mut instance_count = 0;
+            let mut instance_count = 1;
             for (binding, buffer) in bindings.iter() {
                 let slot = binding.slot;
                 log::debug!("Setting vertex buffer {}", slot);
