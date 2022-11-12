@@ -53,7 +53,7 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
 
     surface.configure(&device, &config);
 
-    let camera_controller = CameraController::new();
+    let camera_controller = CameraController::new(&window);
 
     let depth_texture_in = device.create_texture(&wgpu::TextureDescriptor {
         size: wgpu::Extent3d {
