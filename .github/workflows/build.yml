@@ -16,7 +16,7 @@ jobs:
           - false
         rust:
           - stable
-          - 1.60.0  # Minimum supported Rust version
+          - 1.65.0  # Minimum supported Rust version
         include:
           - rust: beta
             experimental: true

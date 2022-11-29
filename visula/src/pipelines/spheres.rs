@@ -97,7 +97,7 @@ impl Spheres {
             naga::back::wgsl::write_string(&module, &info, WriterFlags::all()).unwrap();
         log::debug!("Resulting spheres shader code:\n{}", output_str);
 
-        let shader_module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
             source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(&output_str)),
         });
@@ -151,7 +151,7 @@ impl Spheres {
             fragment: Some(wgpu::FragmentState {
                 module: &shader_module,
                 entry_point: "fs_main",
-                targets: &[application.config.format.into()],
+                targets: &[Some(application.config.format.into())],
             }),
             primitive: wgpu::PrimitiveState {
                 front_face: wgpu::FrontFace::Ccw,

@@ -11,7 +11,7 @@ use winit::platform::web::WindowExtWebSys;
 
 use winit::{
     event::Event,
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::{ControlFlow, EventLoopBuilder},
 };
 
 pub mod application;
@@ -61,7 +61,7 @@ pub type Matrix4 = cgmath::Matrix4<f32>;
 pub type Point3 = cgmath::Point3<f32>;
 
 pub fn run<S: 'static + Simulation>() {
-    let event_loop = EventLoop::<CustomEvent>::with_user_event();
+    let event_loop = EventLoopBuilder::<CustomEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
     let mut builder = winit::window::WindowBuilder::new();
     builder = builder.with_title("Visula");
