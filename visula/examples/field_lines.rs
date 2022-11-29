@@ -1,103 +1,3 @@
-//use macroquad::prelude::*;
-
-//struct Particle {
-    //position: [f32; 2],
-    //charge: f32,
-//}
-
-//fn calculate_field(particles: &[Particle], position: [f32; 2]) -> [f32; 2] {
-    //let mut e_x = 0.0;
-    //let mut e_y = 0.0;
-    //for particle in particles {
-        //let xdiff = position[0] - particle.position[0];
-        //let ydiff = position[1] - particle.position[1];
-
-        //let distance_squared = xdiff * xdiff + ydiff * ydiff;
-        //let distance = distance_squared.sqrt();
-
-        //let _rsq = distance_squared;
-
-        //e_x += particle.charge * xdiff / (distance * distance_squared);
-        //e_y += particle.charge * ydiff / (distance * distance_squared);
-    //}
-
-    //[e_x, e_y]
-//}
-
-//fn window_conf() -> Conf {
-    //Conf {
-        //window_title: "Drawula".to_owned(),
-        //high_dpi: true,
-        //sample_count: 4,
-        //..Default::default()
-    //}
-//}
-
-//#[macroquad::main(window_conf)]
-//async fn main() {
-    //let step_length = 0.01;
-    //let n_steps = 10000;
-    //let particles = vec![
-        //Particle {
-            //position: [screen_width() / 3.0, screen_height() / 2.0],
-            //charge: 1.0,
-        //},
-        //Particle {
-            //position: [2.0 * screen_width() / 3.0, screen_height() / 2.0],
-            //charge: -1.0,
-        //},
-        //Particle {
-            //position: [screen_width() / 2.0, screen_height() / 3.0],
-            //charge: -0.5,
-        //},
-    //];
-    //loop {
-        //clear_background(WHITE);
-
-        //let radius = 5.0;
-        //for (j, particle) in particles.iter().enumerate() {
-            //let xa = particle.position[0];
-            //let ya = particle.position[1];
-
-            //let sign = if particle.charge > 0.0 { 1.0 } else { -1.0 };
-
-            //let line_count = 10;
-            //let start_angle = j as f32 / particles.len() as f32 * 2.0 * 3.14;
-            //for a in 0..line_count {
-                //let mut current_x =
-                    //xa + radius * (start_angle + a as f32 / line_count as f32 * 2.0 * 3.14).cos();
-                //let mut current_y =
-                    //ya + radius * (start_angle + a as f32 / line_count as f32 * 2.0 * 3.14).sin();
-                //let mut prev_x = current_x;
-                //let mut prev_y = current_y;
-
-                //for _ in 0..n_steps {
-                    //let field = calculate_field(&particles, [current_x, current_y]);
-                    //let step_x = field[0] ;
-                    //let step_y = field[1] ;
-                    //let scale = step_length * step_length / (step_length / 10000000000. + step_x * step_x + step_y * step_y);
-
-                    //current_x = prev_x + sign * scale * step_x;
-                    //current_y = prev_y + sign * scale * step_y;
-
-
-                    //draw_line(prev_x, prev_y, current_x, current_y, 2.0, BLACK);
-
-                    //prev_x = current_x;
-                    //prev_y = current_y;
-                //}
-            //}
-        //}
-        //for particle in particles.iter() {
-            //let xa = particle.position[0];
-            //let ya = particle.position[1];
-            //let color = if particle.charge > 0.0 { RED } else { BLUE };
-            //draw_circle(xa, ya, radius, color);
-        //}
-        //next_frame().await
-    //}
-//}
-//
 use lyon::extra::rust_logo::build_logo_path;
 use lyon::math::*;
 use lyon::path::Path;
@@ -422,19 +322,19 @@ fn main() {
 
     let vs_module = &device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Geometry vs"),
-        source: wgpu::ShaderSource::Wgsl(include_str!("./../shaders/geometry.vs.wgsl").into()),
+        source: wgpu::ShaderSource::Wgsl(include_str!("../src/shaders/geometry.vs.wgsl").into()),
     });
     let fs_module = &device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Geometry fs"),
-        source: wgpu::ShaderSource::Wgsl(include_str!("./../shaders/geometry.fs.wgsl").into()),
+        source: wgpu::ShaderSource::Wgsl(include_str!("../src/shaders/geometry.fs.wgsl").into()),
     });
     let bg_vs_module = &device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Background vs"),
-        source: wgpu::ShaderSource::Wgsl(include_str!("./../shaders/background.vs.wgsl").into()),
+        source: wgpu::ShaderSource::Wgsl(include_str!("../src/shaders/background.vs.wgsl").into()),
     });
     let bg_fs_module = &device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Background fs"),
-        source: wgpu::ShaderSource::Wgsl(include_str!("./../shaders/background.fs.wgsl").into()),
+        source: wgpu::ShaderSource::Wgsl(include_str!("../src/shaders/background.fs.wgsl").into()),
     });
 
     let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -608,6 +508,7 @@ fn main() {
         width: size.width,
         height: size.height,
         present_mode: wgpu::PresentMode::AutoVsync,
+        alpha_mode: wgpu::CompositeAlphaMode::Auto,
     };
 
     let mut multisampled_render_target = None;
@@ -961,3 +862,4 @@ fn update_inputs(
 
     true
 }
+
