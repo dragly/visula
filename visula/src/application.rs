@@ -138,14 +138,14 @@ impl Application {
                 // default clear pass
                 encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("clear"),
-                    color_attachments: &[wgpu::RenderPassColorAttachment {
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                         view: &view,
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(simulation.clear_color()),
                             store: true,
                         },
-                    }],
+                    })],
                     depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                         view: &self.depth_texture,
                         depth_ops: Some(wgpu::Operations {

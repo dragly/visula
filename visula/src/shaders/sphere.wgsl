@@ -1,28 +1,29 @@
 struct Globals {
-    view_matrix: mat4x4<f32>;
-    transform: mat4x4<f32>;
-    camera_center: vec4<f32>;
-    camera_view_vector: vec4<f32>;
-    camera_position: vec4<f32>;
-    camera_up: vec4<f32>;
+    view_matrix: mat4x4<f32>,
+    transform: mat4x4<f32>,
+    camera_center: vec4<f32>,
+    camera_view_vector: vec4<f32>,
+    camera_position: vec4<f32>,
+    camera_up: vec4<f32>,
 };
 
-[[group(0), binding(0)]]
+@group(0)
+@binding(0)
 var<uniform> u_globals: Globals;
 
 struct VertexOutput {
-    [[builtin(position)]] proj_position: vec4<f32>;
-    [[location(0)]] plane_coord: vec2<f32>;
-    [[location(1)]] radius: f32;
-    [[location(2)]] vertex_position: vec3<f32>;
-    [[location(3)]] instance_position: vec3<f32>;
-    [[location(4)]] instance_color: vec3<f32>;
+    @builtin(position) proj_position: vec4<f32>,
+    @location(0) plane_coord: vec2<f32>,
+    @location(1) radius: f32,
+    @location(2) vertex_position: vec3<f32>,
+    @location(3) instance_position: vec3<f32>,
+    @location(4) instance_color: vec3<f32>,
 };
 
 struct Sphere {
-    position: vec3<f32>;
-    radius: f32;
-    color: vec3<f32>;
+    position: vec3<f32>,
+    radius: f32,
+    color: vec3<f32>,
 };
 
 fn spheres(
@@ -60,17 +61,17 @@ fn spheres(
     return output;
 }
 
-[[stage(vertex)]]
+@vertex
 fn vs_main(
-    [[location(0)]] vertex_offset_pre_transform: vec4<f32>,
+    @location(0) vertex_offset_pre_transform: vec4<f32>,
 ) -> VertexOutput {
     var sphere: Sphere;
     // modification happens here
     return spheres(vertex_offset_pre_transform, sphere);
 }
 
-[[stage(fragment)]]
-fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let rayDirection: vec3<f32> = normalize(in.vertex_position - u_globals.camera_position.xyz);
     let rayOrigin: vec3<f32> = in.vertex_position - in.instance_position;
 

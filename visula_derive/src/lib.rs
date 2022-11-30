@@ -371,7 +371,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                             group: bind_group,
                             binding: 0,
                         }),
-                        class: ::naga::StorageClass::Uniform,
+                        space: ::naga::AddressSpace::Uniform,
                         ty: uniform_type,
                         init: None,
                     },

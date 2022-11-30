@@ -42,7 +42,7 @@ pub fn create_mesh_pipeline(
         ..
     } = application;
     let vertex_size = size_of::<MeshVertexAttributes>();
-    let shader_module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+    let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,
         source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(include_str!("../mesh.wgsl"))),
     });
@@ -67,7 +67,7 @@ pub fn create_mesh_pipeline(
         fragment: Some(wgpu::FragmentState {
             module: &shader_module,
             entry_point: "fs_main",
-            targets: &[application.config.format.into()],
+            targets: &[Some(application.config.format.into())],
         }),
         primitive: wgpu::PrimitiveState {
             front_face: wgpu::FrontFace::Ccw,
