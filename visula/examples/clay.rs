@@ -326,12 +326,6 @@ struct Simulation {
     particle_buffer: Buffer<ParticleData>,
 }
 
-macro_rules! delegate_vec {
-    ($($elements:expr),+) => {
-        Expression::new(ExpressionInner::Vector {components: vec![ $($elements.into()),+ ]})
-    }
-}
-
 impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
@@ -362,7 +356,7 @@ impl visula::Simulation for Simulation {
             &SphereDelegate {
                 position: particle.position,
                 radius: settings.radius,
-                color: delegate_vec![0.2, 0.8, 0.6],
+                color: glam::Vec3::new(0.2, 0.8, 0.6).into(),
             },
         )
         .unwrap();

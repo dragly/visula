@@ -1,4 +1,4 @@
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 use bytemuck::{Pod, Zeroable};
 use wgpu::BufferUsages;
@@ -212,12 +212,6 @@ impl Simulation {
     }
 }
 
-macro_rules! delegate_vec {
-    ($($elements:expr),+) => {
-        Expression::new(ExpressionInner::Vector {components: vec![ $($elements.into()),+ ]})
-    }
-}
-
 impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
@@ -259,7 +253,7 @@ impl visula::Simulation for Simulation {
             &SphereDelegate {
                 position: pos,
                 radius: 1.0 + settings.radius,
-                color: particle.position / 40.0 + delegate_vec![0.1, 0.3, 0.8],
+                color: particle.position / 40.0 + glam::Vec3::new(0.1, 0.3, 0.8),
             },
         )
         .unwrap();

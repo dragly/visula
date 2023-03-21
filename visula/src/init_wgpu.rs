@@ -47,7 +47,7 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
         format: *surface.get_supported_formats(&adapter).get(0).unwrap(),
         width: size.width,
         height: size.height,
-        present_mode: wgpu::PresentMode::Mailbox,
+        present_mode: wgpu::PresentMode::AutoVsync,
         alpha_mode: wgpu::CompositeAlphaMode::Auto,
     };
 
