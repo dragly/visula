@@ -105,9 +105,7 @@ impl Lines {
         });
 
         let bind_group_layouts: Vec<&BindGroupLayout> = binding_builder
-            .uniforms
-            .iter()
-            .map(|(_id, binding)| binding.bind_group_layout.as_ref())
+            .uniforms.values().map(|binding| binding.bind_group_layout.as_ref())
             .collect();
 
         let uniforms = {
@@ -140,9 +138,7 @@ impl Lines {
             ],
         };
         let mut layouts = binding_builder
-            .bindings
-            .iter()
-            .map(|(_id, binding)| binding.layout.build())
+            .bindings.values().map(|binding| binding.layout.build())
             .collect();
         let buffers = {
             let mut buffers = vec![vertex_buffer_layout];
