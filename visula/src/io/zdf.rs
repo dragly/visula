@@ -33,7 +33,7 @@ pub fn read_zdf<R: ReadSeek>(input: R, device: &mut wgpu::Device) -> ZdfFile {
             let row_p = (row as i64 + 1).min(points.shape()[1] as i64 - 1) as usize;
 
             let color = colors.slice(s![col, row, ..]);
-            let color = [color[0] as u8, color[1] as u8, color[2] as u8, 255];
+            let color = [color[0], color[1], color[2], 255];
             let point_c = points.slice(s![col, row, ..]);
             let point_l = points.slice(s![col_m, row, ..]);
             let point_r = points.slice(s![col_p, row, ..]);

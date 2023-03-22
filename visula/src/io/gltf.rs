@@ -97,7 +97,7 @@ pub fn parse_gltf(
                                 }
                                 gltf::mesh::util::ReadIndices::U32(iter) => {
                                     for index in iter {
-                                        indices.push(index as u32);
+                                        indices.push(index);
                                     }
                                 }
                             }

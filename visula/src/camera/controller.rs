@@ -89,8 +89,8 @@ impl CameraController {
                 };
                 if self.left_pressed {
                     if self.control_pressed {
-                        let offset_up = -position_diff.y as f32;
-                        let offset_right = position_diff.x as f32;
+                        let offset_up = -position_diff.y;
+                        let offset_right = position_diff.x;
                         let offset = offset_up + offset_right;
                         let rotation = cgmath::Quaternion::from_axis_angle(
                             forward,
@@ -105,13 +105,13 @@ impl CameraController {
                                 captured_event: false,
                             };
                         }
-                        let offset_up = up * position_diff.y as f32;
-                        let offset_right = -right * position_diff.x as f32;
+                        let offset_up = up * position_diff.y;
+                        let offset_right = -right * position_diff.x;
                         let offset = offset_up + offset_right;
                         let axis = Vector3::cross(offset, forward).normalize();
                         let rotation = cgmath::Quaternion::from_axis_angle(
                             axis,
-                            cgmath::Rad(self.rotational_speed * position_diff.magnitude() as f32),
+                            cgmath::Rad(self.rotational_speed * position_diff.magnitude()),
                         );
                         let new_forward = (rotation * self.forward).normalize();
                         if Vector3::dot(up, new_forward).abs() > 0.99 {
@@ -125,7 +125,7 @@ impl CameraController {
                             let axis = Vector3::cross(offset, forward).normalize();
                             let rotation = cgmath::Quaternion::from_axis_angle(
                                 axis,
-                                cgmath::Rad(self.rotational_speed * (position_diff.x).abs() as f32),
+                                cgmath::Rad(self.rotational_speed * (position_diff.x).abs()),
                             );
                             let new_forward = (rotation * self.forward).normalize();
                             self.forward = new_forward;
@@ -143,10 +143,10 @@ impl CameraController {
                 }
                 if self.right_pressed {
                     if self.control_pressed {
-                        self.center += up * position_diff.y as f32 - right * position_diff.x as f32;
+                        self.center += up * position_diff.y - right * position_diff.x;
                     } else {
                         self.center +=
-                            flat_forward * position_diff.y as f32 - right * position_diff.x as f32;
+                            flat_forward * position_diff.y - right * position_diff.x;
                     }
                     needs_redraw = true;
                     captured_event = true;
