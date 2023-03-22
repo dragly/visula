@@ -1,7 +1,8 @@
 on:
   push:
-  schedule:
-    - cron: '15 14 12 * *'
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 name: Continuous integration
 env:
@@ -9,19 +10,11 @@ env:
 jobs:
   ci:
     runs-on: ubuntu-20.04
-    continue-on-error: ${{ matrix.experimental }}
     strategy:
       matrix:
-        experimental:
-          - false
         rust:
           - stable
           - 1.65.0  # Minimum supported Rust version
-        include:
-          - rust: beta
-            experimental: true
-          - rust: nightly
-            experimental: true
 
     steps:
       - uses: actions/checkout@v2
@@ -47,28 +40,17 @@ jobs:
           sudo chmod +x /usr/bin/sccache
           sccache --show-stats
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
           toolchain: ${{ matrix.rust }}
-          override: true
-          components: rustfmt, clippy
-      - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --examples
-      - name: Test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
+          components: clippy, rustfmt
       - name: Check formatting
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+        run: cargo fmt --all
+      - name: Check
+        run: cargo check --all-features --all-targets
+      - name: Build
+        run: cargo build --all-features --all-targets
+      - name: Test
+        run: cargo test --all-features --all-targets
       - name: Clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all --examples -- -D warnings
+        run: cargo clippy --all-features --all-targets -- -D warnings
