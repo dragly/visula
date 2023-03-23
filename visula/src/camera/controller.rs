@@ -8,6 +8,7 @@ use winit::event::{
     MouseScrollDelta::{LineDelta, PixelDelta},
     WindowEvent,
 };
+use winit::window::Window;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum State {
@@ -36,14 +37,8 @@ pub struct Response {
     pub captured_event: bool,
 }
 
-impl Default for CameraController {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl CameraController {
-    pub fn new() -> CameraController {
+    pub fn new(window: &Window) -> CameraController {
         let up = Vector3::unit_y();
         let forward = Vector3::unit_z();
         let right = Vector3::cross(forward, up).normalize();
@@ -53,6 +48,7 @@ impl CameraController {
         let axis = Vector3::cross(offset, forward).normalize();
         let rotation = cgmath::Quaternion::from_axis_angle(axis, cgmath::Rad(0.4));
         let new_forward = (rotation * forward).normalize();
+        let scale_factor = window.scale_factor() as f32;
         CameraController {
             left_pressed: false,
             right_pressed: false,
@@ -61,8 +57,8 @@ impl CameraController {
             up,
             distance: 100.0,
             center: Vector3::new(0.0, 0.0, 0.0),
-            rotational_speed: 0.005,
-            roll_speed: 0.005,
+            rotational_speed: 0.005 / scale_factor,
+            roll_speed: 0.005 / scale_factor,
             state: State::Released,
         }
     }

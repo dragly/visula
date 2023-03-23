@@ -84,12 +84,6 @@ struct Simulation {
     mouse: Mouse,
 }
 
-macro_rules! delegate_vec {
-    ($($elements:expr),+) => {
-        Expression::new(ExpressionInner::Vector {components: vec![ $($elements.into()),+ ]})
-    }
-}
-
 impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
@@ -127,11 +121,11 @@ impl visula::Simulation for Simulation {
             &SphereDelegate {
                 position: pos.clone(),
                 radius: settings.radius,
-                color: delegate_vec![
-                    0.1 + (particle.voltage.clone() + 10.0) / 120.0,
-                    0.2 + (particle.voltage.clone() + 10.0) / 120.0,
-                    0.3 + (particle.voltage.clone() + 10.0) / 120.0
-                ],
+                color: Expression::new(ExpressionInner::Vector3 {
+                    x: 0.1 + (particle.voltage.clone() + 10.0) / 120.0,
+                    y: 0.2 + (particle.voltage.clone() + 10.0) / 120.0,
+                    z: 0.3 + (particle.voltage.clone() + 10.0) / 120.0,
+                }),
             },
         )
         .unwrap();

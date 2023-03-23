@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 use bytemuck::{Pod, Zeroable};
 use wgpu::BufferUsages;
 
@@ -201,17 +203,12 @@ struct Simulation {
     bounding_box: BoundingBox,
     count: usize,
     target_temperature: f32,
+    last_update: Instant,
 }
 
 impl Simulation {
     fn reset(&mut self) {
         self.particles = generate(self.count);
-    }
-}
-
-macro_rules! delegate_vec {
-    ($($elements:expr),+) => {
-        Expression::new(ExpressionInner::Vector {components: vec![ $($elements.into()),+ ]})
     }
 }
 
@@ -256,7 +253,7 @@ impl visula::Simulation for Simulation {
             &SphereDelegate {
                 position: pos,
                 radius: 1.0 + settings.radius,
-                color: particle.position / 40.0 + delegate_vec![0.1, 0.3, 0.8],
+                color: particle.position / 40.0 + glam::Vec3::new(0.1, 0.3, 0.8),
             },
         )
         .unwrap();
@@ -287,12 +284,20 @@ impl visula::Simulation for Simulation {
             },
             count,
             target_temperature: 10.0,
+            last_update: Instant::now(),
         })
     }
 
     fn update(&mut self, application: &visula::Application) {
         let mut bond_data = Vec::new();
-        for _ in 0..self.settings.speed {
+        let current_time = Instant::now();
+        let time_diff = current_time - self.last_update;
+        let target_fps = self.settings.speed as f32 * 60.0;
+        if time_diff < Duration::from_secs_f32(1.0 / target_fps) {
+            return;
+        }
+        let steps = ((target_fps * time_diff.as_secs_f32()) as i32).min(self.settings.speed);
+        for _ in 0..steps {
             let previous_particles = self.particles.clone();
             bond_data = integrate(
                 &mut self.particles,
@@ -307,6 +312,7 @@ impl visula::Simulation for Simulation {
 
         self.particle_buffer.update(application, &self.particles);
         self.settings_buffer.update(application, &[self.settings]);
+        self.last_update = current_time;
     }
 
     fn render(&mut self, data: &mut SimulationRenderData) {
