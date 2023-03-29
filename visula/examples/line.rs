@@ -2,9 +2,9 @@ use bytemuck::{Pod, Zeroable};
 use wgpu::BufferUsages;
 
 use visula::{
-    BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Expression,
-    ExpressionInner, Instance, InstanceField, InstanceHandle, LineDelegate, Lines, NagaType,
-    SimulationRenderData, VertexAttrFormat, VertexBufferLayoutBuilder,
+    BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Expression, Instance,
+    InstanceField, InstanceHandle, LineDelegate, Lines, NagaType, SimulationRenderData,
+    VertexAttrFormat, VertexBufferLayoutBuilder,
 };
 use visula_derive::Instance;
 

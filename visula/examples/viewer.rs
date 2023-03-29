@@ -7,9 +7,9 @@ use wgpu::BufferUsages;
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 use visula::{
-    BindingBuilder, Buffer, BufferInner, CustomEvent, DropEvent, Expression, ExpressionInner,
-    MeshPipeline, Pipeline, SimulationRenderData, Sphere, SphereDelegate, Spheres, Uniform,
-    UniformBinding, UniformField, UniformHandle,
+    BindingBuilder, Buffer, BufferInner, CustomEvent, DropEvent, Expression, MeshPipeline,
+    Pipeline, SimulationRenderData, Sphere, SphereDelegate, Spheres, Uniform, UniformBinding,
+    UniformField, UniformHandle,
 };
 use visula_derive::Uniform;
 
