@@ -17,23 +17,18 @@ fn visula_crate_name() -> TokenStream2 {
     }
 }
 
-#[proc_macro]
-pub fn define_delegate(input: TokenStream) -> TokenStream {
-    let crate_name = visula_crate_name();
+#[proc_macro_derive(Delegate)]
+pub fn delegate(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as syn::Item);
     let result = match input {
         syn::Item::Struct(ItemStruct {
-            vis, ident, fields, ..
+            ident, fields, ..
         }) => {
-            let mut field_delegates: Vec<TokenStream2> = Vec::new();
             let mut field_modifications: Vec<TokenStream2> = Vec::new();
             match fields {
                 Fields::Named(FieldsNamed { named, .. }) => {
                     for (index, field) in named.iter().enumerate() {
-                        let Field { vis, ident, .. } = field;
-                        field_delegates.push(quote! {
-                            #vis #ident: #crate_name::Expression,
-                        });
+                        let Field { ident, .. } = field;
                         field_modifications.push(quote! {
                             {
                                 let result_expression = self.#ident.setup(module, binding_builder);
@@ -58,10 +53,6 @@ pub fn define_delegate(input: TokenStream) -> TokenStream {
                 _ => unimplemented!(),
             };
             quote! {
-                #vis struct #ident {
-                    #(#field_delegates)*
-                }
-
                 impl #ident {
                     fn inject(&self, shader_variable_name: &str, module: &mut ::naga::Module, binding_builder: &mut BindingBuilder) {
                         let entry_point_index = binding_builder.entry_point_index;

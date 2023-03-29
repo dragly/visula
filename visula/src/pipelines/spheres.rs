@@ -1,11 +1,11 @@
 use crate::simulation::SimulationRenderData;
-use crate::{Application, DefaultRenderPassDescriptor};
+use crate::{Application, DefaultRenderPassDescriptor, Expression};
 use crate::{BindingBuilder, BufferBinding};
 use bytemuck::{Pod, Zeroable};
 use naga::{back::wgsl::WriterFlags, valid::ValidationFlags, Block, Statement};
 use std::cell::Ref;
 use std::mem::size_of;
-use visula_derive::define_delegate;
+use visula_derive::Delegate;
 use wgpu::util::DeviceExt;
 use wgpu::{BindGroupLayout, BufferUsages};
 
@@ -47,12 +47,11 @@ pub struct Spheres {
     binding_builder: BindingBuilder,
 }
 
-define_delegate! {
-    pub struct SphereDelegate {
-        pub position: vec3,
-        pub radius: f32,
-        pub color: vec3,
-    }
+#[derive(Delegate)]
+pub struct SphereDelegate {
+    pub position: Expression,
+    pub radius: Expression,
+    pub color: Expression,
 }
 
 impl Spheres {
