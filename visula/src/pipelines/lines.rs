@@ -1,12 +1,13 @@
 use crate::{
-    Application, BindingBuilder, BufferBinding, DefaultRenderPassDescriptor, SimulationRenderData,
+    Application, BindingBuilder, BufferBinding, DefaultRenderPassDescriptor, Expression,
+    SimulationRenderData,
 };
 use bytemuck::{Pod, Zeroable};
 use naga::back::wgsl::WriterFlags;
 use naga::{valid::ValidationFlags, Block, Statement};
 use std::cell::Ref;
 use std::mem::size_of;
-use visula_derive::define_delegate;
+use visula_derive::Delegate;
 use wgpu::BufferUsages;
 use wgpu::{util::DeviceExt, BindGroupLayout};
 
@@ -48,13 +49,12 @@ pub struct Lines {
     binding_builder: BindingBuilder,
 }
 
-define_delegate! {
-    pub struct LineDelegate {
-        pub start: vec3,
-        pub end: vec3,
-        pub width: f32,
-        pub alpha: f32,
-    }
+#[derive(Delegate)]
+pub struct LineDelegate {
+    pub start: Expression,
+    pub end: Expression,
+    pub width: Expression,
+    pub alpha: Expression,
 }
 
 impl Lines {
@@ -105,7 +105,9 @@ impl Lines {
         });
 
         let bind_group_layouts: Vec<&BindGroupLayout> = binding_builder
-            .uniforms.values().map(|binding| binding.bind_group_layout.as_ref())
+            .uniforms
+            .values()
+            .map(|binding| binding.bind_group_layout.as_ref())
             .collect();
 
         let uniforms = {
@@ -138,7 +140,9 @@ impl Lines {
             ],
         };
         let mut layouts = binding_builder
-            .bindings.values().map(|binding| binding.layout.build())
+            .bindings
+            .values()
+            .map(|binding| binding.layout.build())
             .collect();
         let buffers = {
             let mut buffers = vec![vertex_buffer_layout];
