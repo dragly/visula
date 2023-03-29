@@ -141,8 +141,7 @@ impl CameraController {
                     if self.control_pressed {
                         self.center += up * position_diff.y - right * position_diff.x;
                     } else {
-                        self.center +=
-                            flat_forward * position_diff.y - right * position_diff.x;
+                        self.center += flat_forward * position_diff.y - right * position_diff.x;
                     }
                     needs_redraw = true;
                     captured_event = true;

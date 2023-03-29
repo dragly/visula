@@ -10,10 +10,10 @@ use itertools_num::linspace;
 use structopt::StructOpt;
 
 use visula::{
-    BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Expression,
-    ExpressionInner, Instance, InstanceField, InstanceHandle, NagaType, SimulationRenderData,
-    SphereDelegate, Spheres, Uniform, UniformBinding, UniformField, UniformHandle, Vector3,
-    VertexAttrFormat, VertexBufferLayoutBuilder,
+    BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Expression, Instance,
+    InstanceField, InstanceHandle, NagaType, SimulationRenderData, SphereDelegate, Spheres,
+    Uniform, UniformBinding, UniformField, UniformHandle, Vector3, VertexAttrFormat,
+    VertexBufferLayoutBuilder,
 };
 use visula_derive::{Instance, Uniform};
 

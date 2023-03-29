@@ -1,56 +1,80 @@
 use std::{
     fmt::{Error, Formatter},
-    ops::{Add, Div},
+    ops::{Add, Deref, Div},
 };
 
 use crate::{BindingBuilder, InstanceField, UniformField};
 
 #[derive(Clone)]
-pub enum ExpressionInner {
+pub struct ExpressionInner {
+    inner: Box<Expression>,
+}
+
+#[derive(Clone)]
+pub enum Expression {
     BinaryOperator {
-        left: Expression,
-        right: Expression,
+        left: ExpressionInner,
+        right: ExpressionInner,
         operator: naga::BinaryOperator,
     },
     Constant(naga::ConstantInner),
     InstanceField(InstanceField),
     UniformField(UniformField),
     Vector2 {
-        x: Expression,
-        y: Expression,
+        x: ExpressionInner,
+        y: ExpressionInner,
     },
     Vector3 {
-        x: Expression,
-        y: Expression,
-        z: Expression,
+        x: ExpressionInner,
+        y: ExpressionInner,
+        z: ExpressionInner,
     },
     Vector4 {
-        x: Expression,
-        y: Expression,
-        z: Expression,
-        w: Expression,
+        x: ExpressionInner,
+        y: ExpressionInner,
+        z: ExpressionInner,
+        w: ExpressionInner,
     },
+}
+
+impl ExpressionInner {
+    fn new(expression: Expression) -> ExpressionInner {
+        ExpressionInner {
+            inner: Box::new(expression),
+        }
+    }
+}
+
+impl<T> From<T> for ExpressionInner
+where
+    T: Into<Expression>,
+{
+    fn from(value: T) -> Self {
+        ExpressionInner::new(value.into())
+    }
+}
+
+impl Deref for ExpressionInner {
+    type Target = Box<Expression>;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
 }
 
 pub trait AsValue {
-    fn as_value(&self) -> ExpressionInner;
+    fn as_value(&self) -> Expression;
 }
 
 impl AsValue for InstanceField {
-    fn as_value(&self) -> ExpressionInner {
-        ExpressionInner::InstanceField(self.clone())
+    fn as_value(&self) -> Expression {
+        Expression::InstanceField(self.clone())
     }
 }
 
 impl AsValue for UniformField {
-    fn as_value(&self) -> ExpressionInner {
-        ExpressionInner::UniformField(self.clone())
+    fn as_value(&self) -> Expression {
+        Expression::UniformField(self.clone())
     }
-}
-
-#[derive(Clone)]
-pub struct Expression {
-    inner: Box<ExpressionInner>,
 }
 
 impl Expression {
@@ -59,10 +83,10 @@ impl Expression {
         module: &mut naga::Module,
         binding_builder: &mut BindingBuilder,
     ) -> naga::Handle<naga::Expression> {
-        let val = self.inner.clone();
+        let val = self.clone();
 
-        match *val {
-            ExpressionInner::Constant(inner) => {
+        match val {
+            Expression::Constant(inner) => {
                 // TODO handle non-float type
                 let constant = module.constants.append(
                     ::naga::Constant {
@@ -80,7 +104,7 @@ impl Expression {
                         ::naga::Span::default(),
                     )
             }
-            ExpressionInner::Vector2 { x, y } => {
+            Expression::Vector2 { x, y } => {
                 let naga_type = ::naga::Type {
                     name: None,
                     inner: ::naga::TypeInner::Vector {
@@ -105,7 +129,7 @@ impl Expression {
                         ::naga::Span::default(),
                     )
             }
-            ExpressionInner::Vector3 { x, y, z } => {
+            Expression::Vector3 { x, y, z } => {
                 let naga_type = ::naga::Type {
                     name: None,
                     inner: ::naga::TypeInner::Vector {
@@ -130,7 +154,7 @@ impl Expression {
                         ::naga::Span::default(),
                     )
             }
-            ExpressionInner::Vector4 { x, y, z, w } => {
+            Expression::Vector4 { x, y, z, w } => {
                 let naga_type = ::naga::Type {
                     name: None,
                     inner: ::naga::TypeInner::Vector {
@@ -155,7 +179,7 @@ impl Expression {
                         ::naga::Span::default(),
                     )
             }
-            ExpressionInner::BinaryOperator {
+            Expression::BinaryOperator {
                 left,
                 right,
                 operator,
@@ -174,7 +198,7 @@ impl Expression {
                         naga::Span::default(),
                     )
             }
-            ExpressionInner::InstanceField(field) => {
+            Expression::InstanceField(field) => {
                 if !binding_builder.bindings.contains_key(&field.buffer_handle) {
                     (field.integrate_buffer)(
                         &field.inner,
@@ -195,7 +219,7 @@ impl Expression {
                         naga::Span::default(),
                     )
             }
-            ExpressionInner::UniformField(field) => {
+            Expression::UniformField(field) => {
                 let inner = field.inner.borrow();
                 if !binding_builder.bindings.contains_key(&field.buffer_handle) {
                     (field.integrate_buffer)(
@@ -228,41 +252,35 @@ impl Expression {
             }
         }
     }
-
-    pub fn new(value: ExpressionInner) -> Expression {
-        Expression {
-            inner: Box::new(value),
-        }
-    }
 }
 
 impl std::fmt::Debug for Expression {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
-        let value = self.inner.clone();
-        match *value {
-            ExpressionInner::BinaryOperator { left, right, .. } => {
+        let value = self.clone();
+        match value {
+            Expression::BinaryOperator { left, right, .. } => {
                 write!(fmt, "BinaryOperator {{ left:")?;
                 left.fmt(fmt)?;
                 write!(fmt, "right: ")?;
                 right.fmt(fmt)?;
                 write!(fmt, "}}")?;
             }
-            ExpressionInner::Constant { .. } => {
+            Expression::Constant { .. } => {
                 write!(fmt, "Constant")?;
             }
-            ExpressionInner::InstanceField(_) => {
+            Expression::InstanceField(_) => {
                 write!(fmt, "InstanceField")?;
             }
-            ExpressionInner::UniformField(_) => {
+            Expression::UniformField(_) => {
                 write!(fmt, "UniformField")?;
             }
-            ExpressionInner::Vector2 { .. } => {
+            Expression::Vector2 { .. } => {
                 write!(fmt, "Vector2")?;
             }
-            ExpressionInner::Vector3 { .. } => {
+            Expression::Vector3 { .. } => {
                 write!(fmt, "Vector3")?;
             }
-            ExpressionInner::Vector4 { .. } => {
+            Expression::Vector4 { .. } => {
                 write!(fmt, "Vector4")?;
             }
         }
@@ -275,11 +293,11 @@ impl Div<f32> for Expression {
 
     fn div(self, other: f32) -> Expression {
         let other_scalar: Expression = other.into();
-        Expression::new(ExpressionInner::BinaryOperator {
-            left: self,
-            right: other_scalar,
+        Expression::BinaryOperator {
+            left: ExpressionInner::new(self),
+            right: ExpressionInner::new(other_scalar),
             operator: naga::BinaryOperator::Divide,
-        })
+        }
     }
 }
 
@@ -363,11 +381,11 @@ where
 
     fn add(self, other: T) -> Expression {
         let other_expression: Expression = other.into();
-        Expression::new(ExpressionInner::BinaryOperator {
-            left: self,
-            right: other_expression,
+        Expression::BinaryOperator {
+            left: ExpressionInner::new(self),
+            right: ExpressionInner::new(other_expression),
             operator: naga::BinaryOperator::Add,
-        })
+        }
     }
 }
 
@@ -406,48 +424,48 @@ impl From<&Expression> for Expression {
 
 impl From<f32> for Expression {
     fn from(value: f32) -> Expression {
-        Expression::new(ExpressionInner::Constant(naga::ConstantInner::Scalar {
+        Expression::Constant(naga::ConstantInner::Scalar {
             value: naga::ScalarValue::Float(value as f64),
             width: 4,
-        }))
+        })
     }
 }
 
 impl From<i32> for Expression {
     fn from(value: i32) -> Expression {
-        Expression::new(ExpressionInner::Constant(naga::ConstantInner::Scalar {
+        Expression::Constant(naga::ConstantInner::Scalar {
             value: naga::ScalarValue::Sint(value as i64),
             width: 4,
-        }))
+        })
     }
 }
 
 impl From<glam::Vec2> for Expression {
     fn from(value: glam::Vec2) -> Expression {
-        Expression::new(ExpressionInner::Vector2 {
+        Expression::Vector2 {
             x: value.x.into(),
             y: value.y.into(),
-        })
+        }
     }
 }
 
 impl From<glam::Vec3> for Expression {
     fn from(value: glam::Vec3) -> Expression {
-        Expression::new(ExpressionInner::Vector3 {
+        Expression::Vector3 {
             x: value.x.into(),
             y: value.y.into(),
             z: value.z.into(),
-        })
+        }
     }
 }
 
 impl From<glam::Vec4> for Expression {
     fn from(value: glam::Vec4) -> Expression {
-        Expression::new(ExpressionInner::Vector4 {
+        Expression::Vector4 {
             x: value.x.into(),
             y: value.y.into(),
             z: value.z.into(),
             w: value.w.into(),
-        })
+        }
     }
 }

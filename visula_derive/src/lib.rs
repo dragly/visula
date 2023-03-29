@@ -21,9 +21,7 @@ fn visula_crate_name() -> TokenStream2 {
 pub fn delegate(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as syn::Item);
     let result = match input {
-        syn::Item::Struct(ItemStruct {
-            ident, fields, ..
-        }) => {
+        syn::Item::Struct(ItemStruct { ident, fields, .. }) => {
             let mut field_modifications: Vec<TokenStream2> = Vec::new();
             match fields {
                 Fields::Named(FieldsNamed { named, .. }) => {
@@ -154,12 +152,12 @@ pub fn instance(input: TokenStream) -> TokenStream {
                                 }
                             });
                             instance_field_values.push(quote! {
-                                #field_name: Expression::new(#crate_name::ExpressionInner::InstanceField(#crate_name::InstanceField {
+                                #field_name: #crate_name::Expression::InstanceField(#crate_name::InstanceField {
                                     buffer_handle: inner.borrow().handle,
                                     inner: inner.clone(),
                                     field_index: #field_index,
                                     integrate_buffer: #instance_struct_name::integrate,
-                                }))
+                                })
                             });
                             attributes.push(quote! {
                                 wgpu::VertexAttribute{
@@ -297,13 +295,13 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                                 }
                             });
                             uniform_field_values.push(quote! {
-                                #field_name: Expression::new(#crate_name::ExpressionInner::UniformField(#crate_name::UniformField {
+                                #field_name: #crate_name::Expression::UniformField(#crate_name::UniformField {
                                     buffer_handle: inner.borrow().handle,
                                     inner: inner.clone(),
                                     field_index: #field_index,
                                     bind_group_layout: inner.borrow().bind_group_layout.clone(),
                                     integrate_buffer: #uniform_struct_name::integrate,
-                                }))
+                                })
                             });
                             field_index += 1;
                             sizes.push(size);

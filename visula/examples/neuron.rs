@@ -6,9 +6,9 @@ use wgpu::BufferUsages;
 use glam::Vec3;
 use visula::{
     simulation::SimulationRenderData, BindingBuilder, Buffer, BufferBinding, BufferBindingField,
-    BufferInner, CustomEvent, Expression, ExpressionInner, Instance, InstanceField, InstanceHandle,
-    LineDelegate, Lines, NagaType, SphereDelegate, Spheres, Uniform, UniformBinding, UniformField,
-    UniformHandle, VertexAttrFormat, VertexBufferLayoutBuilder,
+    BufferInner, CustomEvent, Expression, Instance, InstanceField, InstanceHandle, LineDelegate,
+    Lines, NagaType, SphereDelegate, Spheres, Uniform, UniformBinding, UniformField, UniformHandle,
+    VertexAttrFormat, VertexBufferLayoutBuilder,
 };
 use visula_derive::{Instance, Uniform};
 use winit::{
@@ -121,11 +121,11 @@ impl visula::Simulation for Simulation {
             &SphereDelegate {
                 position: pos.clone(),
                 radius: settings.radius,
-                color: Expression::new(ExpressionInner::Vector3 {
-                    x: 0.1 + (particle.voltage.clone() + 10.0) / 120.0,
-                    y: 0.2 + (particle.voltage.clone() + 10.0) / 120.0,
-                    z: 0.3 + (particle.voltage.clone() + 10.0) / 120.0,
-                }),
+                color: Expression::Vector3 {
+                    x: (0.1 + (particle.voltage.clone() + 10.0) / 120.0).into(),
+                    y: (0.2 + (particle.voltage.clone() + 10.0) / 120.0).into(),
+                    z: (0.3 + (particle.voltage.clone() + 10.0) / 120.0).into(),
+                },
             },
         )
         .unwrap();
