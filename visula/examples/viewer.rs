@@ -80,9 +80,7 @@ impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
         let args = Cli::from_args();
-        let sphere_buffer = Buffer::<Sphere>::new(
-            application,
-        );
+        let sphere_buffer = Buffer::<Sphere>::new(application);
         let sphere = sphere_buffer.instance();
         let settings_data = Settings {
             radius: 0.5,
@@ -90,10 +88,7 @@ impl visula::Simulation for Simulation {
             _padding2: 0.0,
             _padding3: 0.0,
         };
-        let settings_buffer = Buffer::new_with_init(
-            application,
-            &[settings_data],
-        );
+        let settings_buffer = Buffer::new_with_init(application, &[settings_data]);
         let settings = settings_buffer.uniform();
         let points = Spheres::new(
             application,

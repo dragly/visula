@@ -87,14 +87,10 @@ impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
         // TODO split into UniformBuffer and InstanceBuffer to avoid having UNIFORM usage on all
-        let particle_buffer = Buffer::<Particle>::new(
-            application,
-        );
+        let particle_buffer = Buffer::<Particle>::new(application);
         let particle = particle_buffer.instance();
 
-        let lines_buffer = Buffer::<BondData>::new(
-            application,
-        );
+        let lines_buffer = Buffer::<BondData>::new(application);
         let bond = lines_buffer.instance();
 
         let settings_data = Settings {
@@ -103,10 +99,7 @@ impl visula::Simulation for Simulation {
             speed: 4,
             _padding: 0.0,
         };
-        let settings_buffer = Buffer::new_with_init(
-            application,
-            &[settings_data],
-        );
+        let settings_buffer = Buffer::new_with_init(application, &[settings_data]);
         let settings = settings_buffer.uniform();
         let pos = &particle.position;
         let spheres = Spheres::new(

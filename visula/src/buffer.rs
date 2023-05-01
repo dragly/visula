@@ -76,10 +76,7 @@ impl<T: Pod> Buffer<T> {
         }
     }
 
-    pub fn new_with_init(
-        application: &mut crate::Application,
-        data: &[T],
-    ) -> Self {
+    pub fn new_with_init(application: &mut crate::Application, data: &[T]) -> Self {
         let label = std::any::type_name::<T>();
         let usage = BufferUsages::UNIFORM | BufferUsages::VERTEX | BufferUsages::COPY_DST;
         let buffer = application

@@ -333,18 +333,13 @@ impl visula::Simulation for Simulation {
         let particles = generate(count);
 
         // TODO split into UniformBuffer and InstanceBuffer to avoid having UNIFORM usage on all
-        let particle_buffer = Buffer::<ParticleData>::new(
-            application,
-        );
+        let particle_buffer = Buffer::<ParticleData>::new(application);
         let particle = particle_buffer.instance();
         let settings_data = Settings {
             radius: 2.0,
             width: 0.3,
         };
-        let settings_buffer = Buffer::new_with_init(
-            application,
-            &[settings_data],
-        );
+        let settings_buffer = Buffer::new_with_init(application, &[settings_data]);
         let settings = settings_buffer.uniform();
         let spheres = Spheres::new(
             application,

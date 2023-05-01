@@ -27,9 +27,7 @@ struct Simulation {
 impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
-        let line_buffer = Buffer::<LineData>::new(
-            application,
-        );
+        let line_buffer = Buffer::<LineData>::new(application);
         let line = line_buffer.instance();
 
         let lines = Lines::new(

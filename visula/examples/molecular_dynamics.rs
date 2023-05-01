@@ -219,14 +219,10 @@ impl visula::Simulation for Simulation {
         let particles = generate(count);
 
         // TODO split into UniformBuffer and InstanceBuffer to avoid having UNIFORM usage on all
-        let particle_buffer = Buffer::<Particle>::new(
-            application,
-        );
+        let particle_buffer = Buffer::<Particle>::new(application);
         let particle = particle_buffer.instance();
 
-        let bond_buffer = Buffer::<BondData>::new(
-            application,
-        );
+        let bond_buffer = Buffer::<BondData>::new(application);
         let bond = bond_buffer.instance();
 
         let settings_data = Settings {
@@ -235,10 +231,7 @@ impl visula::Simulation for Simulation {
             speed: 4,
             _padding: 0.0,
         };
-        let settings_buffer = Buffer::new_with_init(
-            application,
-            &[settings_data],
-        );
+        let settings_buffer = Buffer::new_with_init(application, &[settings_data]);
         let settings = settings_buffer.uniform();
         let pos = particle.position.clone();
         let spheres = Spheres::new(
