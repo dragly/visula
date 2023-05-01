@@ -3,7 +3,6 @@ use std::collections::VecDeque;
 use std::rc::Rc;
 
 use bytemuck::{Pod, Zeroable};
-use wgpu::BufferUsages;
 
 use cgmath::InnerSpace;
 use itertools_num::linspace;
@@ -336,8 +335,6 @@ impl visula::Simulation for Simulation {
         // TODO split into UniformBuffer and InstanceBuffer to avoid having UNIFORM usage on all
         let particle_buffer = Buffer::<ParticleData>::new(
             application,
-            BufferUsages::UNIFORM | BufferUsages::VERTEX | BufferUsages::COPY_DST,
-            "particle",
         );
         let particle = particle_buffer.instance();
         let settings_data = Settings {
@@ -346,9 +343,7 @@ impl visula::Simulation for Simulation {
         };
         let settings_buffer = Buffer::new_with_init(
             application,
-            BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             &[settings_data],
-            "settings",
         );
         let settings = settings_buffer.uniform();
         let spheres = Spheres::new(

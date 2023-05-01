@@ -1,7 +1,6 @@
 use std::time::{Duration, Instant};
 
 use bytemuck::{Pod, Zeroable};
-use wgpu::BufferUsages;
 
 use itertools_num::linspace;
 use structopt::StructOpt;
@@ -222,15 +221,11 @@ impl visula::Simulation for Simulation {
         // TODO split into UniformBuffer and InstanceBuffer to avoid having UNIFORM usage on all
         let particle_buffer = Buffer::<Particle>::new(
             application,
-            BufferUsages::UNIFORM | BufferUsages::VERTEX | BufferUsages::COPY_DST,
-            "particle",
         );
         let particle = particle_buffer.instance();
 
         let bond_buffer = Buffer::<BondData>::new(
             application,
-            BufferUsages::UNIFORM | BufferUsages::VERTEX | BufferUsages::COPY_DST,
-            "bond",
         );
         let bond = bond_buffer.instance();
 
@@ -242,9 +237,7 @@ impl visula::Simulation for Simulation {
         };
         let settings_buffer = Buffer::new_with_init(
             application,
-            BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             &[settings_data],
-            "settings",
         );
         let settings = settings_buffer.uniform();
         let pos = particle.position.clone();

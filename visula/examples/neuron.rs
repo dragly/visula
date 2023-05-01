@@ -1,7 +1,6 @@
 use bytemuck::{Pod, Zeroable};
 use cgmath::{InnerSpace, SquareMatrix};
 use slotmap::{DefaultKey, SlotMap};
-use wgpu::BufferUsages;
 
 use glam::Vec3;
 use visula::{
@@ -90,15 +89,11 @@ impl visula::Simulation for Simulation {
         // TODO split into UniformBuffer and InstanceBuffer to avoid having UNIFORM usage on all
         let particle_buffer = Buffer::<Particle>::new(
             application,
-            BufferUsages::UNIFORM | BufferUsages::VERTEX | BufferUsages::COPY_DST,
-            "particle",
         );
         let particle = particle_buffer.instance();
 
         let lines_buffer = Buffer::<BondData>::new(
             application,
-            BufferUsages::UNIFORM | BufferUsages::VERTEX | BufferUsages::COPY_DST,
-            "bond",
         );
         let bond = lines_buffer.instance();
 
@@ -110,9 +105,7 @@ impl visula::Simulation for Simulation {
         };
         let settings_buffer = Buffer::new_with_init(
             application,
-            BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             &[settings_data],
-            "settings",
         );
         let settings = settings_buffer.uniform();
         let pos = &particle.position;
