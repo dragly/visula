@@ -3,7 +3,6 @@ use std::{fs::File, io::Cursor, path::Path};
 use bytemuck::{Pod, Zeroable};
 use oxifive::ReadSeek;
 use structopt::StructOpt;
-use wgpu::BufferUsages;
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 use visula::{
@@ -83,8 +82,6 @@ impl visula::Simulation for Simulation {
         let args = Cli::from_args();
         let sphere_buffer = Buffer::<Sphere>::new(
             application,
-            BufferUsages::UNIFORM | BufferUsages::VERTEX | BufferUsages::COPY_DST,
-            "point",
         );
         let sphere = sphere_buffer.instance();
         let settings_data = Settings {
@@ -95,9 +92,7 @@ impl visula::Simulation for Simulation {
         };
         let settings_buffer = Buffer::new_with_init(
             application,
-            BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             &[settings_data],
-            "settings",
         );
         let settings = settings_buffer.uniform();
         let points = Spheres::new(

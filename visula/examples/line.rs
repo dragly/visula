@@ -1,5 +1,4 @@
 use bytemuck::{Pod, Zeroable};
-use wgpu::BufferUsages;
 
 use visula::{
     BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Expression, Instance,
@@ -30,8 +29,6 @@ impl visula::Simulation for Simulation {
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
         let line_buffer = Buffer::<LineData>::new(
             application,
-            BufferUsages::UNIFORM | BufferUsages::VERTEX | BufferUsages::COPY_DST,
-            "line",
         );
         let line = line_buffer.instance();
 

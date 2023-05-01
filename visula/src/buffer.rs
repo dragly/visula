@@ -22,7 +22,9 @@ pub struct Buffer<T: Pod> {
 }
 
 impl<T: Pod> Buffer<T> {
-    pub fn new(application: &mut crate::Application, usage: BufferUsages, label: &str) -> Self {
+    pub fn new(application: &mut crate::Application) -> Self {
+        let usage = BufferUsages::UNIFORM | BufferUsages::VERTEX | BufferUsages::COPY_DST;
+        let label = std::any::type_name::<T>();
         let buffer = application.device.create_buffer(&wgpu::BufferDescriptor {
             mapped_at_creation: true, // TODO not sure we need this?
             size: 16,
@@ -76,10 +78,10 @@ impl<T: Pod> Buffer<T> {
 
     pub fn new_with_init(
         application: &mut crate::Application,
-        usage: BufferUsages,
         data: &[T],
-        label: &str,
     ) -> Self {
+        let label = std::any::type_name::<T>();
+        let usage = BufferUsages::UNIFORM | BufferUsages::VERTEX | BufferUsages::COPY_DST;
         let buffer = application
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
