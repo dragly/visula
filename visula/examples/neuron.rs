@@ -58,13 +58,13 @@ fn lennard_jones(position_a: Vec3, position_b: Vec3, eps: f32, sigma: f32) -> Ve
 #[derive(Debug)]
 struct Error {}
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Uniform, Zeroable)]
 struct Settings {
     radius: f32,
     width: f32,
     speed: i32,
-    _padding: f32,
+    //_padding: f32,
 }
 
 struct Mouse {
@@ -86,7 +86,6 @@ struct Simulation {
 impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
-        // TODO split into UniformBuffer and InstanceBuffer to avoid having UNIFORM usage on all
         let particle_buffer = Buffer::<Particle>::new(application);
         let particle = particle_buffer.instance();
 
@@ -97,7 +96,7 @@ impl visula::Simulation for Simulation {
             radius: 10.0,
             width: 4.0,
             speed: 4,
-            _padding: 0.0,
+            //_padding: 0.0,
         };
         let settings_buffer = Buffer::new_with_init(application, &[settings_data]);
         let settings = settings_buffer.uniform();
@@ -345,6 +344,10 @@ impl visula::Simulation for Simulation {
         egui::Window::new("Settings").show(context, |ui| {
             ui.label("Simulation speed");
             ui.add(egui::Slider::new(&mut self.settings.speed, 1..=20));
+            ui.label("Radius");
+            ui.add(egui::Slider::new(&mut self.settings.radius, 1.0..=20.0));
+            ui.label("Width");
+            ui.add(egui::Slider::new(&mut self.settings.width, 1.0..=20.0));
         });
     }
 
