@@ -74,6 +74,7 @@ impl Application {
                     format: wgpu::TextureFormat::Depth32Float,
                     usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                     label: None,
+                    view_formats: &[],
                 });
                 self.depth_texture =
                     depth_texture.create_view(&wgpu::TextureViewDescriptor::default());

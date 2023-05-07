@@ -5,6 +5,7 @@ use crate::custom_event::CustomEvent;
 use egui::FontDefinitions;
 use egui_wgpu_backend::RenderPass;
 use egui_winit_platform::{Platform, PlatformDescriptor};
+use wgpu::InstanceDescriptor;
 
 use crate::vec_to_buffer::vec_to_buffer;
 
@@ -15,9 +16,14 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
     let size = window.inner_size();
 
     // TODO remove this when https://github.com/gfx-rs/wgpu/issues/1492 is resolved
-    let backend = wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all);
-    let instance = wgpu::Instance::new(backend);
-    let surface = unsafe { instance.create_surface(&window) };
+    let backends = wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all);
+    let dx12_shader_compiler = wgpu::util::dx12_shader_compiler_from_env().unwrap_or_default();
+
+    let instance = wgpu::Instance::new(InstanceDescriptor {
+        backends,
+        dx12_shader_compiler,
+    });
+    let surface = unsafe { instance.create_surface(&window).unwrap() };
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::default(),
@@ -42,15 +48,11 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
         .await
         .unwrap();
 
-    let config = wgpu::SurfaceConfiguration {
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        format: *surface.get_supported_formats(&adapter).get(0).unwrap(),
-        width: size.width,
-        height: size.height,
-        present_mode: wgpu::PresentMode::AutoVsync,
-        alpha_mode: wgpu::CompositeAlphaMode::Auto,
-    };
-
+    let mut config = surface
+        .get_default_config(&adapter, size.width, size.height)
+        .expect("Surface isn't supported by the adapter.");
+    let surface_view_format = config.format.add_srgb_suffix();
+    config.view_formats.push(surface_view_format);
     surface.configure(&device, &config);
 
     let camera_controller = CameraController::new(&window);
@@ -67,6 +69,7 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
         format: wgpu::TextureFormat::Depth32Float,
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         label: None,
+        view_formats: &[],
     });
     let depth_texture = depth_texture_in.create_view(&wgpu::TextureViewDescriptor::default());
 
