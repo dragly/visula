@@ -82,9 +82,6 @@ impl Application {
                 self.config.height = size.height;
                 self.surface.configure(&self.device, &self.config);
             }
-            Event::MainEventsCleared => {
-                // handle logic updates, such as physics
-            }
             _ => {}
         }
         false
