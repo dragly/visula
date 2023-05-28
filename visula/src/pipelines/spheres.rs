@@ -1,4 +1,4 @@
-use crate::simulation::SimulationRenderData;
+use crate::simulation::RenderData;
 use crate::{Application, DefaultRenderPassDescriptor, Expression};
 use crate::{BindingBuilder, BufferBinding};
 use bytemuck::{Pod, Zeroable};
@@ -180,13 +180,13 @@ impl Spheres {
 impl Spheres {
     pub fn render(
         &self,
-        SimulationRenderData {
+        RenderData {
             encoder,
             view,
             depth_texture,
             camera_bind_group,
             ..
-        }: &mut SimulationRenderData,
+        }: &mut RenderData,
     ) {
         log::debug!("Rendering spheres");
         let mut count = None;
@@ -207,7 +207,7 @@ impl Spheres {
                 }
             }
         }
-        log::debug!("Line count {count:#?}");
+        log::debug!("Sphere count {count:#?}");
         if count.is_none() {
             log::debug!("Empty spheres buffer detected. Aborting render of spheres.");
             return;

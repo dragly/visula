@@ -1,6 +1,6 @@
 use crate::camera::controller::Response;
 use crate::custom_event::CustomEvent;
-use crate::{camera::controller::CameraController, simulation::SimulationRenderData};
+use crate::{camera::controller::CameraController, simulation::RenderData};
 
 use winit::{
     event::{Event, WindowEvent},
@@ -158,7 +158,7 @@ impl Application {
                 });
             }
 
-            simulation.render(&mut SimulationRenderData {
+            simulation.render(&mut RenderData {
                 view: &view,
                 depth_texture: &self.depth_texture,
                 encoder: &mut encoder,

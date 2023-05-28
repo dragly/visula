@@ -1,6 +1,6 @@
 use crate::{
     Application, BindingBuilder, BufferBinding, DefaultRenderPassDescriptor, Expression,
-    SimulationRenderData,
+    RenderData,
 };
 use bytemuck::{Pod, Zeroable};
 use naga::back::wgsl::WriterFlags;
@@ -192,13 +192,13 @@ impl Lines {
 
     pub fn render(
         &self,
-        SimulationRenderData {
+        RenderData {
             encoder,
             view,
             depth_texture,
             camera_bind_group,
             ..
-        }: &mut SimulationRenderData,
+        }: &mut RenderData,
     ) {
         log::debug!("Rendering lines");
         let mut count = None;

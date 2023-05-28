@@ -4,7 +4,7 @@ use wgpu::util::DeviceExt;
 
 use crate::pipelines::pipeline::Pipeline;
 use crate::primitives::mesh::MeshVertexAttributes;
-use crate::{DefaultRenderPassDescriptor, SimulationRenderData};
+use crate::{DefaultRenderPassDescriptor, RenderData};
 
 pub struct MeshPipeline {
     pub render_pipeline: wgpu::RenderPipeline,
@@ -14,8 +14,8 @@ pub struct MeshPipeline {
 }
 
 impl Pipeline for MeshPipeline {
-    fn render(&mut self, data: &mut SimulationRenderData) {
-        let SimulationRenderData {
+    fn render(&mut self, data: &mut RenderData) {
+        let RenderData {
             encoder,
             view,
             depth_texture,
