@@ -23,9 +23,9 @@ pub struct UniformBinding {
     pub inner: Rc<RefCell<BufferInner>>,
 }
 
-pub type BindingMap = HashMap<u64, BufferBinding>;
-pub type UniformMap = HashMap<u64, UniformBinding>;
-pub type BindGroupMap = HashMap<u64, BindGroup>;
+pub type BindingMap = HashMap<uuid::Uuid, BufferBinding>;
+pub type UniformMap = HashMap<uuid::Uuid, UniformBinding>;
+pub type BindGroupMap = HashMap<uuid::Uuid, BindGroup>;
 
 pub struct BindingBuilder {
     pub bindings: BindingMap,

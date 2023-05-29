@@ -10,8 +10,8 @@ use structopt::StructOpt;
 
 use visula::{
     BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Expression, Instance,
-    InstanceField, InstanceHandle, NagaType, RenderData, SphereDelegate, Spheres,
-    Uniform, UniformBinding, UniformField, UniformHandle, Vector3, VertexAttrFormat,
+    InstanceField, InstanceHandle, NagaType, RenderData, SphereDelegate, Spheres, Uniform,
+    UniformBinding, UniformField, UniformHandle, Vector3, VertexAttrFormat,
     VertexBufferLayoutBuilder,
 };
 use visula_derive::{Instance, Uniform};
@@ -333,16 +333,16 @@ impl visula::Simulation for Simulation {
         let particles = generate(count);
 
         // TODO split into UniformBuffer and InstanceBuffer to avoid having UNIFORM usage on all
-        let particle_buffer = Buffer::<ParticleData>::new(application);
+        let particle_buffer = Buffer::<ParticleData>::new(&application.device);
         let particle = particle_buffer.instance();
         let settings_data = Settings {
             radius: 2.0,
             width: 0.3,
         };
-        let settings_buffer = Buffer::new_with_init(application, &[settings_data]);
+        let settings_buffer = Buffer::new_with_init(&application.device, &[settings_data]);
         let settings = settings_buffer.uniform();
         let spheres = Spheres::new(
-            application,
+            &application.rendering_descriptor(),
             &SphereDelegate {
                 position: particle.position,
                 radius: settings.radius,
@@ -374,7 +374,8 @@ impl visula::Simulation for Simulation {
                 radius: particle.mass,
             })
             .collect();
-        self.particle_buffer.update(application, &particle_data);
+        self.particle_buffer
+            .update(&application.device, &application.queue, &particle_data);
     }
 
     fn render(&mut self, data: &mut RenderData) {

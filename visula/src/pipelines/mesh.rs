@@ -19,12 +19,12 @@ impl Pipeline for MeshPipeline {
             encoder,
             view,
             depth_texture,
-            camera_bind_group,
+            camera,
             ..
         } = data;
         let default_render_pass = DefaultRenderPassDescriptor::new("mesh", view, depth_texture);
         let mut render_pass = encoder.begin_render_pass(&default_render_pass.build());
-        render_pass.set_bind_group(0, camera_bind_group, &[]);
+        render_pass.set_bind_group(0, &camera.bind_group, &[]);
 
         render_pass.set_pipeline(&self.render_pipeline);
         render_pass.set_vertex_buffer(0, self.vertex_buf.slice(..));
@@ -36,11 +36,7 @@ impl Pipeline for MeshPipeline {
 pub fn create_mesh_pipeline(
     application: &crate::Application,
 ) -> Result<MeshPipeline, Box<dyn std::error::Error>> {
-    let crate::Application {
-        device,
-        camera,
-        ..
-    } = application;
+    let crate::Application { device, camera, .. } = application;
     let vertex_size = size_of::<MeshVertexAttributes>();
     let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,

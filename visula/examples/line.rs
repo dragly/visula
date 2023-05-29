@@ -2,8 +2,8 @@ use bytemuck::{Pod, Zeroable};
 
 use visula::{
     BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Expression, Instance,
-    InstanceField, InstanceHandle, LineDelegate, Lines, NagaType, RenderData,
-    VertexAttrFormat, VertexBufferLayoutBuilder,
+    InstanceField, InstanceHandle, LineDelegate, Lines, NagaType, RenderData, VertexAttrFormat,
+    VertexBufferLayoutBuilder,
 };
 use visula_derive::Instance;
 
@@ -27,11 +27,11 @@ struct Simulation {
 impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
-        let line_buffer = Buffer::<LineData>::new(application);
+        let line_buffer = Buffer::<LineData>::new(&application.device);
         let line = line_buffer.instance();
 
         let lines = Lines::new(
-            application,
+            &application.rendering_descriptor(),
             &LineDelegate {
                 start: line.position_a,
                 end: line.position_b,
@@ -58,7 +58,8 @@ impl visula::Simulation for Simulation {
     }
 
     fn update(&mut self, application: &visula::Application) {
-        self.line_buffer.update(application, &self.line_data);
+        self.line_buffer
+            .update(&application.device, &application.queue, &self.line_data);
     }
 
     fn render(&mut self, data: &mut RenderData) {
