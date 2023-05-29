@@ -1,7 +1,11 @@
 use visula::{
-    camera::Camera, rendering_descriptor::RenderingDescriptor, BindingBuilder, Buffer,
-    BufferBinding, BufferBindingField, BufferInner, Expression, Instance, InstanceField,
-    InstanceHandle, LineDelegate, Lines, NagaType, RenderData, VertexAttrFormat,
+    camera::{
+        controller::{CameraController, Response},
+        Camera,
+    },
+    rendering_descriptor::RenderingDescriptor,
+    BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Expression, Instance,
+    InstanceField, InstanceHandle, LineDelegate, Lines, NagaType, RenderData, VertexAttrFormat,
     VertexBufferLayoutBuilder,
 };
 use visula_derive::Instance;
@@ -134,6 +138,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let line_buffer = Buffer::<LineData>::new_with_init(&device, &line_data);
     let line = line_buffer.instance();
 
+    let mut camera_controller = CameraController::new(&window);
     let camera = Camera::new(&device);
 
     let lines = Lines::new(
@@ -154,7 +159,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     )
     .unwrap();
 
-    let camera = Camera::new(&device);
+    let mut camera = Camera::new(&device);
 
     event_loop.run(move |event, _, control_flow| {
         // Have the closure take ownership of the resources.
@@ -163,6 +168,17 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         let _ = (&instance, &adapter, &shader, &pipeline_layout);
 
         *control_flow = ControlFlow::Wait;
+        camera_controller.update();
+        let Response {
+            needs_redraw,
+            captured_event,
+        } = camera_controller.handle_event(&event);
+        if needs_redraw {
+            window.request_redraw();
+        }
+        if captured_event {
+            return ;
+        }
         match event {
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),
@@ -176,6 +192,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
+                let camera_uniforms =
+                    camera_controller.uniforms(config.width as f32 / config.height as f32);
+                camera.update(&camera_uniforms, &queue);
                 let frame = surface
                     .get_current_texture()
                     .expect("Failed to acquire next swap chain texture");
@@ -184,6 +203,27 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     .create_view(&wgpu::TextureViewDescriptor::default());
                 let mut encoder =
                     device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+
+                encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("clear"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::GREEN),
+                            store: true,
+                        },
+                    })],
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: &depth_texture,
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(1.0),
+                            store: true,
+                        }),
+                        stencil_ops: None,
+                    }),
+                });
+
                 {
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: None,
@@ -191,7 +231,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                             view: &view,
                             resolve_target: None,
                             ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::GREEN),
+                                load: wgpu::LoadOp::Load,
                                 store: true,
                             },
                         })],
