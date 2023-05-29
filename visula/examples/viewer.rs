@@ -6,9 +6,9 @@ use structopt::StructOpt;
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 use visula::{
-    BindingBuilder, Buffer, BufferInner, CustomEvent, DropEvent, Expression, MeshPipeline,
-    Pipeline, RenderData, Sphere, SphereDelegate, Spheres, Uniform, UniformBinding, UniformField,
-    UniformHandle,
+    BindingBuilder, CustomEvent, DropEvent, Expression, InstanceBuffer, MeshPipeline, Pipeline,
+    RenderData, Sphere, SphereDelegate, Spheres, Uniform, UniformBinding, UniformBuffer,
+    UniformBufferInner, UniformField, UniformHandle,
 };
 use visula_derive::Uniform;
 
@@ -42,9 +42,9 @@ struct Settings {
 struct Simulation {
     render_mode: RenderMode,
     spheres: Spheres,
-    sphere_buffer: Buffer<Sphere>,
+    sphere_buffer: InstanceBuffer<Sphere>,
     settings: Settings,
-    settings_buffer: Buffer<Settings>,
+    settings_buffer: UniformBuffer<Settings>,
     mesh: MeshPipeline,
 }
 
@@ -82,7 +82,7 @@ impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
         let args = Cli::from_args();
-        let sphere_buffer = Buffer::<Sphere>::new(&application.device);
+        let sphere_buffer = InstanceBuffer::<Sphere>::new(&application.device);
         let sphere = sphere_buffer.instance();
         let settings_data = Settings {
             radius: 0.5,
@@ -90,7 +90,7 @@ impl visula::Simulation for Simulation {
             _padding2: 0.0,
             _padding3: 0.0,
         };
-        let settings_buffer = Buffer::new_with_init(&application.device, &[settings_data]);
+        let settings_buffer = UniformBuffer::new_with_init(&application.device, &settings_data);
         let settings = settings_buffer.uniform();
         let points = Spheres::new(
             &application.rendering_descriptor(),
@@ -120,7 +120,7 @@ impl visula::Simulation for Simulation {
 
     fn update(&mut self, application: &visula::Application) {
         self.settings_buffer
-            .update(&application.device, &application.queue, &[self.settings]);
+            .update(&application.queue, &self.settings);
     }
 
     fn render(&mut self, data: &mut RenderData) {

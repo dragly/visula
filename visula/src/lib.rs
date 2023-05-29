@@ -16,12 +16,12 @@ use winit::{
 
 pub mod application;
 pub mod bindings;
-pub mod buffer;
 pub mod camera;
 pub mod custom_event;
 pub mod drop_event;
 pub mod error;
 pub mod init_wgpu;
+pub mod instance_buffer;
 pub mod instances;
 pub mod io;
 pub mod naga_type;
@@ -30,6 +30,7 @@ pub mod primitives;
 pub mod render_pass;
 pub mod rendering_descriptor;
 pub mod simulation;
+pub mod uniform_buffer;
 pub mod value;
 pub mod vec_to_buffer;
 pub mod vertex_attr;
@@ -45,15 +46,16 @@ pub mod setup_wasm;
 
 pub use application::Application;
 pub use bindings::*;
-pub use buffer::*;
 pub use custom_event::CustomEvent;
 pub use drop_event::DropEvent;
+pub use instance_buffer::*;
 pub use instances::*;
 pub use naga_type::*;
 pub use pipelines::*;
 pub use primitives::*;
 pub use render_pass::*;
 pub use simulation::*;
+pub use uniform_buffer::*;
 pub use value::*;
 
 pub type Vector2 = cgmath::Vector2<f32>;

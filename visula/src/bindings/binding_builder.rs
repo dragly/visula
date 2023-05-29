@@ -1,4 +1,4 @@
-use crate::{BufferInner, VertexBufferLayoutBuilder};
+use crate::{InstanceBufferInner, UniformBufferInner, VertexBufferLayoutBuilder};
 use naga::Module;
 use naga::{Expression, Handle};
 use std::cell::RefCell;
@@ -14,13 +14,13 @@ pub struct BufferBinding {
     pub slot: u32,
     pub fields: Vec<BufferBindingField>,
     pub layout: VertexBufferLayoutBuilder,
-    pub inner: Rc<RefCell<BufferInner>>,
+    pub inner: Rc<RefCell<InstanceBufferInner>>,
 }
 
 pub struct UniformBinding {
     pub expression: Handle<Expression>,
     pub bind_group_layout: Rc<BindGroupLayout>,
-    pub inner: Rc<RefCell<BufferInner>>,
+    pub inner: Rc<RefCell<UniformBufferInner>>,
 }
 
 pub type BindingMap = HashMap<uuid::Uuid, BufferBinding>;

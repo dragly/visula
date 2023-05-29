@@ -4,9 +4,9 @@ use visula::{
         Camera,
     },
     rendering_descriptor::RenderingDescriptor,
-    BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Expression, Instance,
-    InstanceField, InstanceHandle, LineDelegate, Lines, NagaType, RenderData, VertexAttrFormat,
-    VertexBufferLayoutBuilder,
+    BindingBuilder, BufferBinding, BufferBindingField, Expression, Instance, InstanceBuffer,
+    InstanceBufferInner, InstanceField, InstanceHandle, LineDelegate, Lines, NagaType, RenderData,
+    VertexAttrFormat, VertexBufferLayoutBuilder,
 };
 use visula_derive::Instance;
 
@@ -61,7 +61,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         .await
         .expect("Failed to find an appropriate adapter");
 
-    // Create the logical device and command queue
     let (device, queue) = adapter
         .request_device(
             &wgpu::DeviceDescriptor {
@@ -76,7 +75,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         .await
         .expect("Failed to create device");
 
-    // Load the shaders from disk
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,
         source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
@@ -135,7 +133,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         position_b: [10.0, 0.0, 0.0],
         _padding: [0.0; 2],
     }];
-    let line_buffer = Buffer::<LineData>::new_with_init(&device, &line_data);
+    let line_buffer = InstanceBuffer::<LineData>::new_with_init(&device, &line_data);
     let line = line_buffer.instance();
 
     let mut camera_controller = CameraController::new(&window);
@@ -177,7 +175,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             window.request_redraw();
         }
         if captured_event {
-            return ;
+            return;
         }
         match event {
             Event::WindowEvent {

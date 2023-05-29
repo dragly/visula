@@ -4,10 +4,10 @@ use slotmap::{DefaultKey, SlotMap};
 
 use glam::Vec3;
 use visula::{
-    simulation::RenderData, BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner,
-    CustomEvent, Expression, Instance, InstanceField, InstanceHandle, LineDelegate, Lines,
-    NagaType, SphereDelegate, Spheres, Uniform, UniformBinding, UniformField, UniformHandle,
-    VertexAttrFormat, VertexBufferLayoutBuilder,
+    simulation::RenderData, BindingBuilder, BufferBinding, BufferBindingField, CustomEvent,
+    Expression, Instance, InstanceBuffer, InstanceBufferInner, InstanceField, InstanceHandle,
+    LineDelegate, Lines, NagaType, SphereDelegate, Spheres, Uniform, UniformBinding, UniformBuffer,
+    UniformBufferInner, UniformField, UniformHandle, VertexAttrFormat, VertexBufferLayoutBuilder,
 };
 use visula_derive::{Instance, Uniform};
 use winit::{
@@ -74,11 +74,11 @@ struct Mouse {
 struct Simulation {
     particles: Vec<Particle>,
     spheres: Spheres,
-    particle_buffer: Buffer<Particle>,
+    particle_buffer: InstanceBuffer<Particle>,
     lines: Lines,
     settings: Settings,
-    settings_buffer: Buffer<Settings>,
-    lines_buffer: Buffer<BondData>,
+    settings_buffer: UniformBuffer<Settings>,
+    lines_buffer: InstanceBuffer<BondData>,
     compartments: SlotMap<DefaultKey, Compartment>,
     mouse: Mouse,
 }
@@ -86,10 +86,10 @@ struct Simulation {
 impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
-        let particle_buffer = Buffer::<Particle>::new(&application.device);
+        let particle_buffer = InstanceBuffer::<Particle>::new(&application.device);
         let particle = particle_buffer.instance();
 
-        let lines_buffer = Buffer::<BondData>::new(&application.device);
+        let lines_buffer = InstanceBuffer::<BondData>::new(&application.device);
         let bond = lines_buffer.instance();
 
         let settings_data = Settings {
@@ -98,7 +98,7 @@ impl visula::Simulation for Simulation {
             speed: 4,
             //_padding: 0.0,
         };
-        let settings_buffer = Buffer::new_with_init(&application.device, &[settings_data]);
+        let settings_buffer = UniformBuffer::new_with_init(&application.device, &settings_data);
         let settings = settings_buffer.uniform();
         let pos = &particle.position;
         let spheres = Spheres::new(
@@ -333,7 +333,7 @@ impl visula::Simulation for Simulation {
         self.particle_buffer
             .update(&application.device, &application.queue, &self.particles);
         self.settings_buffer
-            .update(&application.device, &application.queue, &[self.settings]);
+            .update(&application.queue, &self.settings);
         self.lines_buffer
             .update(&application.device, &application.queue, &bonds);
     }

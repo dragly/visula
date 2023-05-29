@@ -192,7 +192,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
 
         impl #instance_struct_name {
             fn integrate(
-                inner: &std::rc::Rc<std::cell::RefCell<#crate_name::BufferInner>>,
+                inner: &std::rc::Rc<std::cell::RefCell<#crate_name::InstanceBufferInner>>,
                 handle: &::uuid::Uuid,
                 module: &mut ::naga::Module,
                 binding_builder: &mut #crate_name::BindingBuilder,
@@ -230,7 +230,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
 
         impl #crate_name::Instance for #name {
             type Type = #instance_struct_name;
-            fn instance( inner: std::rc::Rc<std::cell::RefCell<#crate_name::BufferInner>>) -> Self::Type {
+            fn instance( inner: std::rc::Rc<std::cell::RefCell<#crate_name::InstanceBufferInner>>) -> Self::Type {
                 let handle = inner.borrow().handle;
                 Self::Type {
                     #(#instance_field_values,)*
@@ -327,7 +327,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
         }
         impl #uniform_struct_name {
             fn integrate(
-                inner: &std::rc::Rc<std::cell::RefCell<#crate_name::BufferInner>>,
+                inner: &std::rc::Rc<std::cell::RefCell<#crate_name::UniformBufferInner>>,
                 handle: &::uuid::Uuid,
                 module: &mut ::naga::Module,
                 binding_builder: &mut #crate_name::BindingBuilder,
@@ -383,7 +383,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
 
         impl #crate_name::Uniform for #name {
             type Type = #uniform_struct_name;
-            fn uniform( inner: std::rc::Rc<std::cell::RefCell<#crate_name::BufferInner>>) -> Self::Type {
+            fn uniform( inner: std::rc::Rc<std::cell::RefCell<#crate_name::UniformBufferInner>>) -> Self::Type {
                 Self::Type {
                     #(#uniform_field_values,)*
                     handle: inner.borrow().handle,
