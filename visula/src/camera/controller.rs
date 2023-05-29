@@ -1,5 +1,5 @@
 use crate::camera::uniforms::CameraUniforms;
-use crate::{CustomEvent, Matrix4, Point3, Vector2, Vector3};
+use crate::{Matrix4, Point3, Vector2, Vector3};
 
 use cgmath::prelude::*;
 
@@ -65,7 +65,7 @@ impl CameraController {
 
     pub fn update(&mut self) {}
 
-    pub fn handle_event(&mut self, event: &Event<CustomEvent>) -> Response {
+    pub fn handle_event<T>(&mut self, event: &Event<T>) -> Response {
         let mut needs_redraw = false;
         let mut captured_event = false;
 
