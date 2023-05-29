@@ -1,4 +1,4 @@
-use crate::{pipelines::pipeline::Pipeline, DefaultRenderPassDescriptor, SimulationRenderData};
+use crate::{pipelines::pipeline::Pipeline, DefaultRenderPassDescriptor, RenderData};
 
 pub struct InstancedPipeline {
     pub render_pipeline: wgpu::RenderPipeline,
@@ -10,8 +10,8 @@ pub struct InstancedPipeline {
 }
 
 impl Pipeline for InstancedPipeline {
-    fn render(&mut self, data: &mut SimulationRenderData) {
-        let SimulationRenderData {
+    fn render(&mut self, data: &mut RenderData) {
+        let RenderData {
             encoder,
             view,
             depth_texture,

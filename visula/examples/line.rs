@@ -2,7 +2,7 @@ use bytemuck::{Pod, Zeroable};
 
 use visula::{
     BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Expression, Instance,
-    InstanceField, InstanceHandle, LineDelegate, Lines, NagaType, SimulationRenderData,
+    InstanceField, InstanceHandle, LineDelegate, Lines, NagaType, RenderData,
     VertexAttrFormat, VertexBufferLayoutBuilder,
 };
 use visula_derive::Instance;
@@ -61,7 +61,7 @@ impl visula::Simulation for Simulation {
         self.line_buffer.update(application, &self.line_data);
     }
 
-    fn render(&mut self, data: &mut SimulationRenderData) {
+    fn render(&mut self, data: &mut RenderData) {
         self.lines.render(data);
     }
 }

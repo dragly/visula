@@ -4,7 +4,7 @@ use slotmap::{DefaultKey, SlotMap};
 
 use glam::Vec3;
 use visula::{
-    simulation::SimulationRenderData, BindingBuilder, Buffer, BufferBinding, BufferBindingField,
+    simulation::RenderData, BindingBuilder, Buffer, BufferBinding, BufferBindingField,
     BufferInner, CustomEvent, Expression, Instance, InstanceField, InstanceHandle, LineDelegate,
     Lines, NagaType, SphereDelegate, Spheres, Uniform, UniformBinding, UniformField, UniformHandle,
     VertexAttrFormat, VertexBufferLayoutBuilder,
@@ -335,7 +335,7 @@ impl visula::Simulation for Simulation {
         self.lines_buffer.update(application, &bonds);
     }
 
-    fn render(&mut self, data: &mut SimulationRenderData) {
+    fn render(&mut self, data: &mut RenderData) {
         self.spheres.render(data);
         self.lines.render(data);
     }

@@ -10,7 +10,7 @@ use structopt::StructOpt;
 
 use visula::{
     BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Expression, Instance,
-    InstanceField, InstanceHandle, NagaType, SimulationRenderData, SphereDelegate, Spheres,
+    InstanceField, InstanceHandle, NagaType, RenderData, SphereDelegate, Spheres,
     Uniform, UniformBinding, UniformField, UniformHandle, Vector3, VertexAttrFormat,
     VertexBufferLayoutBuilder,
 };
@@ -377,7 +377,7 @@ impl visula::Simulation for Simulation {
         self.particle_buffer.update(application, &particle_data);
     }
 
-    fn render(&mut self, data: &mut SimulationRenderData) {
+    fn render(&mut self, data: &mut RenderData) {
         self.spheres.render(data);
     }
 }

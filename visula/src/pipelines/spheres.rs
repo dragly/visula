@@ -1,4 +1,4 @@
-use crate::simulation::SimulationRenderData;
+use crate::simulation::RenderData;
 use crate::{Application, DefaultRenderPassDescriptor, Expression};
 use crate::{BindingBuilder, BufferBinding};
 use bytemuck::{Pod, Zeroable};
@@ -61,7 +61,7 @@ impl Spheres {
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let Application {
             device,
-            camera_bind_group_layout,
+            camera,
             ..
         } = application;
 
@@ -108,7 +108,7 @@ impl Spheres {
             .collect();
 
         let uniforms = {
-            let mut uniforms = vec![camera_bind_group_layout];
+            let mut uniforms = vec![&camera.bind_group_layout];
             for layout in &bind_group_layouts {
                 uniforms.push(layout);
             }
@@ -180,13 +180,13 @@ impl Spheres {
 impl Spheres {
     pub fn render(
         &self,
-        SimulationRenderData {
+        RenderData {
             encoder,
             view,
             depth_texture,
             camera_bind_group,
             ..
-        }: &mut SimulationRenderData,
+        }: &mut RenderData,
     ) {
         log::debug!("Rendering spheres");
         let mut count = None;
@@ -207,7 +207,7 @@ impl Spheres {
                 }
             }
         }
-        log::debug!("Line count {count:#?}");
+        log::debug!("Sphere count {count:#?}");
         if count.is_none() {
             log::debug!("Empty spheres buffer detected. Aborting render of spheres.");
             return;

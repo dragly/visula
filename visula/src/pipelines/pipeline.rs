@@ -1,5 +1,5 @@
-use crate::SimulationRenderData;
+use crate::RenderData;
 
 pub trait Pipeline {
-    fn render(&mut self, data: &mut SimulationRenderData);
+    fn render(&mut self, data: &mut RenderData);
 }

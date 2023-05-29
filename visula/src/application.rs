@@ -1,6 +1,7 @@
+use crate::camera::Camera;
 use crate::camera::controller::Response;
 use crate::custom_event::CustomEvent;
-use crate::{camera::controller::CameraController, simulation::SimulationRenderData};
+use crate::{camera::controller::CameraController, simulation::RenderData};
 
 use winit::{
     event::{Event, WindowEvent},
@@ -20,14 +21,12 @@ pub struct Application {
     pub surface: wgpu::Surface,
     pub window: Window,
     pub camera_controller: CameraController,
-    pub camera_uniform_buffer: wgpu::Buffer,
     pub depth_texture: wgpu::TextureView,
-    pub camera_bind_group: wgpu::BindGroup,
-    pub camera_bind_group_layout: wgpu::BindGroupLayout,
     // TODO make private
     pub next_buffer_handle: u64,
     pub platform: Platform,
     pub egui_rpass: RenderPass,
+    pub camera: Camera,
 }
 
 impl Application {
@@ -82,9 +81,6 @@ impl Application {
                 self.config.height = size.height;
                 self.surface.configure(&self.device, &self.config);
             }
-            Event::MainEventsCleared => {
-                // handle logic updates, such as physics
-            }
             _ => {}
         }
         false
@@ -119,14 +115,10 @@ impl Application {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
         {
-            let model_view_projection_matrix = self
+            let camera_uniforms = self
                 .camera_controller
-                .model_view_projection_matrix(self.config.width as f32 / self.config.height as f32);
-            self.queue.write_buffer(
-                &self.camera_uniform_buffer,
-                0,
-                bytemuck::cast_slice(&[model_view_projection_matrix]),
-            );
+                .uniforms(self.config.width as f32 / self.config.height as f32);
+            self.camera.update(&camera_uniforms, &self.queue);
         }
 
         {
@@ -158,11 +150,11 @@ impl Application {
                 });
             }
 
-            simulation.render(&mut SimulationRenderData {
+            simulation.render(&mut RenderData {
                 view: &view,
                 depth_texture: &self.depth_texture,
                 encoder: &mut encoder,
-                camera_bind_group: &self.camera_bind_group,
+                camera_bind_group: &self.camera.bind_group,
             });
         }
 

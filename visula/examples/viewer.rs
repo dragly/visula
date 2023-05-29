@@ -7,7 +7,7 @@ use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 use visula::{
     BindingBuilder, Buffer, BufferInner, CustomEvent, DropEvent, Expression, MeshPipeline,
-    Pipeline, SimulationRenderData, Sphere, SphereDelegate, Spheres, Uniform, UniformBinding,
+    Pipeline, RenderData, Sphere, SphereDelegate, Spheres, Uniform, UniformBinding,
     UniformField, UniformHandle,
 };
 use visula_derive::Uniform;
@@ -120,7 +120,7 @@ impl visula::Simulation for Simulation {
         self.settings_buffer.update(application, &[self.settings]);
     }
 
-    fn render(&mut self, data: &mut SimulationRenderData) {
+    fn render(&mut self, data: &mut RenderData) {
         match self.render_mode {
             RenderMode::Mesh => self.mesh.render(data),
             RenderMode::Points => self.spheres.render(data),
