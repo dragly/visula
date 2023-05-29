@@ -64,7 +64,7 @@ impl Lines {
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let Application {
             device,
-            camera_bind_group_layout,
+            camera,
             ..
         } = application;
         let mut module =
@@ -111,7 +111,7 @@ impl Lines {
             .collect();
 
         let uniforms = {
-            let mut uniforms = vec![camera_bind_group_layout];
+            let mut uniforms = vec![&camera.bind_group_layout];
             for layout in &bind_group_layouts {
                 uniforms.push(layout);
             }

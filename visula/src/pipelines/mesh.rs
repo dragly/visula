@@ -38,7 +38,7 @@ pub fn create_mesh_pipeline(
 ) -> Result<MeshPipeline, Box<dyn std::error::Error>> {
     let crate::Application {
         device,
-        camera_bind_group_layout,
+        camera,
         ..
     } = application;
     let vertex_size = size_of::<MeshVertexAttributes>();
@@ -48,7 +48,7 @@ pub fn create_mesh_pipeline(
     });
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Mesh pipeline layout"),
-        bind_group_layouts: &[camera_bind_group_layout],
+        bind_group_layouts: &[&camera.bind_group_layout],
         push_constant_ranges: &[],
     });
     let buffer_layout = wgpu::VertexBufferLayout {

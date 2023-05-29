@@ -1,15 +1,15 @@
-use crate::application::Application;
+use crate::{application::Application, camera::Camera};
 use crate::camera::controller::CameraController;
-use crate::camera::uniforms::CameraUniforms;
+
 use crate::custom_event::CustomEvent;
 use egui::FontDefinitions;
 use egui_wgpu_backend::RenderPass;
 use egui_winit_platform::{Platform, PlatformDescriptor};
 use wgpu::InstanceDescriptor;
 
-use crate::vec_to_buffer::vec_to_buffer;
 
-use std::mem::size_of;
+
+
 use winit::{event_loop::EventLoopProxy, window::Window};
 
 pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
@@ -73,39 +73,6 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
     });
     let depth_texture = depth_texture_in.create_view(&wgpu::TextureViewDescriptor::default());
 
-    let camera_bind_group_layout =
-        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: None,
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(size_of::<CameraUniforms>() as u64),
-                },
-                count: None,
-            }],
-        });
-
-    // TODO get the definition of the size of the camera uniforms into one place somehow
-    let model_view_projection_matrix = [0.0; size_of::<CameraUniforms>() / size_of::<f32>()];
-
-    let camera_uniform_buffer = vec_to_buffer(
-        &device,
-        model_view_projection_matrix.as_ref(),
-        wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-    );
-
-    let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: None,
-        layout: &camera_bind_group_layout,
-        entries: &[wgpu::BindGroupEntry {
-            binding: 0,
-            resource: camera_uniform_buffer.as_entire_binding(),
-        }],
-    });
-
     let platform = Platform::new(PlatformDescriptor {
         physical_width: size.width,
         physical_height: size.height,
@@ -116,8 +83,9 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
 
     let egui_rpass = RenderPass::new(&device, config.format, 1);
 
+    let camera = Camera::new(&device);
+
     let event_result = proxy.send_event(CustomEvent::Ready(Box::new(Application {
-        camera_uniform_buffer,
         device,
         queue,
         config,
@@ -125,8 +93,7 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
         surface,
         window,
         depth_texture,
-        camera_bind_group_layout,
-        camera_bind_group,
+        camera,
         next_buffer_handle: 0,
         platform,
         egui_rpass,

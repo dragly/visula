@@ -225,7 +225,7 @@ impl CameraController {
         OPENGL_TO_WGPU_MATRIX * cgmath::perspective(cgmath::Deg(40f32), aspect_ratio, 10.0, 10000.0)
     }
 
-    pub fn model_view_projection_matrix(&self, aspect_ratio: f32) -> CameraUniforms {
+    pub fn uniforms(&self, aspect_ratio: f32) -> CameraUniforms {
         let view_matrix = self.view_matrix();
 
         let model_view_projection_matrix = self.projection_matrix(aspect_ratio) * view_matrix;

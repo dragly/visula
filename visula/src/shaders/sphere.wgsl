@@ -1,4 +1,4 @@
-struct Globals {
+struct Camera {
     view_matrix: mat4x4<f32>,
     transform: mat4x4<f32>,
     camera_center: vec4<f32>,
@@ -9,7 +9,7 @@ struct Globals {
 
 @group(0)
 @binding(0)
-var<uniform> u_globals: Globals;
+var<uniform> u_globals: Camera;
 
 struct VertexOutput {
     @builtin(position) proj_position: vec4<f32>,
