@@ -26,11 +26,12 @@ pub trait Instance {
     fn instance(inner: Rc<RefCell<BufferInner>>) -> Self::Type;
 }
 
-type IntegrateBuffer = fn(&Rc<RefCell<BufferInner>>, u64, &mut naga::Module, &mut BindingBuilder);
+type IntegrateBuffer =
+    fn(&Rc<RefCell<BufferInner>>, &uuid::Uuid, &mut naga::Module, &mut BindingBuilder);
 
 #[derive(Clone)]
 pub struct InstanceField {
-    pub buffer_handle: u64,
+    pub buffer_handle: uuid::Uuid,
     pub field_index: usize,
     pub inner: Rc<RefCell<BufferInner>>,
     pub integrate_buffer: IntegrateBuffer,
@@ -43,7 +44,7 @@ pub trait Uniform {
 
 type IntegrateUniform = fn(
     &Rc<RefCell<BufferInner>>,
-    u64,
+    &uuid::Uuid,
     &mut naga::Module,
     &mut BindingBuilder,
     &Rc<BindGroupLayout>,
@@ -52,7 +53,7 @@ type IntegrateUniform = fn(
 #[derive(Clone)]
 pub struct UniformField {
     pub bind_group_layout: std::rc::Rc<wgpu::BindGroupLayout>,
-    pub buffer_handle: u64,
+    pub buffer_handle: uuid::Uuid,
     pub field_index: usize,
     pub inner: Rc<RefCell<BufferInner>>,
     pub integrate_buffer: IntegrateUniform,

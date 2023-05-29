@@ -28,6 +28,7 @@ pub mod naga_type;
 pub mod pipelines;
 pub mod primitives;
 pub mod render_pass;
+pub mod rendering_descriptor;
 pub mod simulation;
 pub mod value;
 pub mod vec_to_buffer;

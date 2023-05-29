@@ -1,14 +1,11 @@
-use crate::{application::Application, camera::Camera};
 use crate::camera::controller::CameraController;
+use crate::{application::Application, camera::Camera};
 
 use crate::custom_event::CustomEvent;
 use egui::FontDefinitions;
 use egui_wgpu_backend::RenderPass;
 use egui_winit_platform::{Platform, PlatformDescriptor};
 use wgpu::InstanceDescriptor;
-
-
-
 
 use winit::{event_loop::EventLoopProxy, window::Window};
 
@@ -94,7 +91,6 @@ pub async fn init(proxy: EventLoopProxy<CustomEvent>, window: Window) {
         window,
         depth_texture,
         camera,
-        next_buffer_handle: 0,
         platform,
         egui_rpass,
     })));

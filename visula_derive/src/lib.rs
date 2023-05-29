@@ -187,13 +187,13 @@ pub fn instance(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         pub struct #instance_struct_name {
             #(#instance_struct_fields,)*
-            pub handle: u64,
+            pub handle: ::uuid::Uuid,
         }
 
         impl #instance_struct_name {
             fn integrate(
                 inner: &std::rc::Rc<std::cell::RefCell<#crate_name::BufferInner>>,
-                handle: u64,
+                handle: &::uuid::Uuid,
                 module: &mut ::naga::Module,
                 binding_builder: &mut #crate_name::BindingBuilder,
             )
@@ -204,7 +204,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
 
                 #(#module_fields)*
 
-                binding_builder.bindings.insert(handle, #crate_name::BufferBinding {
+                binding_builder.bindings.insert(handle.clone(), #crate_name::BufferBinding {
                     layout: #crate_name::VertexBufferLayoutBuilder {
                         array_stride: std::mem::size_of::<#name>() as wgpu::BufferAddress,
                         step_mode: wgpu::VertexStepMode::Instance,
@@ -319,7 +319,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         struct #uniform_struct_name {
             #(#uniform_struct_fields,)*
-            handle: u64,
+            handle: ::uuid::Uuid,
             bind_group_layout: std::rc::Rc<::wgpu::BindGroupLayout>,
         }
 
@@ -328,7 +328,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
         impl #uniform_struct_name {
             fn integrate(
                 inner: &std::rc::Rc<std::cell::RefCell<#crate_name::BufferInner>>,
-                handle: u64,
+                handle: &::uuid::Uuid,
                 module: &mut ::naga::Module,
                 binding_builder: &mut #crate_name::BindingBuilder,
                 bind_group_layout: &std::rc::Rc<::wgpu::BindGroupLayout>,
@@ -371,7 +371,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                     .expressions
                     .append(::naga::Expression::GlobalVariable(uniform_variable), ::naga::Span::default());
 
-                binding_builder.uniforms.insert(handle, #crate_name::UniformBinding {
+                binding_builder.uniforms.insert(handle.clone(), #crate_name::UniformBinding {
                     expression: settings_expression,
                     bind_group_layout: bind_group_layout.clone(),
                     inner: inner.clone(),

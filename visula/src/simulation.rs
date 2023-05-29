@@ -4,13 +4,14 @@ use egui::Context;
 use winit::event::Event;
 
 use crate::application::Application;
+use crate::camera::Camera;
 use crate::CustomEvent;
 
 pub struct RenderData<'a> {
     pub view: &'a wgpu::TextureView,
     pub depth_texture: &'a wgpu::TextureView,
     pub encoder: &'a mut wgpu::CommandEncoder,
-    pub camera_bind_group: &'a wgpu::BindGroup,
+    pub camera: &'a Camera,
 }
 
 pub trait Simulation: Sized {

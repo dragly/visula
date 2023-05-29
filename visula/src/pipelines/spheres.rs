@@ -1,6 +1,7 @@
+use crate::rendering_descriptor::RenderingDescriptor;
 use crate::simulation::RenderData;
-use crate::{Application, DefaultRenderPassDescriptor, Expression};
 use crate::{BindingBuilder, BufferBinding};
+use crate::{DefaultRenderPassDescriptor, Expression};
 use bytemuck::{Pod, Zeroable};
 use naga::{back::wgsl::WriterFlags, valid::ValidationFlags, Block, Statement};
 use std::cell::Ref;
@@ -56,14 +57,15 @@ pub struct SphereDelegate {
 
 impl Spheres {
     pub fn new(
-        application: &Application,
+        rendering_descriptor: &RenderingDescriptor,
         delegate: &SphereDelegate,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let Application {
+        let &RenderingDescriptor {
             device,
             camera,
+            format,
             ..
-        } = application;
+        } = rendering_descriptor;
 
         let mut module =
             naga::front::wgsl::parse_str(include_str!("../shaders/sphere.wgsl")).unwrap();
@@ -150,7 +152,11 @@ impl Spheres {
             fragment: Some(wgpu::FragmentState {
                 module: &shader_module,
                 entry_point: "fs_main",
-                targets: &[Some(application.config.format.into())],
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: *format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
             }),
             primitive: wgpu::PrimitiveState {
                 front_face: wgpu::FrontFace::Ccw,
@@ -184,7 +190,7 @@ impl Spheres {
             encoder,
             view,
             depth_texture,
-            camera_bind_group,
+            camera,
             ..
         }: &mut RenderData,
     ) {
@@ -228,7 +234,7 @@ impl Spheres {
             let default_render_pass =
                 DefaultRenderPassDescriptor::new("spheres", view, depth_texture);
             let mut render_pass = encoder.begin_render_pass(&default_render_pass.build());
-            render_pass.set_bind_group(0, camera_bind_group, &[]);
+            render_pass.set_bind_group(0, &camera.bind_group, &[]);
 
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);

@@ -4,9 +4,9 @@ use slotmap::{DefaultKey, SlotMap};
 
 use glam::Vec3;
 use visula::{
-    simulation::RenderData, BindingBuilder, Buffer, BufferBinding, BufferBindingField,
-    BufferInner, CustomEvent, Expression, Instance, InstanceField, InstanceHandle, LineDelegate,
-    Lines, NagaType, SphereDelegate, Spheres, Uniform, UniformBinding, UniformField, UniformHandle,
+    simulation::RenderData, BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner,
+    CustomEvent, Expression, Instance, InstanceField, InstanceHandle, LineDelegate, Lines,
+    NagaType, SphereDelegate, Spheres, Uniform, UniformBinding, UniformField, UniformHandle,
     VertexAttrFormat, VertexBufferLayoutBuilder,
 };
 use visula_derive::{Instance, Uniform};
@@ -86,10 +86,10 @@ struct Simulation {
 impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
-        let particle_buffer = Buffer::<Particle>::new(application);
+        let particle_buffer = Buffer::<Particle>::new(&application.device);
         let particle = particle_buffer.instance();
 
-        let lines_buffer = Buffer::<BondData>::new(application);
+        let lines_buffer = Buffer::<BondData>::new(&application.device);
         let bond = lines_buffer.instance();
 
         let settings_data = Settings {
@@ -98,11 +98,11 @@ impl visula::Simulation for Simulation {
             speed: 4,
             //_padding: 0.0,
         };
-        let settings_buffer = Buffer::new_with_init(application, &[settings_data]);
+        let settings_buffer = Buffer::new_with_init(&application.device, &[settings_data]);
         let settings = settings_buffer.uniform();
         let pos = &particle.position;
         let spheres = Spheres::new(
-            application,
+            &application.rendering_descriptor(),
             &SphereDelegate {
                 position: pos.clone(),
                 radius: settings.radius,
@@ -116,7 +116,7 @@ impl visula::Simulation for Simulation {
         .unwrap();
 
         let lines = Lines::new(
-            application,
+            &application.rendering_descriptor(),
             &LineDelegate {
                 start: bond.position_a,
                 end: bond.position_b,
@@ -330,9 +330,12 @@ impl visula::Simulation for Simulation {
             })
             .collect();
 
-        self.particle_buffer.update(application, &self.particles);
-        self.settings_buffer.update(application, &[self.settings]);
-        self.lines_buffer.update(application, &bonds);
+        self.particle_buffer
+            .update(&application.device, &application.queue, &self.particles);
+        self.settings_buffer
+            .update(&application.device, &application.queue, &[self.settings]);
+        self.lines_buffer
+            .update(&application.device, &application.queue, &bonds);
     }
 
     fn render(&mut self, data: &mut RenderData) {

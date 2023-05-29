@@ -7,8 +7,8 @@ use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 use visula::{
     BindingBuilder, Buffer, BufferInner, CustomEvent, DropEvent, Expression, MeshPipeline,
-    Pipeline, RenderData, Sphere, SphereDelegate, Spheres, Uniform, UniformBinding,
-    UniformField, UniformHandle,
+    Pipeline, RenderData, Sphere, SphereDelegate, Spheres, Uniform, UniformBinding, UniformField,
+    UniformHandle,
 };
 use visula_derive::Uniform;
 
@@ -59,7 +59,8 @@ impl Simulation {
         } = visula::io::zdf::read_zdf(input, &mut application.device);
 
         application.camera_controller.center = camera_center;
-        self.sphere_buffer.update(application, &point_cloud[..]);
+        self.sphere_buffer
+            .update(&application.device, &application.queue, &point_cloud[..]);
         self.mesh.index_buf = mesh_index_buf;
         self.mesh.vertex_buf = mesh_vertex_buf;
         self.mesh.vertex_count = mesh_vertex_count;
@@ -69,7 +70,8 @@ impl Simulation {
         let visula::io::xyz::XyzFile { point_cloud } =
             visula::io::xyz::read_xyz(text, &mut application.device);
 
-        self.sphere_buffer.update(application, &point_cloud[..]);
+        self.sphere_buffer
+            .update(&application.device, &application.queue, &point_cloud[..]);
     }
 }
 
@@ -80,7 +82,7 @@ impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
         let args = Cli::from_args();
-        let sphere_buffer = Buffer::<Sphere>::new(application);
+        let sphere_buffer = Buffer::<Sphere>::new(&application.device);
         let sphere = sphere_buffer.instance();
         let settings_data = Settings {
             radius: 0.5,
@@ -88,10 +90,10 @@ impl visula::Simulation for Simulation {
             _padding2: 0.0,
             _padding3: 0.0,
         };
-        let settings_buffer = Buffer::new_with_init(application, &[settings_data]);
+        let settings_buffer = Buffer::new_with_init(&application.device, &[settings_data]);
         let settings = settings_buffer.uniform();
         let points = Spheres::new(
-            application,
+            &application.rendering_descriptor(),
             &SphereDelegate {
                 position: sphere.position,
                 radius: settings.radius,
@@ -117,7 +119,8 @@ impl visula::Simulation for Simulation {
     }
 
     fn update(&mut self, application: &visula::Application) {
-        self.settings_buffer.update(application, &[self.settings]);
+        self.settings_buffer
+            .update(&application.device, &application.queue, &[self.settings]);
     }
 
     fn render(&mut self, data: &mut RenderData) {

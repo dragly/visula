@@ -1,6 +1,7 @@
-use crate::camera::Camera;
 use crate::camera::controller::Response;
+use crate::camera::Camera;
 use crate::custom_event::CustomEvent;
+use crate::rendering_descriptor::RenderingDescriptor;
 use crate::{camera::controller::CameraController, simulation::RenderData};
 
 use winit::{
@@ -22,8 +23,6 @@ pub struct Application {
     pub window: Window,
     pub camera_controller: CameraController,
     pub depth_texture: wgpu::TextureView,
-    // TODO make private
-    pub next_buffer_handle: u64,
     pub platform: Platform,
     pub egui_rpass: RenderPass,
     pub camera: Camera,
@@ -154,7 +153,7 @@ impl Application {
                 view: &view,
                 depth_texture: &self.depth_texture,
                 encoder: &mut encoder,
-                camera_bind_group: &self.camera.bind_group,
+                camera: &self.camera,
             });
         }
 
@@ -212,9 +211,11 @@ impl Application {
         frame.present();
     }
 
-    pub fn create_buffer_handle(&mut self) -> u64 {
-        let handle = self.next_buffer_handle;
-        self.next_buffer_handle += 1;
-        handle
+    pub fn rendering_descriptor(&self) -> RenderingDescriptor {
+        RenderingDescriptor {
+            device: &self.device,
+            format: &self.config.format,
+            camera: &self.camera,
+        }
     }
 }

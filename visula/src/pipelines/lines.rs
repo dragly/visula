@@ -1,7 +1,5 @@
-use crate::{
-    Application, BindingBuilder, BufferBinding, DefaultRenderPassDescriptor, Expression,
-    RenderData,
-};
+use crate::rendering_descriptor::RenderingDescriptor;
+use crate::{BindingBuilder, BufferBinding, DefaultRenderPassDescriptor, Expression, RenderData};
 use bytemuck::{Pod, Zeroable};
 use naga::back::wgsl::WriterFlags;
 use naga::{valid::ValidationFlags, Block, Statement};
@@ -59,14 +57,14 @@ pub struct LineDelegate {
 
 impl Lines {
     pub fn new(
-        application: &Application,
+        rendering_descriptor: &RenderingDescriptor,
         delegate: &LineDelegate,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let Application {
+        let &RenderingDescriptor {
             device,
+            format,
             camera,
-            ..
-        } = application;
+        } = rendering_descriptor;
         let mut module =
             naga::front::wgsl::parse_str(include_str!("../shaders/line.wgsl")).unwrap();
         let mut binding_builder = BindingBuilder::new(&module, "vs_main", 1);
@@ -161,7 +159,7 @@ impl Lines {
                 module: &shader_module,
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: application.config.format,
+                    format: *format,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -196,7 +194,7 @@ impl Lines {
             encoder,
             view,
             depth_texture,
-            camera_bind_group,
+            camera,
             ..
         }: &mut RenderData,
     ) {
@@ -241,7 +239,7 @@ impl Lines {
             let default_render_pass =
                 DefaultRenderPassDescriptor::new("lines", view, depth_texture);
             let mut render_pass = encoder.begin_render_pass(&default_render_pass.build());
-            render_pass.set_bind_group(0, camera_bind_group, &[]);
+            render_pass.set_bind_group(0, &camera.bind_group, &[]);
 
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);

@@ -202,7 +202,7 @@ impl Expression {
                 if !binding_builder.bindings.contains_key(&field.buffer_handle) {
                     (field.integrate_buffer)(
                         &field.inner,
-                        field.buffer_handle,
+                        &field.buffer_handle,
                         module,
                         binding_builder,
                     );
@@ -224,7 +224,7 @@ impl Expression {
                 if !binding_builder.bindings.contains_key(&field.buffer_handle) {
                     (field.integrate_buffer)(
                         &field.inner,
-                        field.buffer_handle,
+                        &field.buffer_handle,
                         module,
                         binding_builder,
                         &inner.bind_group_layout,
