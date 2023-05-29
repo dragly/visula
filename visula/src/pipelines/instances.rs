@@ -1,7 +1,9 @@
 use std::{cell::RefCell, rc::Rc};
 use wgpu::{BindGroupLayout, BufferAddress, VertexAttribute, VertexBufferLayout, VertexStepMode};
 
-use crate::{BindingBuilder, BufferInner};
+use crate::{
+    instance_buffer::InstanceBufferInner, uniform_buffer::UniformBufferInner, BindingBuilder,
+};
 
 pub struct VertexBufferLayoutBuilder {
     pub array_stride: BufferAddress,
@@ -23,27 +25,27 @@ pub trait InstanceHandle {}
 
 pub trait Instance {
     type Type: InstanceHandle;
-    fn instance(inner: Rc<RefCell<BufferInner>>) -> Self::Type;
+    fn instance(inner: Rc<RefCell<InstanceBufferInner>>) -> Self::Type;
 }
 
 type IntegrateBuffer =
-    fn(&Rc<RefCell<BufferInner>>, &uuid::Uuid, &mut naga::Module, &mut BindingBuilder);
+    fn(&Rc<RefCell<InstanceBufferInner>>, &uuid::Uuid, &mut naga::Module, &mut BindingBuilder);
 
 #[derive(Clone)]
 pub struct InstanceField {
     pub buffer_handle: uuid::Uuid,
     pub field_index: usize,
-    pub inner: Rc<RefCell<BufferInner>>,
+    pub inner: Rc<RefCell<InstanceBufferInner>>,
     pub integrate_buffer: IntegrateBuffer,
 }
 
 pub trait Uniform {
     type Type;
-    fn uniform(inner: Rc<RefCell<BufferInner>>) -> Self::Type;
+    fn uniform(inner: Rc<RefCell<UniformBufferInner>>) -> Self::Type;
 }
 
 type IntegrateUniform = fn(
-    &Rc<RefCell<BufferInner>>,
+    &Rc<RefCell<UniformBufferInner>>,
     &uuid::Uuid,
     &mut naga::Module,
     &mut BindingBuilder,
@@ -55,7 +57,7 @@ pub struct UniformField {
     pub bind_group_layout: std::rc::Rc<wgpu::BindGroupLayout>,
     pub buffer_handle: uuid::Uuid,
     pub field_index: usize,
-    pub inner: Rc<RefCell<BufferInner>>,
+    pub inner: Rc<RefCell<UniformBufferInner>>,
     pub integrate_buffer: IntegrateUniform,
 }
 

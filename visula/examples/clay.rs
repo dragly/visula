@@ -9,10 +9,10 @@ use itertools_num::linspace;
 use structopt::StructOpt;
 
 use visula::{
-    BindingBuilder, Buffer, BufferBinding, BufferBindingField, BufferInner, Expression, Instance,
-    InstanceField, InstanceHandle, NagaType, RenderData, SphereDelegate, Spheres, Uniform,
-    UniformBinding, UniformField, UniformHandle, Vector3, VertexAttrFormat,
-    VertexBufferLayoutBuilder,
+    BindingBuilder, BufferBinding, BufferBindingField, Expression, Instance, InstanceBuffer,
+    InstanceBufferInner, InstanceField, InstanceHandle, NagaType, RenderData, SphereDelegate,
+    Spheres, Uniform, UniformBinding, UniformBuffer, UniformBufferInner, UniformField,
+    UniformHandle, Vector3, VertexAttrFormat, VertexBufferLayoutBuilder,
 };
 use visula_derive::{Instance, Uniform};
 
@@ -322,7 +322,7 @@ struct Settings {
 struct Simulation {
     particles: Vec<Particle>,
     spheres: Spheres,
-    particle_buffer: Buffer<ParticleData>,
+    particle_buffer: InstanceBuffer<ParticleData>,
 }
 
 impl visula::Simulation for Simulation {
@@ -333,13 +333,13 @@ impl visula::Simulation for Simulation {
         let particles = generate(count);
 
         // TODO split into UniformBuffer and InstanceBuffer to avoid having UNIFORM usage on all
-        let particle_buffer = Buffer::<ParticleData>::new(&application.device);
+        let particle_buffer = InstanceBuffer::<ParticleData>::new(&application.device);
         let particle = particle_buffer.instance();
         let settings_data = Settings {
             radius: 2.0,
             width: 0.3,
         };
-        let settings_buffer = Buffer::new_with_init(&application.device, &[settings_data]);
+        let settings_buffer = UniformBuffer::new_with_init(&application.device, &settings_data);
         let settings = settings_buffer.uniform();
         let spheres = Spheres::new(
             &application.rendering_descriptor(),

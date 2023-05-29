@@ -121,13 +121,11 @@ impl Application {
         }
 
         {
-            // visualization
             let view = frame
                 .texture
                 .create_view(&wgpu::TextureViewDescriptor::default());
 
             {
-                // default clear pass
                 encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("clear"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -158,28 +156,18 @@ impl Application {
         }
 
         {
-            // GUI
-            //self.platform.update_time(self.start_time.elapsed().as_secs_f64());
-
             let output_view = frame
                 .texture
                 .create_view(&wgpu::TextureViewDescriptor::default());
 
-            // Begin to draw the UI frame.
             self.platform.begin_frame();
 
             let egui_ctx = self.platform.context();
             simulation.gui(&egui_ctx);
 
-            // End the UI frame. We could now handle the output and draw the UI with the backend.
             let full_output = self.platform.end_frame(Some(&self.window));
             let paint_jobs = self.platform.context().tessellate(full_output.shapes);
 
-            //let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            //label: Some("encoder"),
-            //});
-
-            // Upload all resources for the GPU.
             let screen_descriptor = ScreenDescriptor {
                 physical_width: self.config.width,
                 physical_height: self.config.height,
@@ -195,7 +183,6 @@ impl Application {
                 &screen_descriptor,
             );
 
-            // Record all render passes.
             self.egui_rpass
                 .execute(
                     &mut encoder,
