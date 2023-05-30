@@ -1,6 +1,6 @@
 use std::{
     fmt::{Error, Formatter},
-    ops::{Add, Deref, Div},
+    ops::{Add, Deref, Div, Sub},
 };
 
 use crate::{BindingBuilder, InstanceField, UniformField};
@@ -35,6 +35,7 @@ pub enum Expression {
         z: ExpressionInner,
         w: ExpressionInner,
     },
+    Length(ExpressionInner),
 }
 
 impl ExpressionInner {
@@ -198,6 +199,22 @@ impl Expression {
                         naga::Span::default(),
                     )
             }
+            Expression::Length(value) => {
+                let arg = value.setup(module, binding_builder);
+                module.entry_points[binding_builder.entry_point_index]
+                    .function
+                    .expressions
+                    .append(
+                        naga::Expression::Math {
+                            fun: naga::MathFunction::Length,
+                            arg,
+                            arg1: None,
+                            arg2: None,
+                            arg3: None,
+                        },
+                        naga::Span::default(),
+                    )
+            }
             Expression::InstanceField(field) => {
                 if !binding_builder.bindings.contains_key(&field.buffer_handle) {
                     (field.integrate_buffer)(
@@ -283,6 +300,9 @@ impl std::fmt::Debug for Expression {
             Expression::Vector4 { .. } => {
                 write!(fmt, "Vector4")?;
             }
+            Expression::Length(_) => {
+                write!(fmt, "Length")?;
+            }
         }
         Ok(())
     }
@@ -305,6 +325,26 @@ impl Div<f32> for &Expression {
     type Output = Expression;
 
     fn div(self, other: f32) -> Expression {
+        self.clone() / other
+    }
+}
+
+impl Div<Expression> for Expression {
+    type Output = Expression;
+
+    fn div(self, other: Expression) -> Expression {
+        Expression::BinaryOperator {
+            left: ExpressionInner::new(self),
+            right: ExpressionInner::new(other),
+            operator: naga::BinaryOperator::Divide,
+        }
+    }
+}
+
+impl Div<Expression> for &Expression {
+    type Output = Expression;
+
+    fn div(self, other: Expression) -> Expression {
         self.clone() / other
     }
 }
@@ -413,6 +453,34 @@ impl Add<&Expression> for glam::Vec4 {
 
     fn add(self, other: &Expression) -> Expression {
         Expression::from(self) + other
+    }
+}
+
+impl Sub<Expression> for Expression {
+    type Output = Expression;
+
+    fn sub(self, other: Expression) -> Expression {
+        Expression::BinaryOperator {
+            left: ExpressionInner::new(self),
+            right: ExpressionInner::new(other),
+            operator: naga::BinaryOperator::Subtract,
+        }
+    }
+}
+
+impl Sub<&Expression> for Expression {
+    type Output = Expression;
+
+    fn sub(self, other: &Expression) -> Expression {
+        self - other.clone()
+    }
+}
+
+impl Sub<&Expression> for &Expression {
+    type Output = Expression;
+
+    fn sub(self, other: &Expression) -> Expression {
+        self.clone() - other.clone()
     }
 }
 
