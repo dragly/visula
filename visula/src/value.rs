@@ -1,6 +1,6 @@
 use std::{
     fmt::{Error, Formatter},
-    ops::{Add, Deref, Div, Mul, Sub, Neg},
+    ops::{Add, Deref, Div, Mul, Neg, Sub},
 };
 
 use crate::{BindingBuilder, InstanceField, UniformField};
@@ -48,11 +48,11 @@ pub enum Expression {
 }
 
 impl Expression {
-    pub fn pow(&self, exponent: Expression) -> Expression {
-        Expression::Pow {
-            base: self.into(),
-            exponent: exponent.into(),
+    pub fn pow(&self, exponent: impl Into<ExpressionInner>) -> Expression {
+        fn inner(base: ExpressionInner, exponent: ExpressionInner) -> Expression {
+            Expression::Pow { base, exponent }
         }
+        inner(self.into(), exponent.into())
     }
 
     pub fn exp(&self) -> Expression {
@@ -225,10 +225,7 @@ impl Expression {
                         naga::Span::default(),
                     )
             }
-            Expression::UnaryOperator {
-                value,
-                operator,
-            } => {
+            Expression::UnaryOperator { value, operator } => {
                 let value_setup = value.setup(module, binding_builder);
                 module.entry_points[binding_builder.entry_point_index]
                     .function
@@ -570,6 +567,17 @@ impl Sub<&Expression> for &Expression {
     }
 }
 
+impl Neg for Expression {
+    type Output = Expression;
+
+    fn neg(self) -> Expression {
+        Expression::UnaryOperator {
+            value: ExpressionInner::new(self),
+            operator: naga::UnaryOperator::Negate,
+        }
+    }
+}
+
 impl Mul<Expression> for Expression {
     type Output = Expression;
 
@@ -578,17 +586,6 @@ impl Mul<Expression> for Expression {
             left: ExpressionInner::new(self),
             right: ExpressionInner::new(other),
             operator: naga::BinaryOperator::Multiply,
-        }
-    }
-}
-
-impl Neg for Expression {
-    type Output = Expression;
-
-    fn neg(self) -> Expression {
-        Expression::UnaryOperator {
-            value: ExpressionInner::new(self),
-            operator: naga::UnaryOperator::Negate,
         }
     }
 }
@@ -606,6 +603,42 @@ impl Mul<&Expression> for &Expression {
 
     fn mul(self, other: &Expression) -> Expression {
         self.clone() * other.clone()
+    }
+}
+
+impl Mul<f32> for Expression {
+    type Output = Expression;
+
+    fn mul(self, other: f32) -> Expression {
+        Expression::BinaryOperator {
+            left: ExpressionInner::new(self),
+            right: ExpressionInner::new(other.into()),
+            operator: naga::BinaryOperator::Multiply,
+        }
+    }
+}
+
+impl Mul<Expression> for f32 {
+    type Output = Expression;
+
+    fn mul(self, other: Expression) -> Expression {
+        Expression::BinaryOperator {
+            left: ExpressionInner::new(self.into()),
+            right: ExpressionInner::new(other),
+            operator: naga::BinaryOperator::Multiply,
+        }
+    }
+}
+
+impl Mul<&Expression> for f32 {
+    type Output = Expression;
+
+    fn mul(self, other: &Expression) -> Expression {
+        Expression::BinaryOperator {
+            left: ExpressionInner::new(self.into()),
+            right: ExpressionInner::new(other.into()),
+            operator: naga::BinaryOperator::Multiply,
+        }
     }
 }
 

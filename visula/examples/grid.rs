@@ -38,10 +38,9 @@ struct Uniforms {
 }
 
 fn gaussian(a: &Expression, b: &Expression) -> Expression {
-    let height: Expression = 10.0.into();
     Expression::Vector3 {
         x: 0.0.into(),
-        y: (height * &(-((a - b).length()).pow(2.0.into()) / (2.0 * 8.0)).exp()).into(),
+        y: (10.0 * &(-((a - b).length()).pow(2.0) / (2.0 * 8.0)).exp()).into(),
         z: 0.0.into(),
     }
 }
