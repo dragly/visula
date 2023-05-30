@@ -334,6 +334,10 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                 bind_group_layout: &std::rc::Rc<::wgpu::BindGroupLayout>,
             )
             {
+                if binding_builder.uniforms.contains_key(&handle.clone()) {
+                    return;
+                };
+
                 let entry_point_index = binding_builder.entry_point_index;
                 let previous_shader_location_offset = binding_builder.shader_location_offset;
                 let slot = binding_builder.current_slot;

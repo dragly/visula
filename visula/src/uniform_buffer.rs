@@ -113,7 +113,7 @@ impl<T: Pod> UniformBuffer<T> {
 
     pub fn update(&mut self, queue: &Queue, data: &T) {
         let inner = self.inner.borrow_mut();
-        log::debug!("Update uniform buffer '{}'", inner.label);
+        log::trace!("Update uniform buffer '{}'", inner.label);
         queue.write_buffer(&inner.buffer, 0, bytemuck::cast_slice(&[*data]));
     }
 }
