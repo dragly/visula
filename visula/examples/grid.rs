@@ -78,7 +78,7 @@ impl visula::Simulation for Simulation {
         };
         let offset_b = Expression::Vector3 {
             x: 0.0.into(),
-            y: (&height / Expression::Length((&line.position_b).into())).into(),
+            y: (&height / Expression::Length((&line.position_b - &uniforms.cursor_position).into())).into(),
             z: 0.0.into(),
         };
         let lines = Lines::new(
