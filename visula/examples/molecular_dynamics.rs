@@ -8,9 +8,10 @@ use structopt::StructOpt;
 use glam::Vec3;
 use visula::{
     simulation::RenderData, BindingBuilder, BufferBinding, BufferBindingField, Expression,
-    Instance, InstanceBuffer, InstanceBufferInner, InstanceField, InstanceHandle, LineDelegate,
-    Lines, NagaType, SphereDelegate, Spheres, Uniform, UniformBinding, UniformBuffer,
-    UniformBufferInner, UniformField, UniformHandle, VertexAttrFormat, VertexBufferLayoutBuilder,
+    Instance, InstanceBuffer, InstanceBufferInner, InstanceDeviceExt, InstanceField,
+    InstanceHandle, LineDelegate, Lines, NagaType, SphereDelegate, Spheres, Uniform,
+    UniformBinding, UniformBuffer, UniformBufferInner, UniformField, UniformHandle,
+    VertexAttrFormat, VertexBufferLayoutBuilder,
 };
 use visula_derive::{Instance, Uniform};
 
@@ -218,10 +219,10 @@ impl visula::Simulation for Simulation {
         let count = cli.count.unwrap_or(8);
         let particles = generate(count);
 
-        let particle_buffer = InstanceBuffer::<Particle>::new(&application.device);
+        let particle_buffer = application.device.create_instance_buffer::<Particle>();
         let particle = particle_buffer.instance();
 
-        let bond_buffer = InstanceBuffer::<BondData>::new(&application.device);
+        let bond_buffer = application.device.create_instance_buffer::<BondData>();
         let bond = bond_buffer.instance();
 
         let settings_data = Settings {

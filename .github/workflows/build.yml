@@ -45,7 +45,7 @@ jobs:
           toolchain: ${{ matrix.rust }}
           components: clippy, rustfmt
       - name: Check formatting
-        run: cargo fmt --all
+        run: cargo fmt --all --check
       - name: Check
         run: cargo check --all-features --all-targets
       - name: Build

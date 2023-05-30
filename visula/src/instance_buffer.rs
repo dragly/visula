@@ -3,8 +3,8 @@ use std::{cell::RefCell, marker::PhantomData};
 use uuid::Uuid;
 
 use bytemuck::Pod;
-use wgpu::{util::DeviceExt, BufferUsages};
-use wgpu::{Device, Queue};
+use wgpu::BufferUsages;
+use wgpu::{util::DeviceExt, Device, Queue};
 
 use crate::Instance;
 
@@ -21,7 +21,7 @@ pub struct InstanceBuffer<T: Pod> {
     phantom: PhantomData<T>,
 }
 
-impl<T: Pod> InstanceBuffer<T> {
+impl<T: Instance + Pod> InstanceBuffer<T> {
     pub fn new(device: &Device) -> Self {
         let usage = BufferUsages::VERTEX | BufferUsages::COPY_DST;
         let label = std::any::type_name::<T>();
@@ -79,11 +79,23 @@ impl<T: Pod> InstanceBuffer<T> {
             inner.count = data.len();
         }
     }
-}
 
-impl<T: Instance + Pod> InstanceBuffer<T> {
-    // TODO move T to Buffer<T>
     pub fn instance(&self) -> T::Type {
         T::instance(self.inner.clone())
+    }
+}
+
+pub trait InstanceDeviceExt {
+    fn create_instance_buffer<T>(&self) -> InstanceBuffer<T>
+    where
+        T: Instance + Pod;
+}
+
+impl InstanceDeviceExt for wgpu::Device {
+    fn create_instance_buffer<T>(&self) -> InstanceBuffer<T>
+    where
+        T: Instance + Pod,
+    {
+        InstanceBuffer::<T>::new(self)
     }
 }
