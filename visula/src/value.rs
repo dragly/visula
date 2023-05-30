@@ -1,6 +1,6 @@
 use std::{
     fmt::{Error, Formatter},
-    ops::{Add, Deref, Div, Sub},
+    ops::{Add, Deref, Div, Mul, Sub, Neg},
 };
 
 use crate::{BindingBuilder, InstanceField, UniformField};
@@ -16,6 +16,10 @@ pub enum Expression {
         left: ExpressionInner,
         right: ExpressionInner,
         operator: naga::BinaryOperator,
+    },
+    UnaryOperator {
+        value: ExpressionInner,
+        operator: naga::UnaryOperator,
     },
     Constant(naga::ConstantInner),
     InstanceField(InstanceField),
@@ -36,6 +40,28 @@ pub enum Expression {
         w: ExpressionInner,
     },
     Length(ExpressionInner),
+    Exp(ExpressionInner),
+    Pow {
+        base: ExpressionInner,
+        exponent: ExpressionInner,
+    },
+}
+
+impl Expression {
+    pub fn pow(&self, exponent: Expression) -> Expression {
+        Expression::Pow {
+            base: self.into(),
+            exponent: exponent.into(),
+        }
+    }
+
+    pub fn exp(&self) -> Expression {
+        Expression::Exp(self.into())
+    }
+
+    pub fn length(&self) -> Expression {
+        Expression::Length(self.into())
+    }
 }
 
 impl ExpressionInner {
@@ -199,6 +225,22 @@ impl Expression {
                         naga::Span::default(),
                     )
             }
+            Expression::UnaryOperator {
+                value,
+                operator,
+            } => {
+                let value_setup = value.setup(module, binding_builder);
+                module.entry_points[binding_builder.entry_point_index]
+                    .function
+                    .expressions
+                    .append(
+                        naga::Expression::Unary {
+                            expr: value_setup,
+                            op: operator,
+                        },
+                        naga::Span::default(),
+                    )
+            }
             Expression::Length(value) => {
                 let arg = value.setup(module, binding_builder);
                 module.entry_points[binding_builder.entry_point_index]
@@ -209,6 +251,39 @@ impl Expression {
                             fun: naga::MathFunction::Length,
                             arg,
                             arg1: None,
+                            arg2: None,
+                            arg3: None,
+                        },
+                        naga::Span::default(),
+                    )
+            }
+            Expression::Exp(value) => {
+                let arg = value.setup(module, binding_builder);
+                module.entry_points[binding_builder.entry_point_index]
+                    .function
+                    .expressions
+                    .append(
+                        naga::Expression::Math {
+                            fun: naga::MathFunction::Exp,
+                            arg,
+                            arg1: None,
+                            arg2: None,
+                            arg3: None,
+                        },
+                        naga::Span::default(),
+                    )
+            }
+            Expression::Pow { base, exponent } => {
+                let arg = base.setup(module, binding_builder);
+                let arg1 = Some(exponent.setup(module, binding_builder));
+                module.entry_points[binding_builder.entry_point_index]
+                    .function
+                    .expressions
+                    .append(
+                        naga::Expression::Math {
+                            fun: naga::MathFunction::Pow,
+                            arg,
+                            arg1,
                             arg2: None,
                             arg3: None,
                         },
@@ -282,6 +357,11 @@ impl std::fmt::Debug for Expression {
                 right.fmt(fmt)?;
                 write!(fmt, "}}")?;
             }
+            Expression::UnaryOperator { value, .. } => {
+                write!(fmt, "UnaryOperator {{ value:")?;
+                value.fmt(fmt)?;
+                write!(fmt, "}}")?;
+            }
             Expression::Constant { .. } => {
                 write!(fmt, "Constant")?;
             }
@@ -302,6 +382,12 @@ impl std::fmt::Debug for Expression {
             }
             Expression::Length(_) => {
                 write!(fmt, "Length")?;
+            }
+            Expression::Exp(_) => {
+                write!(fmt, "Exp")?;
+            }
+            Expression::Pow { .. } => {
+                write!(fmt, "Pow")?;
             }
         }
         Ok(())
@@ -481,6 +567,45 @@ impl Sub<&Expression> for &Expression {
 
     fn sub(self, other: &Expression) -> Expression {
         self.clone() - other.clone()
+    }
+}
+
+impl Mul<Expression> for Expression {
+    type Output = Expression;
+
+    fn mul(self, other: Expression) -> Expression {
+        Expression::BinaryOperator {
+            left: ExpressionInner::new(self),
+            right: ExpressionInner::new(other),
+            operator: naga::BinaryOperator::Multiply,
+        }
+    }
+}
+
+impl Neg for Expression {
+    type Output = Expression;
+
+    fn neg(self) -> Expression {
+        Expression::UnaryOperator {
+            value: ExpressionInner::new(self),
+            operator: naga::UnaryOperator::Negate,
+        }
+    }
+}
+
+impl Mul<&Expression> for Expression {
+    type Output = Expression;
+
+    fn mul(self, other: &Expression) -> Expression {
+        self * other.clone()
+    }
+}
+
+impl Mul<&Expression> for &Expression {
+    type Output = Expression;
+
+    fn mul(self, other: &Expression) -> Expression {
+        self.clone() * other.clone()
     }
 }
 

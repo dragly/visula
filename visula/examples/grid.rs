@@ -37,6 +37,15 @@ struct Uniforms {
     _padding: f32,
 }
 
+fn gaussian(a: &Expression, b: &Expression) -> Expression {
+    let height: Expression = 10.0.into();
+    Expression::Vector3 {
+        x: 0.0.into(),
+        y: (height * &(-((a - b).length()).pow(2.0.into()) / (2.0 * 8.0)).exp()).into(),
+        z: 0.0.into(),
+    }
+}
+
 impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
@@ -70,17 +79,8 @@ impl visula::Simulation for Simulation {
 
         let line_buffer = InstanceBuffer::<LineData>::new(&application.device);
         let line = line_buffer.instance();
-        let height: Expression = 10.0.into();
-        let offset_a = Expression::Vector3 {
-            x: 0.0.into(),
-            y: (&height / Expression::Length((&line.position_a - &uniforms.cursor_position).into())).into(),
-            z: 0.0.into(),
-        };
-        let offset_b = Expression::Vector3 {
-            x: 0.0.into(),
-            y: (&height / Expression::Length((&line.position_b - &uniforms.cursor_position).into())).into(),
-            z: 0.0.into(),
-        };
+        let offset_a = gaussian(&line.position_a, &uniforms.cursor_position);
+        let offset_b = gaussian(&line.position_b, &uniforms.cursor_position);
         let lines = Lines::new(
             &application.rendering_descriptor(),
             &LineDelegate {

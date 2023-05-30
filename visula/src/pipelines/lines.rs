@@ -198,7 +198,7 @@ impl Lines {
             ..
         }: &mut RenderData,
     ) {
-        log::debug!("Rendering lines");
+        log::trace!("Rendering lines");
         let mut count = None;
         for binding in self.binding_builder.bindings.values() {
             let other = binding.inner.borrow().count;
@@ -217,7 +217,7 @@ impl Lines {
                 }
             }
         }
-        log::debug!("Line count {count:#?}");
+        log::trace!("Line count {count:#?}");
         if count.is_none() {
             log::debug!("Empty line buffer detected. Aborting render of lines.");
             return;
@@ -247,12 +247,12 @@ impl Lines {
             let mut instance_count = 0;
             for (binding, buffer) in bindings.iter() {
                 let slot = binding.slot;
-                log::debug!("Setting vertex buffer {}", slot);
+                log::trace!("Setting vertex buffer {}", slot);
                 render_pass.set_vertex_buffer(slot, buffer.slice(..));
                 instance_count = instance_count.max(binding.inner.borrow().count);
             }
             for bind_group in uniforms.iter() {
-                log::debug!("Setting bind group {}", 1);
+                log::trace!("Setting bind group {}", 1);
                 render_pass.set_bind_group(1, bind_group, &[]);
             }
             render_pass.draw_indexed(0..self.index_count as u32, 0, 0..instance_count as u32);
