@@ -1,7 +1,10 @@
 use proc_macro::TokenStream;
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, Data, DeriveInput, Field, Fields, FieldsNamed, ItemStruct};
+use syn::{
+    parse_macro_input, Data, DeriveInput, Field, Fields, FieldsNamed, Ident, ItemStruct, Path,
+    PathSegment, Type, TypePath,
+};
 
 type TokenStream2 = proc_macro2::TokenStream;
 
@@ -93,6 +96,33 @@ pub fn delegate(input: TokenStream) -> TokenStream {
     TokenStream::from(result)
 }
 
+enum FieldExpressionType {
+    Float,
+    Vec3,
+}
+
+fn get_field_expression_type(field_type: &Type) -> FieldExpressionType {
+    match field_type {
+        Type::Array { .. } => FieldExpressionType::Vec3,
+        Type::Path(TypePath { path, .. }) => {
+            if path.segments.len() == 1 && path.segments.first().unwrap().ident == "f32" {
+                FieldExpressionType::Float
+            } else {
+                unimplemented!("Instance delegate does not support {field_type:?}")
+            }
+        }
+        _ => unimplemented!("Instance delegate does not support {field_type:?}"),
+    }
+}
+
+fn get_delegate_field_type(field_expression_type: &FieldExpressionType) -> proc_macro2::TokenStream {
+    let crate_name = visula_crate_name();
+    match field_expression_type {
+        FieldExpressionType::Vec3 => quote! { #crate_name::Vec3 },
+        FieldExpressionType::Float => quote! { #crate_name::Expression },
+    }
+}
+
 #[proc_macro_derive(Instance)]
 pub fn instance(input: TokenStream) -> TokenStream {
     let crate_name = visula_crate_name();
@@ -119,6 +149,8 @@ pub fn instance(input: TokenStream) -> TokenStream {
                     match field_name {
                         Some(field_name) => {
                             let field_type = &field.ty;
+                            let field_expression_type = get_field_expression_type(&field_type);
+                            let delegate_field_type = get_delegate_field_type(&field_expression_type);
                             let size = quote! {
                                 (std::mem::size_of::<#field_type>() as u64)
                             };
@@ -129,7 +161,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
                                 < #field_type as #crate_name::VertexAttrFormat >::vertex_attr_format()
                             };
                             instance_struct_fields.push(quote! {
-                                pub #field_name: #crate_name::Expression
+                                pub #field_name: #delegate_field_type
                             });
                             let naga_type = quote! {
                                 < #field_type as #crate_name::NagaType >::naga_type()
@@ -151,13 +183,21 @@ pub fn instance(input: TokenStream) -> TokenStream {
                                         });
                                 }
                             });
-                            instance_field_values.push(quote! {
-                                #field_name: #crate_name::Expression::InstanceField(#crate_name::InstanceField {
+                            let instance_field_value_inner = quote! {
+                                #crate_name::Expression::InstanceField(#crate_name::InstanceField {
                                     buffer_handle: inner.borrow().handle,
                                     inner: inner.clone(),
                                     field_index: #field_index,
                                     integrate_buffer: #instance_struct_name::integrate,
                                 })
+                            };
+                            instance_field_values.push(match field_expression_type {
+                                FieldExpressionType::Float => quote! {
+                                    #field_name: #instance_field_value_inner
+                                },
+                                FieldExpressionType::Vec3 => quote! {
+                                    #field_name: #crate_name::Vec3::Expression(#instance_field_value_inner)
+                                },
                             });
                             attributes.push(quote! {
                                 wgpu::VertexAttribute{
@@ -268,6 +308,8 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                     match field_name {
                         Some(field_name) => {
                             let field_type = &field.ty;
+                            let field_expression_type = get_field_expression_type(&field_type);
+                            let delegate_field_type = get_delegate_field_type(&field_expression_type);
                             uniform_struct_fields.push(quote! {
                                 #field_name: #crate_name::Expression
                             });
@@ -294,14 +336,22 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                                     offset: #offset,
                                 }
                             });
-                            uniform_field_values.push(quote! {
-                                #field_name: #crate_name::Expression::UniformField(#crate_name::UniformField {
+                            let uniform_field_value_inner = quote! {
+                                #crate_name::Expression::UniformField(#crate_name::UniformField {
                                     buffer_handle: inner.borrow().handle,
                                     inner: inner.clone(),
                                     field_index: #field_index,
                                     bind_group_layout: inner.borrow().bind_group_layout.clone(),
                                     integrate_buffer: #uniform_struct_name::integrate,
                                 })
+                            };
+                            uniform_field_values.push(match field_expression_type {
+                                FieldExpressionType::Float => quote! {
+                                    #field_name: #uniform_field_value_inner
+                                },
+                                FieldExpressionType::Vec3 => quote! {
+                                    #field_name: #crate_name::Vec3::Expression(#uniform_field_value_inner)
+                                },
                             });
                             field_index += 1;
                             sizes.push(size);

@@ -1,5 +1,5 @@
 use crate::rendering_descriptor::RenderingDescriptor;
-use crate::{BindingBuilder, BufferBinding, DefaultRenderPassDescriptor, Expression, RenderData};
+use crate::{BindingBuilder, BufferBinding, DefaultRenderPassDescriptor, Expression, Vec3, RenderData};
 use bytemuck::{Pod, Zeroable};
 use naga::back::wgsl::WriterFlags;
 use naga::{valid::ValidationFlags, Block, Statement};
@@ -49,8 +49,8 @@ pub struct Lines {
 
 #[derive(Delegate)]
 pub struct LineDelegate {
-    pub start: Expression,
-    pub end: Expression,
+    pub start: Vec3,
+    pub end: Vec3,
     pub width: Expression,
     pub alpha: Expression,
 }

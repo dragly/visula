@@ -47,6 +47,34 @@ pub enum Expression {
     },
 }
 
+#[derive(Clone)]
+pub enum Vec3 {
+    Expression(Expression),
+    Components {
+        x: ExpressionInner,
+        y: ExpressionInner,
+        z: ExpressionInner,
+    },
+}
+
+impl Vec3 {
+    pub fn setup(
+        &self,
+        module: &mut naga::Module,
+        binding_builder: &mut BindingBuilder,
+    ) -> naga::Handle<naga::Expression> {
+        match self {
+            Vec3::Components { x, y, z } => Expression::Vector3 {
+                x: x.clone(),
+                y: y.clone(),
+                z: z.clone(),
+            }
+            .setup(module, binding_builder),
+            Vec3::Expression(expr) => expr.setup(module, binding_builder),
+        }
+    }
+}
+
 impl Expression {
     pub fn pow(&self, exponent: impl Into<ExpressionInner>) -> Expression {
         fn inner(base: ExpressionInner, exponent: ExpressionInner) -> Expression {
@@ -59,6 +87,12 @@ impl Expression {
         Expression::Exp(self.into())
     }
 
+    pub fn length(&self) -> Expression {
+        Expression::Length(self.into())
+    }
+}
+
+impl Vec3 {
     pub fn length(&self) -> Expression {
         Expression::Length(self.into())
     }
@@ -567,6 +601,34 @@ impl Sub<&Expression> for &Expression {
     }
 }
 
+impl Sub<Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn sub(self, other: Vec3) -> Vec3 {
+        Vec3::Expression(Expression::BinaryOperator {
+            left: ExpressionInner::new(self.into()),
+            right: ExpressionInner::new(other.into()),
+            operator: naga::BinaryOperator::Subtract,
+        })
+    }
+}
+
+impl Sub<&Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn sub(self, other: &Vec3) -> Vec3 {
+        self - other.clone()
+    }
+}
+
+impl Sub<&Vec3> for &Vec3 {
+    type Output = Vec3;
+
+    fn sub(self, other: &Vec3) -> Vec3 {
+        self.clone() - other.clone()
+    }
+}
+
 impl Neg for Expression {
     type Output = Expression;
 
@@ -693,5 +755,24 @@ impl From<glam::Vec4> for Expression {
             z: value.z.into(),
             w: value.w.into(),
         }
+    }
+}
+
+impl From<Vec3> for Expression {
+    fn from(value: Vec3) -> Expression {
+        match value {
+            Vec3::Expression(e) => e,
+            Vec3::Components { x, y, z } => Expression::Vector3 {
+                x: x.into(),
+                y: y.into(),
+                z: z.into(),
+            },
+        }
+    }
+}
+
+impl From<&Vec3> for Expression {
+    fn from(value: &Vec3) -> Expression {
+        value.clone().into()
     }
 }

@@ -1,12 +1,11 @@
 use bytemuck::{Pod, Zeroable};
 use cgmath::{InnerSpace, SquareMatrix};
-use glam::Vec3;
 use itertools::iproduct;
 use visula::{
     BindingBuilder, BufferBinding, BufferBindingField, CustomEvent, Expression, Instance,
     InstanceBuffer, InstanceBufferInner, InstanceField, InstanceHandle, LineDelegate, Lines,
     NagaType, RenderData, Uniform, UniformBinding, UniformBuffer, UniformBufferInner, UniformField,
-    UniformHandle, VertexAttrFormat, VertexBufferLayoutBuilder,
+    UniformHandle, Vec3, VertexAttrFormat, VertexBufferLayoutBuilder,
 };
 use visula_derive::{Instance, Uniform};
 use winit::event::{Event, WindowEvent};
@@ -33,12 +32,12 @@ struct Simulation {
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Uniform, Pod, Zeroable)]
 struct Uniforms {
-    cursor_position: Vec3,
+    cursor_position: glam::Vec3,
     _padding: f32,
 }
 
-fn gaussian(a: &Expression, b: &Expression) -> Expression {
-    Expression::Vector3 {
+fn gaussian(a: &Vec3, b: &Vec3) -> Vec3 {
+    Vec3::Components {
         x: 0.0.into(),
         y: (10.0 * &(-((a - b).length()).pow(2.0) / (2.0 * 8.0)).exp()).into(),
         z: 0.0.into(),
@@ -69,7 +68,7 @@ impl visula::Simulation for Simulation {
             .collect();
 
         let uniforms_data = Uniforms {
-            cursor_position: Vec3::new(0.0, 0.0, 0.0),
+            cursor_position: glam::Vec3::new(0.0, 0.0, 0.0),
             _padding: 0.0,
         };
         let uniforms_buffer =
@@ -155,7 +154,7 @@ impl visula::Simulation for Simulation {
         let ray_origin = application.camera_controller.position();
         let t = -ray_origin.y / ray_world.y;
         let intersection = ray_origin + t * ray_world;
-        let intersection = Vec3::new(intersection.x, intersection.y, intersection.z);
+        let intersection = glam::Vec3::new(intersection.x, intersection.y, intersection.z);
         self.uniforms_data.cursor_position = intersection;
         self.uniforms_buffer
             .update(&application.queue, &self.uniforms_data);
