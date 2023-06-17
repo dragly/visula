@@ -137,7 +137,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let line = line_buffer.instance();
 
     let mut camera_controller = CameraController::new(&window);
-    let camera = Camera::new(&device);
+    let mut camera = Camera::new(&device);
 
     let lines = Lines::new(
         &RenderingDescriptor {
@@ -156,8 +156,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         },
     )
     .unwrap();
-
-    let mut camera = Camera::new(&device);
 
     event_loop.run(move |event, _, control_flow| {
         // Have the closure take ownership of the resources.
