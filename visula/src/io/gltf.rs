@@ -3,7 +3,7 @@ use std::io::Seek;
 use wgpu::util::DeviceExt;
 
 use crate::error::Error;
-use crate::primitives::mesh::MeshVertexAttributes;
+use crate::primitives::mesh_primitive::MeshVertexAttributes;
 use crate::Application;
 
 impl From<gltf::Error> for Error {

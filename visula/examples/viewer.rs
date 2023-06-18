@@ -7,7 +7,7 @@ use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 use visula::{
     BindingBuilder, CustomEvent, DropEvent, Expression, InstanceBuffer, MeshPipeline, Pipeline,
-    RenderData, Sphere, SphereDelegate, Spheres, Uniform, UniformBinding, UniformBuffer,
+    RenderData, SpherePrimitive, SphereDelegate, Spheres, Uniform, UniformBinding, UniformBuffer,
     UniformBufferInner, UniformField, UniformHandle,
 };
 use visula_derive::Uniform;
@@ -42,7 +42,7 @@ struct Settings {
 struct Simulation {
     render_mode: RenderMode,
     spheres: Spheres,
-    sphere_buffer: InstanceBuffer<Sphere>,
+    sphere_buffer: InstanceBuffer<SpherePrimitive>,
     settings: Settings,
     settings_buffer: UniformBuffer<Settings>,
     mesh: MeshPipeline,
@@ -82,7 +82,7 @@ impl visula::Simulation for Simulation {
     type Error = Error;
     fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
         let args = Cli::from_args();
-        let sphere_buffer = InstanceBuffer::<Sphere>::new(&application.device);
+        let sphere_buffer = InstanceBuffer::<SpherePrimitive>::new(&application.device);
         let sphere = sphere_buffer.instance();
         let settings_data = Settings {
             radius: 0.5,

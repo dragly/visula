@@ -1,5 +1,5 @@
-pub mod mesh;
-pub mod sphere;
+pub mod mesh_primitive;
+pub mod sphere_primitive;
 
-pub use mesh::*;
-pub use sphere::*;
+pub use mesh_primitive::*;
+pub use sphere_primitive::*;

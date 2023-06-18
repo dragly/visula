@@ -3,7 +3,7 @@ use std::mem::size_of;
 use wgpu::util::DeviceExt;
 
 use crate::pipelines::pipeline::Pipeline;
-use crate::primitives::mesh::MeshVertexAttributes;
+use crate::primitives::mesh_primitive::MeshVertexAttributes;
 use crate::{DefaultRenderPassDescriptor, RenderData};
 
 pub struct MeshPipeline {

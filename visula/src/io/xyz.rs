@@ -1,8 +1,8 @@
-use crate::primitives::sphere::Sphere;
+use crate::primitives::sphere_primitive::SpherePrimitive;
 use crate::Point3;
 
 pub struct XyzFile {
-    pub point_cloud: Vec<Sphere>,
+    pub point_cloud: Vec<SpherePrimitive>,
 }
 
 pub fn read_xyz(text: &[u8], _device: &mut wgpu::Device) -> XyzFile {
@@ -14,7 +14,7 @@ pub fn read_xyz(text: &[u8], _device: &mut wgpu::Device) -> XyzFile {
     );
     let snapshot = trajectory.read_snapshot().unwrap();
 
-    let point_cloud: Vec<Sphere> = snapshot
+    let point_cloud: Vec<SpherePrimitive> = snapshot
         .particles
         .iter()
         .filter_map(|particle| {
@@ -28,7 +28,7 @@ pub fn read_xyz(text: &[u8], _device: &mut wgpu::Device) -> XyzFile {
                 "2" => (Point3::new(0.0, 1.0, 0.0), 0.4),
                 _ => (Point3::new(1.0, 1.0, 1.0), 0.6),
             };
-            position.map(|p| Sphere {
+            position.map(|p| SpherePrimitive {
                 position: p.into(),
                 radius,
                 color: color.into(),

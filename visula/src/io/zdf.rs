@@ -3,14 +3,14 @@ use ndarray::{s, Ix3};
 use oxifive::ReadSeek;
 use wgpu::util::DeviceExt;
 
-use crate::primitives::mesh::MeshVertexAttributes;
-use crate::primitives::sphere::Sphere;
+use crate::primitives::mesh_primitive::MeshVertexAttributes;
+use crate::primitives::sphere_primitive::SpherePrimitive;
 use crate::Point3;
 use crate::Vector3;
 
 pub struct ZdfFile {
     pub camera_center: Vector3,
-    pub point_cloud: Vec<Sphere>,
+    pub point_cloud: Vec<SpherePrimitive>,
     pub mesh_vertex_buf: wgpu::Buffer,
     pub mesh_index_buf: wgpu::Buffer,
     pub mesh_vertex_count: usize,
@@ -93,7 +93,7 @@ pub fn read_zdf<R: ReadSeek>(input: R, device: &mut wgpu::Device) -> ZdfFile {
     let colors_shape = (colors.shape()[0] * colors.shape()[1], colors.shape()[2]);
     let points_flat = points.into_shape(points_shape).unwrap();
     let colors_flat = colors.into_shape(colors_shape).unwrap();
-    let point_cloud: Vec<Sphere> = points_flat
+    let point_cloud: Vec<SpherePrimitive> = points_flat
         .outer_iter()
         .zip(colors_flat.outer_iter())
         .filter_map(|(point, color)| {
@@ -113,7 +113,7 @@ pub fn read_zdf<R: ReadSeek>(input: R, device: &mut wgpu::Device) -> ZdfFile {
 
             mean_position += position.to_vec();
 
-            Some(Sphere {
+            Some(SpherePrimitive {
                 position: position.into(),
                 radius,
                 color: color.into(),
