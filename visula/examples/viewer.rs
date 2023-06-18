@@ -7,7 +7,7 @@ use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 use visula::{
     BindingBuilder, CustomEvent, DropEvent, Expression, InstanceBuffer, MeshPipeline, Pipeline,
-    RenderData, SpherePrimitive, SphereDelegate, Spheres, Uniform, UniformBinding, UniformBuffer,
+    RenderData, SphereDelegate, SpherePrimitive, Spheres, Uniform, UniformBinding, UniformBuffer,
     UniformBufferInner, UniformField, UniformHandle,
 };
 use visula_derive::Uniform;
