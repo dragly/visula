@@ -86,7 +86,7 @@ impl visula::Simulation for Simulation {
                 start: &line.position_a + &offset_a,
                 end: line.position_b + &offset_b,
                 width: 0.1.into(),
-                alpha: 1.0.into(),
+                ..Default::default()
             },
         )
         .unwrap();

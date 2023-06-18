@@ -1,6 +1,7 @@
 use crate::rendering_descriptor::RenderingDescriptor;
 use crate::{BindingBuilder, BufferBinding, DefaultRenderPassDescriptor, Expression, RenderData};
 use bytemuck::{Pod, Zeroable};
+use glam::Vec3;
 use naga::back::wgsl::WriterFlags;
 use naga::{valid::ValidationFlags, Block, Statement};
 use std::cell::Ref;
@@ -53,6 +54,17 @@ pub struct LineDelegate {
     pub end: Expression,
     pub width: Expression,
     pub alpha: Expression,
+}
+
+impl Default for LineDelegate {
+    fn default() -> Self {
+        LineDelegate {
+            start: Vec3::new(0.0, 0.0, 0.0).into(),
+            end: Vec3::new(1.0, 0.0, 0.0).into(),
+            width: 1.0.into(),
+            alpha: 1.0.into(),
+        }
+    }
 }
 
 impl Lines {
