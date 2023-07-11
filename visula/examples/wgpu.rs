@@ -1,12 +1,6 @@
 use visula::{
-    camera::{
-        controller::{CameraController, Response},
-        Camera,
-    },
-    rendering_descriptor::RenderingDescriptor,
-    BindingBuilder, BufferBinding, BufferBindingField, Expression, Instance, InstanceBuffer,
-    InstanceBufferInner, InstanceField, InstanceHandle, LineDelegate, Lines, NagaType, RenderData,
-    VertexAttrFormat, VertexBufferLayoutBuilder,
+    Camera, CameraController, CameraControllerResponse, Expression, InstanceBuffer, LineDelegate,
+    Lines, RenderData, RenderingDescriptor,
 };
 use visula_derive::Instance;
 
@@ -165,7 +159,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
         *control_flow = ControlFlow::Wait;
         camera_controller.update();
-        let Response {
+        let CameraControllerResponse {
             needs_redraw,
             captured_event,
         } = camera_controller.handle_event(&event);

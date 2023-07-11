@@ -1,11 +1,12 @@
 use crate::rendering_descriptor::RenderingDescriptor;
-use crate::{BindingBuilder, BufferBinding, DefaultRenderPassDescriptor, Expression, RenderData};
+use crate::{DefaultRenderPassDescriptor, RenderData};
 use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
 use naga::back::wgsl::WriterFlags;
 use naga::{valid::ValidationFlags, Block, Statement};
 use std::cell::Ref;
 use std::mem::size_of;
+use visula_core::{BindingBuilder, BufferBinding, Expression};
 use visula_derive::Delegate;
 use wgpu::BufferUsages;
 use wgpu::{util::DeviceExt, BindGroupLayout};

@@ -1,10 +1,28 @@
-use crate::{InstanceBufferInner, UniformBufferInner, VertexBufferLayoutBuilder};
+use crate::{InstanceBufferInner, UniformBufferInner};
 use naga::Module;
 use naga::{Expression, Handle};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use wgpu::{BindGroup, BindGroupLayout};
+use wgpu::{
+    BindGroup, BindGroupLayout, BufferAddress, VertexAttribute, VertexBufferLayout, VertexStepMode,
+};
+
+pub struct VertexBufferLayoutBuilder {
+    pub array_stride: BufferAddress,
+    pub step_mode: VertexStepMode,
+    pub attributes: Vec<VertexAttribute>,
+}
+
+impl VertexBufferLayoutBuilder {
+    pub fn build(&self) -> VertexBufferLayout {
+        VertexBufferLayout {
+            array_stride: self.array_stride,
+            step_mode: self.step_mode,
+            attributes: &self.attributes,
+        }
+    }
+}
 
 pub struct BufferBindingField {
     pub function_argument: u32,

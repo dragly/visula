@@ -2522,12 +2522,25 @@ dependencies = [
  "syn 1.0.98",
  "trajan",
  "uuid",
+ "visula_core",
  "visula_derive",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
  "wgpu",
  "winit",
+]
+
+[[package]]
+name = "visula_core"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "glam",
+ "log",
+ "naga 0.10.0",
+ "uuid",
+ "wgpu",
 ]
 
 [[package]]

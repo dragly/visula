@@ -15,29 +15,18 @@ use winit::{
 };
 
 pub mod application;
-pub mod bindings;
 pub mod camera;
 pub mod custom_event;
 pub mod drop_event;
 pub mod error;
 pub mod init_wgpu;
-pub mod instance_buffer;
-pub mod instances;
 pub mod io;
-pub mod naga_type;
 pub mod pipelines;
 pub mod primitives;
 pub mod render_pass;
 pub mod rendering_descriptor;
 pub mod simulation;
-pub mod uniform_buffer;
-pub mod value;
 pub mod vec_to_buffer;
-pub mod vertex_attr;
-pub mod vertex_attr_format;
-
-pub use vertex_attr::VertexAttr;
-pub use vertex_attr_format::VertexAttrFormat;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod setup_other;
@@ -45,18 +34,21 @@ pub mod setup_other;
 pub mod setup_wasm;
 
 pub use application::Application;
-pub use bindings::*;
+pub use camera::controller::{CameraController, CameraControllerResponse};
+pub use camera::Camera;
 pub use custom_event::CustomEvent;
 pub use drop_event::DropEvent;
-pub use instance_buffer::*;
-pub use instances::*;
-pub use naga_type::*;
 pub use pipelines::*;
 pub use primitives::*;
 pub use render_pass::*;
+pub use rendering_descriptor::RenderingDescriptor;
 pub use simulation::*;
-pub use uniform_buffer::*;
-pub use value::*;
+
+pub use visula_core::{
+    glam, naga, uuid, wgpu, Expression, InstanceBuffer, InstanceDeviceExt, UniformBuffer,
+};
+
+pub use egui;
 
 pub type Vector2 = cgmath::Vector2<f32>;
 pub type Vector3 = cgmath::Vector3<f32>;

@@ -32,7 +32,7 @@ pub struct CameraController {
 }
 
 #[derive(Clone, Debug)]
-pub struct Response {
+pub struct CameraControllerResponse {
     pub needs_redraw: bool,
     pub captured_event: bool,
 }
@@ -65,7 +65,7 @@ impl CameraController {
 
     pub fn update(&mut self) {}
 
-    pub fn handle_event<T>(&mut self, event: &Event<T>) -> Response {
+    pub fn handle_event<T>(&mut self, event: &Event<T>) -> CameraControllerResponse {
         let mut needs_redraw = false;
         let mut captured_event = false;
 
@@ -96,7 +96,7 @@ impl CameraController {
                         self.forward = (rotation * self.forward).normalize();
                     } else {
                         if (position_diff.x + position_diff.y).abs() < 0.000001 {
-                            return Response {
+                            return CameraControllerResponse {
                                 needs_redraw: false,
                                 captured_event: false,
                             };
@@ -112,7 +112,7 @@ impl CameraController {
                         let new_forward = (rotation * self.forward).normalize();
                         if Vector3::dot(up, new_forward).abs() > 0.99 {
                             if position_diff.x.abs() < 0.00001 {
-                                return Response {
+                                return CameraControllerResponse {
                                     needs_redraw: false,
                                     captured_event: false,
                                 };
@@ -126,7 +126,7 @@ impl CameraController {
                             let new_forward = (rotation * self.forward).normalize();
                             self.forward = new_forward;
                             self.state = State::Moving;
-                            return Response {
+                            return CameraControllerResponse {
                                 needs_redraw: true,
                                 captured_event: true,
                             };
@@ -198,7 +198,7 @@ impl CameraController {
             _ => {}
         }
 
-        Response {
+        CameraControllerResponse {
             needs_redraw,
             captured_event,
         }
