@@ -1,4 +1,4 @@
-use crate::camera::controller::Response;
+use crate::camera::controller::CameraControllerResponse;
 use crate::camera::Camera;
 use crate::custom_event::CustomEvent;
 use crate::rendering_descriptor::RenderingDescriptor;
@@ -38,7 +38,7 @@ impl Application {
         if self.platform.captures_event(event) {
             return true;
         }
-        let Response {
+        let CameraControllerResponse {
             needs_redraw,
             captured_event,
         } = self.camera_controller.handle_event(event);

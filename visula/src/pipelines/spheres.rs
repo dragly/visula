@@ -1,11 +1,11 @@
 use crate::rendering_descriptor::RenderingDescriptor;
 use crate::simulation::RenderData;
-use crate::{BindingBuilder, BufferBinding};
-use crate::{DefaultRenderPassDescriptor, Expression};
+use crate::DefaultRenderPassDescriptor;
 use bytemuck::{Pod, Zeroable};
 use naga::{back::wgsl::WriterFlags, valid::ValidationFlags, Block, Statement};
 use std::cell::Ref;
 use std::mem::size_of;
+use visula_core::{BindingBuilder, BufferBinding, Expression};
 use visula_derive::Delegate;
 use wgpu::util::DeviceExt;
 use wgpu::{BindGroupLayout, BufferUsages};

@@ -7,11 +7,8 @@ use structopt::StructOpt;
 
 use glam::Vec3;
 use visula::{
-    simulation::RenderData, BindingBuilder, BufferBinding, BufferBindingField, Expression,
-    Instance, InstanceBuffer, InstanceBufferInner, InstanceDeviceExt, InstanceField,
-    InstanceHandle, LineDelegate, Lines, NagaType, SphereDelegate, Spheres, Uniform,
-    UniformBinding, UniformBuffer, UniformBufferInner, UniformField, UniformHandle,
-    VertexAttrFormat, VertexBufferLayoutBuilder,
+    InstanceBuffer, InstanceDeviceExt, LineDelegate, Lines, RenderData, SphereDelegate, Spheres,
+    UniformBuffer,
 };
 use visula_derive::{Instance, Uniform};
 

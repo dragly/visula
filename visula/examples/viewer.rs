@@ -6,9 +6,8 @@ use structopt::StructOpt;
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 use visula::{
-    BindingBuilder, CustomEvent, DropEvent, Expression, InstanceBuffer, MeshPipeline, Pipeline,
-    RenderData, SphereDelegate, SpherePrimitive, Spheres, Uniform, UniformBinding, UniformBuffer,
-    UniformBufferInner, UniformField, UniformHandle,
+    CustomEvent, DropEvent, InstanceBuffer, MeshPipeline, Pipeline, RenderData, SphereDelegate,
+    SpherePrimitive, Spheres, UniformBuffer,
 };
 use visula_derive::Uniform;
 
