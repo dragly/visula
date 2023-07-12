@@ -20,9 +20,8 @@ struct Simulation {
     line_data: Vec<LineData>,
 }
 
-impl visula::Simulation for Simulation {
-    type Error = Error;
-    fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
+impl Simulation {
+    fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
         let line_buffer = InstanceBuffer::<LineData>::new(&application.device);
         let line = line_buffer.instance();
 
@@ -52,7 +51,10 @@ impl visula::Simulation for Simulation {
             line_data,
         })
     }
+}
 
+impl visula::Simulation for Simulation {
+    type Error = Error;
     fn update(&mut self, application: &visula::Application) {
         self.line_buffer
             .update(&application.device, &application.queue, &self.line_data);
@@ -64,5 +66,5 @@ impl visula::Simulation for Simulation {
 }
 
 fn main() {
-    visula::run::<Simulation>();
+    visula::run(|app| Simulation::new(app).expect("Initializing simulation failed"));
 }

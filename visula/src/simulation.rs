@@ -16,7 +16,6 @@ pub struct RenderData<'a> {
 
 pub trait Simulation: Sized {
     type Error: Debug;
-    fn init(application: &mut Application) -> Result<Self, Self::Error>;
     fn handle_event(&mut self, _application: &mut Application, _event: &Event<CustomEvent>) {}
     fn update(&mut self, _application: &Application) {}
     fn render(&mut self, _data: &mut RenderData) {}

@@ -42,9 +42,8 @@ fn gaussian(a: &Expression, b: &Expression) -> Expression {
     }
 }
 
-impl visula::Simulation for Simulation {
-    type Error = Error;
-    fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
+impl Simulation {
+    fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
         let column_count = 100;
         let row_count = 100;
         let columns = 0..column_count;
@@ -96,7 +95,10 @@ impl visula::Simulation for Simulation {
             uniforms_buffer,
         })
     }
+}
 
+impl visula::Simulation for Simulation {
+    type Error = Error;
     fn update(&mut self, application: &visula::Application) {
         self.line_buffer
             .update(&application.device, &application.queue, &self.line_data);
@@ -160,5 +162,5 @@ impl visula::Simulation for Simulation {
 }
 
 fn main() {
-    visula::run::<Simulation>();
+    visula::run(|app| Simulation::new(app).expect("Initializing simulation failed"));
 }

@@ -77,9 +77,8 @@ impl Simulation {
 #[derive(Debug)]
 struct Error {}
 
-impl visula::Simulation for Simulation {
-    type Error = Error;
-    fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
+impl Simulation {
+    fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
         let args = Cli::from_args();
         let sphere_buffer = InstanceBuffer::<SpherePrimitive>::new(&application.device);
         let sphere = sphere_buffer.instance();
@@ -116,6 +115,10 @@ impl visula::Simulation for Simulation {
         }
         Ok(simulation)
     }
+}
+
+impl visula::Simulation for Simulation {
+    type Error = Error;
 
     fn update(&mut self, application: &visula::Application) {
         self.settings_buffer
@@ -216,5 +219,5 @@ fn main() {
     #[cfg(target_arch = "wasm32")]
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-    visula::run::<Simulation>();
+    visula::run(|app| Simulation::new(app).expect("Initializing simulation failed"));
 }

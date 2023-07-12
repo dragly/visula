@@ -320,9 +320,8 @@ struct Simulation {
     particle_buffer: InstanceBuffer<ParticleData>,
 }
 
-impl visula::Simulation for Simulation {
-    type Error = Error;
-    fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
+impl Simulation {
+    fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
         let cli = Cli::from_args();
         let count = cli.count.unwrap_or(6);
         let particles = generate(count);
@@ -352,7 +351,10 @@ impl visula::Simulation for Simulation {
             particle_buffer,
         })
     }
+}
 
+impl visula::Simulation for Simulation {
+    type Error = Error;
     fn update(&mut self, application: &visula::Application) {
         let previous_particles = self.particles.clone();
         integrate(
@@ -379,5 +381,5 @@ impl visula::Simulation for Simulation {
 }
 
 fn main() {
-    visula::run::<Simulation>();
+    visula::run(|app| Simulation::new(app).expect("Initializing simulation failed"));
 }

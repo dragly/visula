@@ -49,17 +49,45 @@ pub use visula_core::{
 };
 
 pub use egui;
+pub use wasm_bindgen;
 
 pub type Vector2 = cgmath::Vector2<f32>;
 pub type Vector3 = cgmath::Vector3<f32>;
 pub type Matrix4 = cgmath::Matrix4<f32>;
 pub type Point3 = cgmath::Point3<f32>;
 
-pub fn run<S: 'static + Simulation>() {
+pub struct RunConfig {
+    pub canvas_name: String,
+}
+
+pub fn run<F, S>(init: F)
+where
+    F: FnMut(&mut Application) -> S + 'static,
+    S: Simulation + 'static,
+{
+    run_with_config(
+        RunConfig {
+            canvas_name: "glcanvas".to_string(),
+        },
+        init,
+    )
+}
+
+pub fn run_with_config<F, S>(config: RunConfig, mut init: F)
+where
+    F: FnMut(&mut Application) -> S + 'static,
+    S: Simulation + 'static,
+{
     let event_loop = EventLoopBuilder::<CustomEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
     let mut builder = winit::window::WindowBuilder::new();
     builder = builder.with_title("Visula");
+
+    #[cfg(not(target_arch = "wasm32"))]
+    println!(
+        "NOTE: Ignoring canvas name on non-wasm platforms: '{}'",
+        config.canvas_name
+    );
 
     #[cfg(target_arch = "wasm32")]
     let mut canvas_existed = false;
@@ -67,7 +95,7 @@ pub fn run<S: 'static + Simulation>() {
     {
         let window = web_sys::window().expect("no global `window` exists");
         let document = window.document().expect("should have a document on window");
-        if let Some(canvas) = document.get_element_by_id("glcanvas") {
+        if let Some(canvas) = document.get_element_by_id(&config.canvas_name) {
             let canvas = canvas
                 .dyn_into::<HtmlCanvasElement>()
                 .expect("could not cast to HtmlCanvasElement");
@@ -119,7 +147,7 @@ pub fn run<S: 'static + Simulation>() {
         *control_flow = ControlFlow::Poll;
         match event {
             Event::UserEvent(CustomEvent::Ready(mut app)) => {
-                simulation = Some(S::init(&mut app).unwrap());
+                simulation = Some(init(&mut app));
                 application = Some(*app);
             }
             event => {
@@ -139,7 +167,6 @@ pub fn run<S: 'static + Simulation>() {
                             if !app.handle_event(&event, control_flow) {
                                 sim.handle_event(app, &event);
                             }
-                            app.handle_event(&event, control_flow);
                         }
                     }
                 }
