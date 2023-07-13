@@ -33,9 +33,8 @@ impl From<visula::error::Error> for Error {
     }
 }
 
-impl visula::Simulation for Simulation {
-    type Error = Error;
-    fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
+impl Simulation {
+    fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
         let cli = Cli::from_args();
         let filename = cli.filename;
         let file = File::open(filename)?;
@@ -61,6 +60,10 @@ impl visula::Simulation for Simulation {
         mesh.index_buf = index_buffer;
         Ok(Simulation { mesh })
     }
+}
+
+impl visula::Simulation for Simulation {
+    type Error = Error;
 
     fn update(&mut self, _application: &visula::Application) {}
 
@@ -70,5 +73,5 @@ impl visula::Simulation for Simulation {
 }
 
 fn main() {
-    visula::run::<Simulation>();
+    visula::run(|app| Simulation::new(app).expect("Initializing simulation failed"));
 }

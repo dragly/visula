@@ -81,9 +81,8 @@ struct Simulation {
     mouse: Mouse,
 }
 
-impl visula::Simulation for Simulation {
-    type Error = Error;
-    fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
+impl Simulation {
+    fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
         let particle_buffer = InstanceBuffer::<Particle>::new(&application.device);
         let particle = particle_buffer.instance();
 
@@ -174,7 +173,10 @@ impl visula::Simulation for Simulation {
             mouse: Mouse { position: None },
         })
     }
+}
 
+impl visula::Simulation for Simulation {
+    type Error = Error;
     fn update(&mut self, application: &visula::Application) {
         let compartments = &mut self.compartments;
         let injecting_current = false;
@@ -439,5 +441,5 @@ impl visula::Simulation for Simulation {
 }
 
 fn main() {
-    visula::run::<Simulation>();
+    visula::run(|app| Simulation::new(app).expect("Initializing simulation failed"));
 }

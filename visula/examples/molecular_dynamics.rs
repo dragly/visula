@@ -204,14 +204,7 @@ struct Simulation {
 }
 
 impl Simulation {
-    fn reset(&mut self) {
-        self.particles = generate(self.count);
-    }
-}
-
-impl visula::Simulation for Simulation {
-    type Error = Error;
-    fn init(application: &mut visula::Application) -> Result<Simulation, Error> {
+    fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
         let cli = Cli::from_args();
         let count = cli.count.unwrap_or(8);
         let particles = generate(count);
@@ -271,6 +264,13 @@ impl visula::Simulation for Simulation {
         })
     }
 
+    fn reset(&mut self) {
+        self.particles = generate(self.count);
+    }
+}
+
+impl visula::Simulation for Simulation {
+    type Error = Error;
     fn update(&mut self, application: &visula::Application) {
         let mut bond_data = Vec::new();
         let current_time = Instant::now();
@@ -323,5 +323,5 @@ impl visula::Simulation for Simulation {
 }
 
 fn main() {
-    visula::run::<Simulation>();
+    visula::run(|app| Simulation::new(app).expect("Initializing simulation failed"));
 }
