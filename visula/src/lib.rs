@@ -49,6 +49,8 @@ pub use visula_core::{
 };
 
 pub use egui;
+pub use web_sys;
+pub use winit;
 pub use wasm_bindgen;
 
 pub type Vector2 = cgmath::Vector2<f32>;
