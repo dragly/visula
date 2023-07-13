@@ -6,6 +6,6 @@ resolver = "2"
 wgpu = { version = "0.16.0", features = ["webgl"] }
 glam = { version = "0.20", features = ["bytemuck"] }
 naga = { version = "0.10", features = ["wgsl-in", "wgsl-out"] }
-uuid = { version = "1.3.3", features = ["v4", "fast-rng", "macro-diagnostics"] }
+uuid = { version = "1.3.3", features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
 bytemuck = { version = "1.4", features = ["derive"] }
 log = "0.4"
