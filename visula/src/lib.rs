@@ -80,6 +80,12 @@ where
     F: FnMut(&mut Application) -> S + 'static,
     S: Simulation + 'static,
 {
+    #[cfg(target_arch = "wasm32")]
+    {
+        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+        console_log::init().expect("could not initialize logger");
+    }
+
     let event_loop = EventLoopBuilder::<CustomEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
     let mut builder = winit::window::WindowBuilder::new();
