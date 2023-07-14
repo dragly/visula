@@ -123,6 +123,15 @@ impl Application {
         event: &Event<CustomEvent>,
         control_flow: &mut ControlFlow,
     ) -> bool {
+        if let Event::WindowEvent {
+            window_id,
+            event: _event,
+        } = event
+        {
+            if *window_id != self.window.id() {
+                return false;
+            }
+        }
         self.platform.handle_event(event);
         if self.platform.captures_event(event) {
             return true;

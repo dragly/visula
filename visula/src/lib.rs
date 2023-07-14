@@ -49,9 +49,9 @@ pub use visula_core::{
 };
 
 pub use egui;
+pub use wasm_bindgen;
 pub use web_sys;
 pub use winit;
-pub use wasm_bindgen;
 
 pub type Vector2 = cgmath::Vector2<f32>;
 pub type Vector3 = cgmath::Vector3<f32>;
@@ -75,7 +75,7 @@ where
     )
 }
 
-pub fn run_with_config<F, S>(config: RunConfig, mut init: F)
+pub fn run_with_config<F, S>(_config: RunConfig, mut init: F)
 where
     F: FnMut(&mut Application) -> S + 'static,
     S: Simulation + 'static,
@@ -103,7 +103,7 @@ where
     {
         let window = web_sys::window().expect("no global `window` exists");
         let document = window.document().expect("should have a document on window");
-        if let Some(canvas) = document.get_element_by_id(&config.canvas_name) {
+        if let Some(canvas) = document.get_element_by_id(&_config.canvas_name) {
             let canvas = canvas
                 .dyn_into::<HtmlCanvasElement>()
                 .expect("could not cast to HtmlCanvasElement");
