@@ -8,7 +8,7 @@ use winit::event::{
     MouseScrollDelta::{LineDelta, PixelDelta},
     WindowEvent,
 };
-use winit::window::Window;
+use winit::window::{Window, WindowId};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum State {
@@ -29,6 +29,7 @@ pub struct CameraController {
     pub rotational_speed: f32,
     pub roll_speed: f32,
     state: State,
+    window_id: WindowId,
 }
 
 #[derive(Clone, Debug)]
@@ -49,6 +50,7 @@ impl CameraController {
         let rotation = cgmath::Quaternion::from_axis_angle(axis, cgmath::Rad(0.4));
         let new_forward = (rotation * forward).normalize();
         let scale_factor = window.scale_factor() as f32;
+        let window_id = window.id();
         CameraController {
             left_pressed: false,
             right_pressed: false,
@@ -60,6 +62,7 @@ impl CameraController {
             rotational_speed: 0.005 / scale_factor,
             roll_speed: 0.005 / scale_factor,
             state: State::Released,
+            window_id,
         }
     }
 
@@ -149,8 +152,8 @@ impl CameraController {
             }
             Event::WindowEvent {
                 event: window_event,
-                ..
-            } => match window_event {
+                window_id,
+            } if *window_id == self.window_id => match window_event {
                 WindowEvent::ModifiersChanged(state) => {
                     self.control_pressed = state.contains(winit::event::ModifiersState::CTRL);
                 }
