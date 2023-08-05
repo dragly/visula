@@ -50,6 +50,8 @@ pub use visula_core::{
 
 pub use egui;
 pub use wasm_bindgen;
+pub use web_sys;
+pub use winit;
 
 pub type Vector2 = cgmath::Vector2<f32>;
 pub type Vector3 = cgmath::Vector3<f32>;
@@ -73,11 +75,17 @@ where
     )
 }
 
-pub fn run_with_config<F, S>(config: RunConfig, mut init: F)
+pub fn run_with_config<F, S>(_config: RunConfig, mut init: F)
 where
     F: FnMut(&mut Application) -> S + 'static,
     S: Simulation + 'static,
 {
+    #[cfg(target_arch = "wasm32")]
+    {
+        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+        console_log::init().expect("could not initialize logger");
+    }
+
     let event_loop = EventLoopBuilder::<CustomEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
     let mut builder = winit::window::WindowBuilder::new();
@@ -86,7 +94,7 @@ where
     #[cfg(not(target_arch = "wasm32"))]
     println!(
         "NOTE: Ignoring canvas name on non-wasm platforms: '{}'",
-        config.canvas_name
+        _config.canvas_name
     );
 
     #[cfg(target_arch = "wasm32")]
@@ -95,7 +103,7 @@ where
     {
         let window = web_sys::window().expect("no global `window` exists");
         let document = window.document().expect("should have a document on window");
-        if let Some(canvas) = document.get_element_by_id(&config.canvas_name) {
+        if let Some(canvas) = document.get_element_by_id(&_config.canvas_name) {
             let canvas = canvas
                 .dyn_into::<HtmlCanvasElement>()
                 .expect("could not cast to HtmlCanvasElement");

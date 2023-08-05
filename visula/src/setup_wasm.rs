@@ -15,8 +15,6 @@ pub fn setup_wasm(
     proxy: EventLoopProxy<CustomEvent>,
     drop_proxy_main: Rc<RefCell<EventLoopProxy<CustomEvent>>>,
 ) {
-    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    console_log::init().expect("could not initialize logger");
     log::info!("Start");
     use winit::platform::web::WindowExtWebSys;
     let drag_enter = Closure::wrap(Box::new(|event: &web_sys::Event| {
