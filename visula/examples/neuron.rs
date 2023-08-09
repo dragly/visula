@@ -28,6 +28,12 @@ struct Compartment {
     _padding: f32,
 }
 
+#[derive(Clone, Debug)]
+struct Stimulator {
+    position: Vec3,
+    trigger: f32,
+}
+
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Debug, Instance, Pod, Zeroable)]
 struct Particle {
@@ -161,6 +167,11 @@ impl Simulation {
             _padding: Default::default(),
         },));
 
+        world.spawn((Stimulator {
+            position: Vec3::new(50.0, 0.0, 0.0),
+            trigger: 2.0,
+        },));
+
         Ok(Simulation {
             particles: vec![],
             spheres,
@@ -189,6 +200,12 @@ impl visula::Simulation for Simulation {
         let min_velocity = node_radius * 0.05;
         let mut bonds = vec![];
         for _ in 0..self.settings.speed {
+            let stimulators: Vec<Stimulator> = self
+                .world
+                .query::<&Stimulator>()
+                .iter()
+                .map(|(_, s)| s.clone())
+                .collect();
             for (_key, compartment) in self.world.query_mut::<&mut Compartment>() {
                 compartment.velocity += compartment.acceleration * dt;
                 if compartment.velocity.length() > max_velocity {
@@ -254,12 +271,20 @@ impl visula::Simulation for Simulation {
                 let leak_conductance = 1.3;
                 let leak_current = -leak_conductance * (compartment.voltage - e_m);
 
-                let injected_current = if injecting_current {
+                let mut injected_current = if injecting_current {
                     let mouse_distance = (compartment.position - mouse).length();
                     150.0 * (-mouse_distance * mouse_distance / (2.0 * sigma * sigma)).exp()
                 } else {
                     0.0
                 };
+
+                for stimulator in &stimulators {
+                    let distance = compartment.position.distance(stimulator.position);
+                    if distance < 2.0 * sigma && stimulator.trigger < 0.0 {
+                        injected_current += 5000.0;
+                    }
+                }
+
                 let current = sodium_current + potassium_current + leak_current + injected_current;
                 let delta_voltage = current / compartment.capacitance;
 
@@ -333,6 +358,14 @@ impl visula::Simulation for Simulation {
             {
                 *compartment = next_compartment;
             }
+
+            for (_entity, stimulator) in self.world.query_mut::<&mut Stimulator>() {
+                stimulator.trigger = if stimulator.trigger < 0.0 {
+                    10.0
+                } else {
+                    stimulator.trigger - dt
+                };
+            }
         }
 
         self.particles = self
@@ -344,6 +377,16 @@ impl visula::Simulation for Simulation {
                 voltage: c.voltage,
             })
             .collect();
+
+        self.particles.extend(
+            self.world
+                .query::<&Stimulator>()
+                .iter()
+                .map(|(_, s)| Particle {
+                    position: s.position,
+                    voltage: s.trigger * 10.0,
+                }),
+        );
 
         self.particle_buffer
             .update(&application.device, &application.queue, &self.particles);
