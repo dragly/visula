@@ -1,4 +1,5 @@
 use bytemuck::{Pod, Zeroable};
+use cgmath::EuclideanSpace;
 use cgmath::{InnerSpace, SquareMatrix};
 use slotmap::{DefaultKey, SlotMap};
 
@@ -411,22 +412,52 @@ impl visula::Simulation for Simulation {
                 }
                 .normalize();
                 let ray_origin = application.camera_controller.position();
-                let t = -ray_origin.y / ray_world.y;
-                let intersection = ray_origin + t * ray_world;
-                let intersection = Vec3::new(intersection.x, intersection.y, intersection.z);
-                self.compartments.insert(Compartment {
-                    position: intersection,
-                    velocity: Vec3::new(0.0, 0.0, 0.0),
-                    acceleration: Vec3::new(0.0, 0.0, 0.0),
-                    //voltage: 4.0266542,
-                    voltage: 100.0,
-                    m: 0.084073044,
-                    h: 0.45317015,
-                    n: 0.38079754,
-                    influence: 0.0,
-                    capacitance: 4.0,
-                    _padding: 0.0,
-                });
+                self.compartments
+                    .iter()
+                    .filter_map(|(_key, compartment)| {
+                        let position = cgmath::Point3 {
+                            x: compartment.position.x,
+                            y: compartment.position.y,
+                            z: compartment.position.z,
+                        };
+                        let ray_origin = ray_origin - position;
+                        let radius = self.settings.radius;
+                        let r2: f32 = radius * radius;
+                        let a: f32 = ray_world.dot(ray_world);
+                        let b: f32 = 2.0 * ray_origin.dot(ray_world);
+                        let c: f32 = ray_origin.dot(ray_origin) - r2;
+
+                        // discriminant of sphere equation
+                        let d: f32 = b * b - 4.0 * a * c;
+                        if d < 0.0 {
+                            return None;
+                        }
+
+                        let sqrtd: f32 = d.sqrt();
+                        let t1: f32 = (-b - sqrtd) / (2.0 * a);
+                        let t2: f32 = (-b + sqrtd) / (2.0 * a);
+
+                        let t: f32 = t1.min(t2);
+
+                        let sphere_intersection = ray_origin + t * ray_world;
+                        Some((5.0 * sphere_intersection + position.to_vec(), t))
+                    })
+                    .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .map(|(intersection, _)| {
+                        self.compartments.insert(Compartment {
+                            position: Vec3::new(intersection.x, intersection.y, intersection.z),
+                            velocity: Vec3::new(0.0, 0.0, 0.0),
+                            acceleration: Vec3::new(0.0, 0.0, 0.0),
+                            //voltage: 4.0266542,
+                            voltage: 100.0,
+                            m: 0.084073044,
+                            h: 0.45317015,
+                            n: 0.38079754,
+                            influence: 0.0,
+                            capacitance: 4.0,
+                            _padding: 0.0,
+                        });
+                    });
             }
             Event::WindowEvent {
                 event: WindowEvent::CursorMoved { position, .. },

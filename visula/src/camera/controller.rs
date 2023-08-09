@@ -225,7 +225,7 @@ impl CameraController {
     }
 
     pub fn projection_matrix(&self, aspect_ratio: f32) -> Matrix4 {
-        OPENGL_TO_WGPU_MATRIX * cgmath::perspective(cgmath::Deg(40f32), aspect_ratio, 10.0, 10000.0)
+        OPENGL_TO_WGPU_MATRIX * cgmath::perspective(cgmath::Deg(70f32), aspect_ratio, 10.0, 10000.0)
     }
 
     pub fn uniforms(&self, aspect_ratio: f32) -> CameraUniforms {

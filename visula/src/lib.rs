@@ -94,7 +94,7 @@ where
     #[cfg(not(target_arch = "wasm32"))]
     println!(
         "NOTE: Ignoring canvas name on non-wasm platforms: '{}'",
-        config.canvas_name
+        _config.canvas_name
     );
 
     #[cfg(target_arch = "wasm32")]
