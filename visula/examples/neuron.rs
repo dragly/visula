@@ -168,8 +168,16 @@ impl Simulation {
         },));
 
         world.spawn((Stimulator {
-            position: Vec3::new(80.0, 0.0, 0.0),
+            position: Vec3::new(260.0, 0.0, 0.0),
             trigger: 2.0,
+        },));
+        world.spawn((Stimulator {
+            position: Vec3::new(0.0, 260.0, 0.0),
+            trigger: 4.0,
+        },));
+        world.spawn((Stimulator {
+            position: Vec3::new(0.0, 0.0, 260.0),
+            trigger: 8.0,
         },));
 
         Ok(Simulation {
@@ -361,7 +369,7 @@ impl visula::Simulation for Simulation {
 
             for (_entity, stimulator) in self.world.query_mut::<&mut Stimulator>() {
                 stimulator.trigger = if stimulator.trigger < 0.0 {
-                    10.0
+                    16.0
                 } else {
                     stimulator.trigger - dt
                 };
@@ -418,7 +426,7 @@ impl visula::Simulation for Simulation {
                 event:
                     WindowEvent::MouseInput {
                         state: ElementState::Released,
-                        button: MouseButton::Left,
+                        button,
                         ..
                     },
                 ..
@@ -469,11 +477,11 @@ impl visula::Simulation for Simulation {
                 }
                 .normalize();
                 let ray_origin = application.camera_controller.position();
-                let new_compartment = self
+                let intersection = self
                     .world
                     .query::<&Compartment>()
                     .iter()
-                    .filter_map(|(_key, compartment)| {
+                    .filter_map(|(entity, compartment)| {
                         let position = cgmath::Point3 {
                             x: compartment.position.x,
                             y: compartment.position.y,
@@ -488,12 +496,16 @@ impl visula::Simulation for Simulation {
                             return None;
                         }
                         let placement = position + 5.0 * self.settings.radius * d.normalize();
-                        Some((placement, distance))
+                        Some((entity, placement, distance))
                     })
-                    .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                    .map(|(intersection, _)| {
-                        Compartment {
-                            position: Vec3::new(intersection.x, intersection.y, intersection.z),
+                    .min_by(|(_, _, a), (_, _, b)| {
+                        a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+                    });
+
+                if *button == MouseButton::Left {
+                    intersection.map(|(_, placement, _)| {
+                        self.world.spawn((Compartment {
+                            position: Vec3::new(placement.x, placement.y, placement.z),
                             velocity: Vec3::new(0.0, 0.0, 0.0),
                             acceleration: Vec3::new(0.0, 0.0, 0.0),
                             //voltage: 4.0266542,
@@ -504,11 +516,15 @@ impl visula::Simulation for Simulation {
                             influence: 0.0,
                             capacitance: 4.0,
                             _padding: 0.0,
-                        }
+                        },));
                     });
-                new_compartment.map(|compartment| {
-                    self.world.spawn((compartment,));
-                });
+                } else {
+                    intersection.map(|(entity, _, _)| {
+                        self.world
+                            .despawn(entity)
+                            .expect("Failed to despawn entity!");
+                    });
+                }
             }
             Event::WindowEvent {
                 event: WindowEvent::CursorMoved { position, .. },
