@@ -168,7 +168,7 @@ impl Simulation {
         },));
 
         world.spawn((Stimulator {
-            position: Vec3::new(50.0, 0.0, 0.0),
+            position: Vec3::new(80.0, 0.0, 0.0),
             trigger: 2.0,
         },));
 
@@ -280,8 +280,8 @@ impl visula::Simulation for Simulation {
 
                 for stimulator in &stimulators {
                     let distance = compartment.position.distance(stimulator.position);
-                    if distance < 2.0 * sigma && stimulator.trigger < 0.0 {
-                        injected_current += 5000.0;
+                    if distance < sigma && stimulator.trigger < 0.0 {
+                        injected_current += 50000.0;
                     }
                 }
 
