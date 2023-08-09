@@ -35,6 +35,7 @@ egui_winit_platform = "0.18"
 crude-profiler = "0.1.7"
 oxifive = { git = "https://github.com/dragly/oxifive", rev = "9f4314b587ef51029033288d95b4a44e40b0ddb5" }
 itertools = "0.10.5"
+hecs = "0.10.3"
 
 [dev-dependencies]
 slotmap = "1.0.2"

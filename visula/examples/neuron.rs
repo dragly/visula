@@ -1,7 +1,6 @@
 use bytemuck::{Pod, Zeroable};
-use cgmath::EuclideanSpace;
 use cgmath::{InnerSpace, SquareMatrix};
-use slotmap::{DefaultKey, SlotMap};
+use hecs::World;
 
 use glam::Vec3;
 use visula::{
@@ -78,8 +77,8 @@ struct Simulation {
     settings: Settings,
     settings_buffer: UniformBuffer<Settings>,
     lines_buffer: InstanceBuffer<BondData>,
-    compartments: SlotMap<DefaultKey, Compartment>,
     mouse: Mouse,
+    world: World,
 }
 
 impl Simulation {
@@ -124,8 +123,8 @@ impl Simulation {
         )
         .unwrap();
 
-        let mut compartments = SlotMap::<DefaultKey, Compartment>::new();
-        compartments.insert(Compartment {
+        let mut world = World::new();
+        world.spawn((Compartment {
             position: Vec3::new(0.0, 0.0, 0.0),
             velocity: Vec3::new(0.0, 0.0, 0.0),
             acceleration: Vec3::new(0.0, 0.0, 0.0),
@@ -136,8 +135,8 @@ impl Simulation {
             influence: 0.0,
             capacitance: 4.0,
             _padding: Default::default(),
-        });
-        compartments.insert(Compartment {
+        },));
+        world.spawn((Compartment {
             position: Vec3::new(2.0, 0.0, 0.0),
             velocity: Vec3::new(0.0, 0.0, 0.0),
             acceleration: Vec3::new(0.0, 0.0, 0.0),
@@ -148,8 +147,8 @@ impl Simulation {
             influence: 0.0,
             capacitance: 4.0,
             _padding: Default::default(),
-        });
-        compartments.insert(Compartment {
+        },));
+        world.spawn((Compartment {
             position: Vec3::new(2.0, 0.0, 2.0),
             velocity: Vec3::new(0.0, 0.0, 0.0),
             acceleration: Vec3::new(0.0, 0.0, 0.0),
@@ -160,7 +159,7 @@ impl Simulation {
             influence: 0.0,
             capacitance: 4.0,
             _padding: Default::default(),
-        });
+        },));
 
         Ok(Simulation {
             particles: vec![],
@@ -170,8 +169,8 @@ impl Simulation {
             lines,
             settings: settings_data,
             settings_buffer,
-            compartments,
             mouse: Mouse { position: None },
+            world,
         })
     }
 }
@@ -179,7 +178,6 @@ impl Simulation {
 impl visula::Simulation for Simulation {
     type Error = Error;
     fn update(&mut self, application: &visula::Application) {
-        let compartments = &mut self.compartments;
         let injecting_current = false;
         let mouse = Vec3::new(0.0, 0.0, 0.0);
         let dt = 0.01;
@@ -191,7 +189,7 @@ impl visula::Simulation for Simulation {
         let min_velocity = node_radius * 0.05;
         let mut bonds = vec![];
         for _ in 0..self.settings.speed {
-            for (_key, compartment) in compartments.iter_mut() {
+            for (_key, compartment) in self.world.query_mut::<&mut Compartment>() {
                 compartment.velocity += compartment.acceleration * dt;
                 if compartment.velocity.length() > max_velocity {
                     compartment.velocity =
@@ -272,12 +270,20 @@ impl visula::Simulation for Simulation {
                 compartment.voltage = compartment.voltage.clamp(-50.0, 200.0)
             }
 
-            let mut next_compartments = compartments.clone();
+            let compartments: Vec<Compartment> = self
+                .world
+                .query::<&Compartment>()
+                .iter()
+                .map(|(_, c)| c.clone())
+                .collect();
+            let mut next_compartments: Vec<Compartment> = compartments.clone();
 
-            for ((key_a, compartment_a), (_next_key_a, next_a)) in
-                compartments.iter().zip(&mut next_compartments)
+            for ((key_a, compartment_a), (_next_key_a, next_a)) in compartments
+                .iter()
+                .enumerate()
+                .zip(next_compartments.iter_mut().enumerate())
             {
-                for (key_b, compartment_b) in compartments.iter() {
+                for (key_b, compartment_b) in compartments.iter().enumerate() {
                     if key_a == key_b {
                         continue;
                     }
@@ -314,18 +320,26 @@ impl visula::Simulation for Simulation {
                     }
                 }
             }
-            for (_key, compartment) in &mut next_compartments {
+            for compartment in &mut next_compartments {
                 compartment.acceleration /= 1.0 + compartment.influence;
                 compartment.acceleration += -0.5 * compartment.velocity;
             }
 
-            *compartments = next_compartments;
+            for ((_, compartment), next_compartment) in self
+                .world
+                .query_mut::<&mut Compartment>()
+                .into_iter()
+                .zip(next_compartments)
+            {
+                *compartment = next_compartment;
+            }
         }
 
         self.particles = self
-            .compartments
-            .values()
-            .map(|c| Particle {
+            .world
+            .query::<&Compartment>()
+            .iter()
+            .map(|(_, c)| Particle {
                 position: c.position,
                 voltage: c.voltage,
             })
@@ -412,7 +426,9 @@ impl visula::Simulation for Simulation {
                 }
                 .normalize();
                 let ray_origin = application.camera_controller.position();
-                self.compartments
+                let new_compartment = self
+                    .world
+                    .query::<&Compartment>()
                     .iter()
                     .filter_map(|(_key, compartment)| {
                         let position = cgmath::Point3 {
@@ -420,31 +436,20 @@ impl visula::Simulation for Simulation {
                             y: compartment.position.y,
                             z: compartment.position.z,
                         };
-                        let ray_origin = ray_origin - position;
-                        let radius = self.settings.radius;
-                        let r2: f32 = radius * radius;
-                        let a: f32 = ray_world.dot(ray_world);
-                        let b: f32 = 2.0 * ray_origin.dot(ray_world);
-                        let c: f32 = ray_origin.dot(ray_origin) - r2;
-
-                        // discriminant of sphere equation
-                        let d: f32 = b * b - 4.0 * a * c;
-                        if d < 0.0 {
+                        let v = position - ray_origin;
+                        let t = v.dot(ray_world);
+                        let r = ray_origin + t * ray_world;
+                        let d = r - position;
+                        let distance = d.magnitude();
+                        if distance > self.settings.radius * 10.0 {
                             return None;
                         }
-
-                        let sqrtd: f32 = d.sqrt();
-                        let t1: f32 = (-b - sqrtd) / (2.0 * a);
-                        let t2: f32 = (-b + sqrtd) / (2.0 * a);
-
-                        let t: f32 = t1.min(t2);
-
-                        let sphere_intersection = ray_origin + t * ray_world;
-                        Some((5.0 * sphere_intersection + position.to_vec(), t))
+                        let placement = position + 5.0 * self.settings.radius * d.normalize();
+                        Some((placement, distance))
                     })
                     .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
                     .map(|(intersection, _)| {
-                        self.compartments.insert(Compartment {
+                        Compartment {
                             position: Vec3::new(intersection.x, intersection.y, intersection.z),
                             velocity: Vec3::new(0.0, 0.0, 0.0),
                             acceleration: Vec3::new(0.0, 0.0, 0.0),
@@ -456,8 +461,11 @@ impl visula::Simulation for Simulation {
                             influence: 0.0,
                             capacitance: 4.0,
                             _padding: 0.0,
-                        });
+                        }
                     });
+                new_compartment.map(|compartment| {
+                    self.world.spawn((compartment,));
+                });
             }
             Event::WindowEvent {
                 event: WindowEvent::CursorMoved { position, .. },
