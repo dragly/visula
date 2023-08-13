@@ -138,12 +138,7 @@ impl Simulation {
         let mut world = World::new();
         world.spawn((
             Position {
-                position: Vec3::new(0.0, 0.0, 0.0),
-            },
-            Kinetic {
-                velocity: Vec3::new(0.0, 0.0, 0.0),
-                acceleration: Vec3::new(0.0, 0.0, 0.0),
-                influence: 0.0,
+                position: Vec3::new(-20.0, 0.0, 0.0),
             },
             Compartment {
                 voltage: 4.0266542,
@@ -155,12 +150,7 @@ impl Simulation {
         ));
         world.spawn((
             Position {
-                position: Vec3::new(2.0, 0.0, 0.0),
-            },
-            Kinetic {
-                velocity: Vec3::new(0.0, 0.0, 0.0),
-                acceleration: Vec3::new(0.0, 0.0, 0.0),
-                influence: 0.0,
+                position: Vec3::new(0.0, 0.0, -20.0),
             },
             Compartment {
                 voltage: 4.0266542,
@@ -172,12 +162,7 @@ impl Simulation {
         ));
         world.spawn((
             Position {
-                position: Vec3::new(2.0, 0.0, 2.0),
-            },
-            Kinetic {
-                velocity: Vec3::new(0.0, 0.0, 0.0),
-                acceleration: Vec3::new(0.0, 0.0, 0.0),
-                influence: 0.0,
+                position: Vec3::new(20.0, 0.0, 20.0),
             },
             Compartment {
                 voltage: 4.0266542,
@@ -377,6 +362,7 @@ impl visula::Simulation for Simulation {
                     }
                 }
             }
+
             for (position, kinetic, compartment) in &mut next_compartments {
                 kinetic.acceleration /= 1.0 + kinetic.influence;
                 kinetic.acceleration += -0.5 * kinetic.velocity;
@@ -393,6 +379,54 @@ impl visula::Simulation for Simulation {
             {
                 *position = next_position;
                 *kinetic = next_kinetic;
+                *compartment = next_compartment;
+            }
+
+            let compartments: Vec<(Position, Compartment)> = self
+                .world
+                .query::<(&Position, &Compartment)>()
+                .iter()
+                .map(|(_, (p, c))| (p.clone(), c.clone()))
+                .collect();
+            let mut next_compartments = compartments.clone();
+
+            for (
+                (key_a, (position_a,  compartment_a)),
+                (_next_key_a, (next_position_a,  next_compartment_a)),
+            ) in compartments
+                .iter()
+                .enumerate()
+                .zip(next_compartments.iter_mut().enumerate())
+            {
+                for (key_b, (position_b,  compartment_b)) in
+                    compartments.iter().enumerate()
+                {
+                    let distance = (position_b.position - position_a.position).length();
+                    if distance < connection_distance {
+                        let voltage_diff = compartment_b.voltage - compartment_a.voltage;
+                        let delta_voltage = voltage_diff / compartment_a.capacitance;
+                        next_compartment_a.voltage += delta_voltage * dt;
+                        let value = voltage_diff.abs() * 0.01;
+                        bonds.push(BondData {
+                            position_a: position_a.position,
+                            position_b: position_b.position,
+                            strength: 0.5 + value,
+                            _padding: 0.0,
+                        });
+                    }
+                }
+            }
+
+            for (
+                (_, (position, compartment)),
+                (next_position, next_compartment),
+            ) in self
+                .world
+                .query_mut::<(&mut Position, &mut Compartment)>()
+                .into_iter()
+                .zip(next_compartments)
+            {
+                *position = next_position;
                 *compartment = next_compartment;
             }
 
