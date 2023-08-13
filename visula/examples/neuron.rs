@@ -13,19 +13,25 @@ use winit::{
     event::{ElementState, Event, MouseButton, WindowEvent},
 };
 
-#[repr(C, align(16))]
-#[derive(Clone, Copy, Debug, Instance, Pod, Zeroable)]
-struct Compartment {
+#[derive(Clone, Copy, Debug, Instance)]
+struct Position {
     position: Vec3,
+}
+
+#[derive(Clone, Copy, Debug, Instance)]
+struct Kinetic {
     velocity: Vec3,
     acceleration: Vec3,
+    influence: f32,
+}
+
+#[derive(Clone, Copy, Debug, Instance)]
+struct Compartment {
     voltage: f32,
     m: f32,
     h: f32,
     n: f32,
-    influence: f32,
     capacitance: f32,
-    _padding: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -130,42 +136,57 @@ impl Simulation {
         .unwrap();
 
         let mut world = World::new();
-        world.spawn((Compartment {
-            position: Vec3::new(0.0, 0.0, 0.0),
-            velocity: Vec3::new(0.0, 0.0, 0.0),
-            acceleration: Vec3::new(0.0, 0.0, 0.0),
-            voltage: 4.0266542,
-            m: 0.084073044,
-            h: 0.45317015,
-            n: 0.38079754,
-            influence: 0.0,
-            capacitance: 4.0,
-            _padding: Default::default(),
-        },));
-        world.spawn((Compartment {
-            position: Vec3::new(2.0, 0.0, 0.0),
-            velocity: Vec3::new(0.0, 0.0, 0.0),
-            acceleration: Vec3::new(0.0, 0.0, 0.0),
-            voltage: 4.0266542,
-            m: 0.084073044,
-            h: 0.45317015,
-            n: 0.38079754,
-            influence: 0.0,
-            capacitance: 4.0,
-            _padding: Default::default(),
-        },));
-        world.spawn((Compartment {
-            position: Vec3::new(2.0, 0.0, 2.0),
-            velocity: Vec3::new(0.0, 0.0, 0.0),
-            acceleration: Vec3::new(0.0, 0.0, 0.0),
-            voltage: 4.0266542,
-            m: 0.084073044,
-            h: 0.45317015,
-            n: 0.38079754,
-            influence: 0.0,
-            capacitance: 4.0,
-            _padding: Default::default(),
-        },));
+        world.spawn((
+            Position {
+                position: Vec3::new(0.0, 0.0, 0.0),
+            },
+            Kinetic {
+                velocity: Vec3::new(0.0, 0.0, 0.0),
+                acceleration: Vec3::new(0.0, 0.0, 0.0),
+                influence: 0.0,
+            },
+            Compartment {
+                voltage: 4.0266542,
+                m: 0.084073044,
+                h: 0.45317015,
+                n: 0.38079754,
+                capacitance: 4.0,
+            },
+        ));
+        world.spawn((
+            Position {
+                position: Vec3::new(2.0, 0.0, 0.0),
+            },
+            Kinetic {
+                velocity: Vec3::new(0.0, 0.0, 0.0),
+                acceleration: Vec3::new(0.0, 0.0, 0.0),
+                influence: 0.0,
+            },
+            Compartment {
+                voltage: 4.0266542,
+                m: 0.084073044,
+                h: 0.45317015,
+                n: 0.38079754,
+                capacitance: 4.0,
+            },
+        ));
+        world.spawn((
+            Position {
+                position: Vec3::new(2.0, 0.0, 2.0),
+            },
+            Kinetic {
+                velocity: Vec3::new(0.0, 0.0, 0.0),
+                acceleration: Vec3::new(0.0, 0.0, 0.0),
+                influence: 0.0,
+            },
+            Compartment {
+                voltage: 4.0266542,
+                m: 0.084073044,
+                h: 0.45317015,
+                n: 0.38079754,
+                capacitance: 4.0,
+            },
+        ));
 
         world.spawn((Stimulator {
             position: Vec3::new(260.0, 0.0, 0.0),
@@ -214,19 +235,23 @@ impl visula::Simulation for Simulation {
                 .iter()
                 .map(|(_, s)| s.clone())
                 .collect();
-            for (_key, compartment) in self.world.query_mut::<&mut Compartment>() {
-                compartment.velocity += compartment.acceleration * dt;
-                if compartment.velocity.length() > max_velocity {
-                    compartment.velocity =
-                        compartment.velocity / compartment.velocity.length() * max_velocity;
+            for (_key, (position, kinetic)) in
+                self.world.query_mut::<(&mut Position, &mut Kinetic)>()
+            {
+                kinetic.velocity += kinetic.acceleration * dt;
+                if kinetic.velocity.length() > max_velocity {
+                    kinetic.velocity = kinetic.velocity / kinetic.velocity.length() * max_velocity;
                 }
-                if compartment.velocity.length() < min_velocity {
-                    compartment.velocity *= 0.0;
+                if kinetic.velocity.length() < min_velocity {
+                    kinetic.velocity *= 0.0;
                 }
-                compartment.position += compartment.velocity * dt;
-                compartment.acceleration = Vec3::new(0.0, 0.0, 0.0);
-                compartment.influence = 0.0;
-
+                position.position += kinetic.velocity * dt;
+                kinetic.acceleration = Vec3::new(0.0, 0.0, 0.0);
+                kinetic.influence = 0.0;
+            }
+            for (_key, (position, compartment)) in
+                self.world.query_mut::<(&Position, &mut Compartment)>()
+            {
                 let v = compartment.voltage;
 
                 let sodium_activation_alpha = 0.1 * (25.0 - v) / ((2.5 - 0.1 * v).exp() - 1.0);
@@ -279,15 +304,9 @@ impl visula::Simulation for Simulation {
                 let leak_conductance = 1.3;
                 let leak_current = -leak_conductance * (compartment.voltage - e_m);
 
-                let mut injected_current = if injecting_current {
-                    let mouse_distance = (compartment.position - mouse).length();
-                    150.0 * (-mouse_distance * mouse_distance / (2.0 * sigma * sigma)).exp()
-                } else {
-                    0.0
-                };
-
+                let mut injected_current = 0.0;
                 for stimulator in &stimulators {
-                    let distance = compartment.position.distance(stimulator.position);
+                    let distance = position.position.distance(stimulator.position);
                     if distance < sigma && stimulator.trigger < 0.0 {
                         injected_current += 50000.0;
                     }
@@ -303,67 +322,77 @@ impl visula::Simulation for Simulation {
                 compartment.voltage = compartment.voltage.clamp(-50.0, 200.0)
             }
 
-            let compartments: Vec<Compartment> = self
+            let compartments: Vec<(Position, Kinetic, Compartment)> = self
                 .world
-                .query::<&Compartment>()
+                .query::<(&Position, &Kinetic, &Compartment)>()
                 .iter()
-                .map(|(_, c)| c.clone())
+                .map(|(_, (p, k, c))| (p.clone(), k.clone(), c.clone()))
                 .collect();
-            let mut next_compartments: Vec<Compartment> = compartments.clone();
+            let mut next_compartments = compartments.clone();
 
-            for ((key_a, compartment_a), (_next_key_a, next_a)) in compartments
+            for (
+                (key_a, (position_a, kinetic_a, compartment_a)),
+                (_next_key_a, (next_position_a, next_kinetic_a, next_compartment_a)),
+            ) in compartments
                 .iter()
                 .enumerate()
                 .zip(next_compartments.iter_mut().enumerate())
             {
-                for (key_b, compartment_b) in compartments.iter().enumerate() {
+                for (key_b, (position_b, kinetic_b, compartment_b)) in
+                    compartments.iter().enumerate()
+                {
                     if key_a == key_b {
                         continue;
                     }
-                    let position_a = if compartment_a.position == compartment_b.position
-                        || (compartment_a.position - compartment_b.position).length() < 0.1 * sigma
+                    let position_a = if position_a.position == position_b.position
+                        || (position_a.position - position_b.position).length() < 0.1 * sigma
                     {
                         let offset = Vec3::new(0.1 * sigma, 0.0, 0.0);
                         if key_a < key_b {
-                            compartment_a.position + offset
+                            position_a.position + offset
                         } else {
-                            compartment_a.position - offset
+                            position_a.position - offset
                         }
                     } else {
-                        compartment_a.position
+                        position_a.position
                     };
-                    let position_b = compartment_b.position;
+                    let position_b = position_b.position;
                     let force = lennard_jones(position_a, position_b, eps, sigma);
 
-                    next_a.acceleration += force;
-                    next_a.influence += 0.01 * force.length();
+                    next_kinetic_a.acceleration += force;
+                    next_kinetic_a.influence += 0.01 * force.length();
 
-                    let distance = (compartment_b.position - compartment_a.position).length();
+                    let distance = (position_b - position_a).length();
                     if distance < connection_distance {
                         let voltage_diff = compartment_b.voltage - compartment_a.voltage;
                         let delta_voltage = voltage_diff / compartment_a.capacitance;
-                        next_a.voltage += delta_voltage * dt;
+                        next_compartment_a.voltage += delta_voltage * dt;
                         let value = voltage_diff.abs() * 0.01;
                         bonds.push(BondData {
-                            position_a: compartment_a.position,
-                            position_b: compartment_b.position,
+                            position_a,
+                            position_b,
                             strength: 0.5 + value,
                             _padding: 0.0,
                         });
                     }
                 }
             }
-            for compartment in &mut next_compartments {
-                compartment.acceleration /= 1.0 + compartment.influence;
-                compartment.acceleration += -0.5 * compartment.velocity;
+            for (position, kinetic, compartment) in &mut next_compartments {
+                kinetic.acceleration /= 1.0 + kinetic.influence;
+                kinetic.acceleration += -0.5 * kinetic.velocity;
             }
 
-            for ((_, compartment), next_compartment) in self
+            for (
+                (_, (position, kinetic, compartment)),
+                (next_position, next_kinetic, next_compartment),
+            ) in self
                 .world
-                .query_mut::<&mut Compartment>()
+                .query_mut::<(&mut Position, &mut Kinetic, &mut Compartment)>()
                 .into_iter()
                 .zip(next_compartments)
             {
+                *position = next_position;
+                *kinetic = next_kinetic;
                 *compartment = next_compartment;
             }
 
@@ -378,10 +407,10 @@ impl visula::Simulation for Simulation {
 
         self.particles = self
             .world
-            .query::<&Compartment>()
+            .query::<(&Position, &Compartment)>()
             .iter()
-            .map(|(_, c)| Particle {
-                position: c.position,
+            .map(|(_, (p, c))| Particle {
+                position: p.position,
                 voltage: c.voltage,
             })
             .collect();
@@ -479,7 +508,7 @@ impl visula::Simulation for Simulation {
                 let ray_origin = application.camera_controller.position();
                 let intersection = self
                     .world
-                    .query::<&Compartment>()
+                    .query::<&Position>()
                     .iter()
                     .filter_map(|(entity, compartment)| {
                         let position = cgmath::Point3 {
@@ -504,19 +533,23 @@ impl visula::Simulation for Simulation {
 
                 if *button == MouseButton::Left {
                     intersection.map(|(_, placement, _)| {
-                        self.world.spawn((Compartment {
-                            position: Vec3::new(placement.x, placement.y, placement.z),
-                            velocity: Vec3::new(0.0, 0.0, 0.0),
-                            acceleration: Vec3::new(0.0, 0.0, 0.0),
-                            //voltage: 4.0266542,
-                            voltage: 100.0,
-                            m: 0.084073044,
-                            h: 0.45317015,
-                            n: 0.38079754,
-                            influence: 0.0,
-                            capacitance: 4.0,
-                            _padding: 0.0,
-                        },));
+                        self.world.spawn((
+                            Position {
+                                position: Vec3::new(placement.x, placement.y, placement.z),
+                            },
+                            Kinetic {
+                                velocity: Vec3::new(0.0, 0.0, 0.0),
+                                acceleration: Vec3::new(0.0, 0.0, 0.0),
+                                influence: 0.0,
+                            },
+                            Compartment {
+                                voltage: 100.0,
+                                m: 0.084073044,
+                                h: 0.45317015,
+                                n: 0.38079754,
+                                capacitance: 4.0,
+                            },
+                        ));
                     });
                 } else {
                     intersection.map(|(entity, _, _)| {
