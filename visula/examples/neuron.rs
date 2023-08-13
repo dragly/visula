@@ -203,8 +203,6 @@ impl Simulation {
 impl visula::Simulation for Simulation {
     type Error = Error;
     fn update(&mut self, application: &visula::Application) {
-        let injecting_current = false;
-        let mouse = Vec3::new(0.0, 0.0, 0.0);
         let dt = 0.01;
         let node_radius = 15.0;
         let connection_distance = 5.0 * node_radius;
