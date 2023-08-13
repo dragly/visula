@@ -389,16 +389,14 @@ impl visula::Simulation for Simulation {
             let mut next_compartments = compartments.clone();
 
             for (
-                (key_a, (position_a,  compartment_a)),
-                (_next_key_a, (next_position_a,  next_compartment_a)),
+                (key_a, (position_a, compartment_a)),
+                (_next_key_a, (next_position_a, next_compartment_a)),
             ) in compartments
                 .iter()
                 .enumerate()
                 .zip(next_compartments.iter_mut().enumerate())
             {
-                for (key_b, (position_b,  compartment_b)) in
-                    compartments.iter().enumerate()
-                {
+                for (key_b, (position_b, compartment_b)) in compartments.iter().enumerate() {
                     let distance = (position_b.position - position_a.position).length();
                     if distance < connection_distance {
                         let voltage_diff = compartment_b.voltage - compartment_a.voltage;
@@ -415,10 +413,7 @@ impl visula::Simulation for Simulation {
                 }
             }
 
-            for (
-                (_, (position, compartment)),
-                (next_position, next_compartment),
-            ) in self
+            for ((_, (position, compartment)), (next_position, next_compartment)) in self
                 .world
                 .query_mut::<(&mut Position, &mut Compartment)>()
                 .into_iter()
@@ -538,8 +533,8 @@ impl visula::Simulation for Simulation {
                 }
                 .normalize();
                 let ray_origin = application.camera_controller.position();
-                let intersection = self
-                    .world
+                let mut command_buffer = hecs::CommandBuffer::new();
+                self.world
                     .query::<&Position>()
                     .iter()
                     .filter_map(|(entity, compartment)| {
@@ -561,35 +556,31 @@ impl visula::Simulation for Simulation {
                     })
                     .min_by(|(_, _, a), (_, _, b)| {
                         a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .map(|(entity, placement, _)| {
+                        if *button == MouseButton::Left {
+                            command_buffer.spawn((
+                                Position {
+                                    position: Vec3::new(placement.x, placement.y, placement.z),
+                                },
+                                Kinetic {
+                                    velocity: Vec3::new(0.0, 0.0, 0.0),
+                                    acceleration: Vec3::new(0.0, 0.0, 0.0),
+                                    influence: 0.0,
+                                },
+                                Compartment {
+                                    voltage: 100.0,
+                                    m: 0.084073044,
+                                    h: 0.45317015,
+                                    n: 0.38079754,
+                                    capacitance: 4.0,
+                                },
+                            ));
+                        } else {
+                            command_buffer.despawn(entity);
+                        }
                     });
-
-                if *button == MouseButton::Left {
-                    intersection.map(|(_, placement, _)| {
-                        self.world.spawn((
-                            Position {
-                                position: Vec3::new(placement.x, placement.y, placement.z),
-                            },
-                            Kinetic {
-                                velocity: Vec3::new(0.0, 0.0, 0.0),
-                                acceleration: Vec3::new(0.0, 0.0, 0.0),
-                                influence: 0.0,
-                            },
-                            Compartment {
-                                voltage: 100.0,
-                                m: 0.084073044,
-                                h: 0.45317015,
-                                n: 0.38079754,
-                                capacitance: 4.0,
-                            },
-                        ));
-                    });
-                } else {
-                    intersection.map(|(entity, _, _)| {
-                        self.world
-                            .despawn(entity)
-                            .expect("Failed to despawn entity!");
-                    });
-                }
+                command_buffer.run_on(&mut self.world);
             }
             Event::WindowEvent {
                 event: WindowEvent::CursorMoved { position, .. },
