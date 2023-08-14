@@ -187,8 +187,7 @@ impl Application {
         self.camera_controller.update();
     }
 
-    pub fn render(&mut self, simulation: &mut impl Simulation)
-    {
+    pub fn render(&mut self, simulation: &mut impl Simulation) {
         let frame = match self.surface.get_current_texture() {
             Ok(frame) => frame,
             Err(wgpu::SurfaceError::Outdated) => {
