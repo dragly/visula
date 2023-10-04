@@ -3,9 +3,9 @@ members = ["run-wasm", "visula", "visula_derive", "visula_core"]
 resolver = "2"
 
 [workspace.dependencies]
-wgpu = { version = "0.16.0", features = ["webgl"] }
-glam = { version = "0.20", features = ["bytemuck"] }
-naga = { version = "0.10", features = ["wgsl-in", "wgsl-out"] }
+wgpu = { version = "0.17.0", features = ["webgl"] }
+glam = { version = "0.24", features = ["bytemuck"] }
+naga = { version = "0.13", features = ["wgsl-in", "wgsl-out"] }
 uuid = { version = "1.3.3", features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
 bytemuck = { version = "1.4", features = ["derive"] }
 log = "0.4"
