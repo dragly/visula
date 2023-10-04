@@ -113,15 +113,10 @@ impl Expression {
         let val = self.clone();
 
         match val {
-            Expression::Literal(inner) => {
-                module.entry_points[binding_builder.entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::Literal(inner),
-                        ::naga::Span::default(),
-                    )
-            }
+            Expression::Literal(inner) => module.entry_points[binding_builder.entry_point_index]
+                .function
+                .expressions
+                .append(naga::Expression::Literal(inner), ::naga::Span::default()),
             Expression::Vector2 { x, y } => {
                 let naga_type = ::naga::Type {
                     name: None,

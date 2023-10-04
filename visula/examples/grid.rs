@@ -112,7 +112,10 @@ impl visula::Simulation for Simulation {
         let Event::WindowEvent {
             event: WindowEvent::CursorMoved { position, .. },
             ..
-        } = event else { return; };
+        } = event
+        else {
+            return;
+        };
         let screen_position = cgmath::Vector4 {
             x: 2.0 * position.x as f32 / application.config.width as f32 - 1.0,
             y: 1.0 - 2.0 * position.y as f32 / application.config.height as f32,
