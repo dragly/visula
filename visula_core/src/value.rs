@@ -21,7 +21,7 @@ pub enum Expression {
         value: ExpressionInner,
         operator: naga::UnaryOperator,
     },
-    Constant(naga::ConstantInner),
+    Literal(naga::Literal),
     InstanceField(InstanceField),
     UniformField(UniformField),
     Vector2 {
@@ -113,24 +113,10 @@ impl Expression {
         let val = self.clone();
 
         match val {
-            Expression::Constant(inner) => {
-                // TODO handle non-float type
-                let constant = module.constants.append(
-                    ::naga::Constant {
-                        name: None,
-                        specialization: None,
-                        inner,
-                    },
-                    ::naga::Span::default(),
-                );
-                module.entry_points[binding_builder.entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        ::naga::Expression::Constant(constant),
-                        ::naga::Span::default(),
-                    )
-            }
+            Expression::Literal(inner) => module.entry_points[binding_builder.entry_point_index]
+                .function
+                .expressions
+                .append(naga::Expression::Literal(inner), ::naga::Span::default()),
             Expression::Vector2 { x, y } => {
                 let naga_type = ::naga::Type {
                     name: None,
@@ -141,7 +127,7 @@ impl Expression {
                     },
                 };
                 let field_type = module.types.insert(naga_type, ::naga::Span::default());
-                let components_setup = vec![x, y]
+                let components_setup = [x, y]
                     .iter()
                     .map(|component| component.setup(module, binding_builder))
                     .collect();
@@ -166,7 +152,7 @@ impl Expression {
                     },
                 };
                 let field_type = module.types.insert(naga_type, ::naga::Span::default());
-                let components_setup = vec![x, y, z]
+                let components_setup = [x, y, z]
                     .iter()
                     .map(|component| component.setup(module, binding_builder))
                     .collect();
@@ -191,7 +177,7 @@ impl Expression {
                     },
                 };
                 let field_type = module.types.insert(naga_type, ::naga::Span::default());
-                let components_setup = vec![x, y, z, w]
+                let components_setup = [x, y, z, w]
                     .iter()
                     .map(|component| component.setup(module, binding_builder))
                     .collect();
@@ -359,8 +345,8 @@ impl std::fmt::Debug for Expression {
                 value.fmt(fmt)?;
                 write!(fmt, "}}")?;
             }
-            Expression::Constant { .. } => {
-                write!(fmt, "Constant")?;
+            Expression::Literal(v) => {
+                write!(fmt, "{v:?}")?;
             }
             Expression::InstanceField(_) => {
                 write!(fmt, "InstanceField")?;
@@ -650,19 +636,13 @@ impl From<&Expression> for Expression {
 
 impl From<f32> for Expression {
     fn from(value: f32) -> Expression {
-        Expression::Constant(naga::ConstantInner::Scalar {
-            value: naga::ScalarValue::Float(value as f64),
-            width: 4,
-        })
+        Expression::Literal(naga::Literal::F32(value))
     }
 }
 
 impl From<i32> for Expression {
     fn from(value: i32) -> Expression {
-        Expression::Constant(naga::ConstantInner::Scalar {
-            value: naga::ScalarValue::Sint(value as i64),
-            width: 4,
-        })
+        Expression::Literal(naga::Literal::I32(value))
     }
 }
 
