@@ -326,7 +326,6 @@ impl Simulation {
         let count = cli.count.unwrap_or(6);
         let particles = generate(count);
 
-        // TODO split into UniformBuffer and InstanceBuffer to avoid having UNIFORM usage on all
         let particle_buffer = InstanceBuffer::<ParticleData>::new(&application.device);
         let particle = particle_buffer.instance();
         let settings_data = Settings {
