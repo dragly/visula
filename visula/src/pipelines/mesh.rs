@@ -177,7 +177,7 @@ impl MeshPipeline {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            let mut instance_count = if count.is_none() { 1 } else { 0 };
+            let mut instance_count = usize::from(count.is_none());
             for (binding, buffer) in bindings.iter() {
                 let slot = binding.slot;
                 log::debug!("Setting vertex buffer {}", slot);
