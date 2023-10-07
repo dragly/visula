@@ -1,11 +1,12 @@
 use std::fs::File;
 
+use glam::{Quat, Vec3};
 use std::io::BufReader;
 use structopt::StructOpt;
 
 use visula::{
     io::gltf::{parse_gltf, GltfMesh},
-    MeshPipeline, Pipeline, RenderData,
+    MeshDelegate, MeshPipeline, RenderData,
 };
 
 #[derive(StructOpt)]
@@ -41,7 +42,14 @@ impl Simulation {
         let mut reader = BufReader::new(file);
         let gltf_file = parse_gltf(&mut reader, application)?;
 
-        let mut mesh = visula::create_mesh_pipeline(application).unwrap();
+        let mut mesh = MeshPipeline::new(
+            &application.rendering_descriptor(),
+            &MeshDelegate {
+                position: Vec3::new(0.0, 0.0, 0.0).into(),
+                rotation: Quat::IDENTITY.into(),
+            },
+        )
+        .unwrap();
         let GltfMesh {
             vertex_buffer,
             index_buffer,
@@ -56,8 +64,8 @@ impl Simulation {
             .next()
             .unwrap();
         mesh.vertex_count = index_count;
-        mesh.vertex_buf = vertex_buffer;
-        mesh.index_buf = index_buffer;
+        mesh.vertex_buffer = vertex_buffer;
+        mesh.index_buffer = index_buffer;
         Ok(Simulation { mesh })
     }
 }

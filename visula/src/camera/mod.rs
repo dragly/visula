@@ -31,13 +31,11 @@ impl Camera {
             }],
         });
 
-        // TODO get the definition of the size of the camera uniforms into one place somehow
-        let model_view_projection_matrix =
-            [0.0; size_of::<uniforms::CameraUniforms>() / size_of::<f32>()];
+        let camera_uniforms = [0.0; size_of::<uniforms::CameraUniforms>() / size_of::<f32>()];
 
         let uniform_buffer = vec_to_buffer(
             device,
-            model_view_projection_matrix.as_ref(),
+            camera_uniforms.as_ref(),
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         );
 

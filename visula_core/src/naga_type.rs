@@ -69,3 +69,23 @@ macro_rules! add_naga_glam_vector {
 add_naga_glam_vector! {glam::Vec2, naga::VectorSize::Bi}
 add_naga_glam_vector! {glam::Vec3, naga::VectorSize::Tri}
 add_naga_glam_vector! {glam::Vec4, naga::VectorSize::Quad}
+add_naga_glam_vector! {glam::Quat, naga::VectorSize::Quad}
+
+macro_rules! add_naga_glam_matrix {
+    ($glam_type:ty, $columns:expr, $rows:expr) => {
+        add_naga_type! {
+            $glam_type, naga::Type {
+                name: None,
+                inner: naga::TypeInner::Matrix {
+                    columns: $columns,
+                    rows: $rows,
+                    width: 4,
+                },
+            }
+        }
+    };
+}
+
+add_naga_glam_matrix! {glam::Mat2, naga::VectorSize::Bi, naga::VectorSize::Bi}
+add_naga_glam_matrix! {glam::Mat3, naga::VectorSize::Tri, naga::VectorSize::Tri}
+add_naga_glam_matrix! {glam::Mat4, naga::VectorSize::Quad, naga::VectorSize::Quad}

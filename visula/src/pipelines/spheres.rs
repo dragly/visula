@@ -2,7 +2,7 @@ use crate::rendering_descriptor::RenderingDescriptor;
 use crate::simulation::RenderData;
 use crate::DefaultRenderPassDescriptor;
 use bytemuck::{Pod, Zeroable};
-use naga::{back::wgsl::WriterFlags, valid::ValidationFlags, Block, Statement};
+use naga::{back::wgsl::WriterFlags, valid::ValidationFlags};
 use std::cell::Ref;
 use std::mem::size_of;
 use visula_core::{BindingBuilder, BufferBinding, Expression};

@@ -675,3 +675,14 @@ impl From<glam::Vec4> for Expression {
         }
     }
 }
+
+impl From<glam::Quat> for Expression {
+    fn from(value: glam::Quat) -> Expression {
+        Expression::Vector4 {
+            x: value.x.into(),
+            y: value.y.into(),
+            z: value.z.into(),
+            w: value.w.into(),
+        }
+    }
+}

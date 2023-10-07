@@ -1,12 +1,13 @@
 use std::{fs::File, io::Cursor, path::Path};
 
 use bytemuck::{Pod, Zeroable};
+use glam::{Quat, Vec3};
 use oxifive::ReadSeek;
 use structopt::StructOpt;
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 use visula::{
-    CustomEvent, DropEvent, InstanceBuffer, MeshPipeline, Pipeline, RenderData, SphereDelegate,
+    CustomEvent, DropEvent, InstanceBuffer, MeshDelegate, MeshPipeline, RenderData, SphereDelegate,
     SpherePrimitive, Spheres, UniformBuffer,
 };
 use visula_derive::Uniform;
@@ -60,8 +61,8 @@ impl Simulation {
         application.camera_controller.center = camera_center;
         self.sphere_buffer
             .update(&application.device, &application.queue, &point_cloud[..]);
-        self.mesh.index_buf = mesh_index_buf;
-        self.mesh.vertex_buf = mesh_vertex_buf;
+        self.mesh.index_buffer = mesh_index_buf;
+        self.mesh.vertex_buffer = mesh_vertex_buf;
         self.mesh.vertex_count = mesh_vertex_count;
     }
 
@@ -99,7 +100,14 @@ impl Simulation {
             },
         )
         .unwrap();
-        let mesh = visula::create_mesh_pipeline(application).unwrap();
+        let mesh = MeshPipeline::new(
+            &application.rendering_descriptor(),
+            &MeshDelegate {
+                position: Vec3::new(0.0, 0.0, 0.0).into(),
+                rotation: Quat::IDENTITY.into(),
+            },
+        )
+        .unwrap();
         let mut simulation = Simulation {
             render_mode: RenderMode::Points,
             sphere_buffer,

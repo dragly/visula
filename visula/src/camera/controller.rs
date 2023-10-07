@@ -22,6 +22,7 @@ pub struct CameraController {
     left_pressed: bool,
     right_pressed: bool,
     control_pressed: bool,
+    pub enabled: bool,
     pub distance: f32,
     pub center: Vector3,
     pub forward: Vector3,
@@ -43,15 +44,16 @@ impl CameraController {
         let up = Vector3::unit_y();
         let forward = Vector3::unit_z();
         let right = Vector3::cross(forward, up).normalize();
-        let offset_up = up * 0.3;
-        let offset_right = -right * 0.4;
-        let offset = offset_up + offset_right;
+        let offset_up = up;
+        let _offset_right = right;
+        let offset = offset_up;
         let axis = Vector3::cross(offset, forward).normalize();
-        let rotation = cgmath::Quaternion::from_axis_angle(axis, cgmath::Rad(0.4));
+        let rotation = cgmath::Quaternion::from_axis_angle(axis, cgmath::Rad(1.0));
         let new_forward = (rotation * forward).normalize();
         let scale_factor = window.scale_factor() as f32;
         let window_id = window.id();
         CameraController {
+            enabled: true,
             left_pressed: false,
             right_pressed: false,
             control_pressed: false,
@@ -69,8 +71,13 @@ impl CameraController {
     pub fn update(&mut self) {}
 
     pub fn handle_event<T>(&mut self, event: &Event<T>) -> CameraControllerResponse {
-        let mut needs_redraw = false;
-        let mut captured_event = false;
+        let mut response = CameraControllerResponse {
+            needs_redraw: false,
+            captured_event: false,
+        };
+        if !self.enabled {
+            return response;
+        }
 
         let up = self.up.normalize();
         let forward = self.forward.normalize();
@@ -136,8 +143,8 @@ impl CameraController {
                         }
                         self.forward = new_forward;
                     }
-                    needs_redraw = true;
-                    captured_event = true;
+                    response.needs_redraw = true;
+                    response.captured_event = true;
                     self.state = State::Moving;
                 }
                 if self.right_pressed {
@@ -146,8 +153,8 @@ impl CameraController {
                     } else {
                         self.center += flat_forward * position_diff.y - right * position_diff.x;
                     }
-                    needs_redraw = true;
-                    captured_event = true;
+                    response.needs_redraw = true;
+                    response.captured_event = true;
                 }
             }
             Event::WindowEvent {
@@ -168,8 +175,8 @@ impl CameraController {
                     } else {
                         self.distance *= factor;
                     }
-                    needs_redraw = true;
-                    captured_event = true;
+                    response.needs_redraw = true;
+                    response.captured_event = true;
                 }
                 WindowEvent::MouseInput { state, button, .. } => match &button {
                     MouseButton::Left => match state {
@@ -179,7 +186,7 @@ impl CameraController {
                         }
                         ElementState::Released => {
                             self.left_pressed = false;
-                            captured_event = self.state == State::Moving;
+                            response.captured_event = self.state == State::Moving;
                             self.state = State::Released;
                         }
                     },
@@ -190,7 +197,7 @@ impl CameraController {
                         }
                         ElementState::Released => {
                             self.right_pressed = false;
-                            captured_event = self.state == State::Moving;
+                            response.captured_event = self.state == State::Moving;
                             self.state = State::Released;
                         }
                     },
@@ -201,10 +208,7 @@ impl CameraController {
             _ => {}
         }
 
-        CameraControllerResponse {
-            needs_redraw,
-            captured_event,
-        }
+        response
     }
 
     pub fn view_matrix(&self) -> Matrix4 {
