@@ -74,7 +74,7 @@ pub fn parse_gltf(
                         if let Some(positions) = reader.read_positions() {
                             if let Some(normals) = reader.read_normals() {
                                 for (position, normal) in positions.zip(normals) {
-                                    let color = [255, 255, 0, 255];
+                                    let color = [230, 100, 230, 255];
                                     vertices.push(MeshVertexAttributes {
                                         position,
                                         normal,

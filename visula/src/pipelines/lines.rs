@@ -3,7 +3,7 @@ use crate::{DefaultRenderPassDescriptor, RenderData};
 use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
 use naga::back::wgsl::WriterFlags;
-use naga::{valid::ValidationFlags, Block, Statement};
+use naga::valid::ValidationFlags;
 use std::cell::Ref;
 use std::mem::size_of;
 use visula_core::{BindingBuilder, BufferBinding, Expression};

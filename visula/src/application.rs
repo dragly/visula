@@ -1,4 +1,3 @@
-use crate::camera::controller::CameraControllerResponse;
 use crate::camera::Camera;
 use crate::custom_event::CustomEvent;
 use crate::rendering_descriptor::RenderingDescriptor;
@@ -15,7 +14,7 @@ use winit::{
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit_platform::{Platform, PlatformDescriptor};
 
-use crate::Simulation;
+use crate::{CameraControllerResponse, Simulation};
 
 pub struct Application {
     pub device: wgpu::Device,

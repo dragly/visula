@@ -27,7 +27,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                                         },
                                         ::visula_core::naga::Span::default(),
                                     );
-                                Statement::Store {
+                                ::naga::Statement::Store {
                                     pointer: access_index,
                                     value: result_expression,
                                 }
@@ -54,7 +54,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                                 _ => false,
                             })
                             .unwrap();
-                        let mut new_body = Block::from_vec(vec![
+                        let mut new_body = ::naga::Block::from_vec(vec![
                             #(#field_modifications)*
                         ]);
                         for (statement, span) in module.entry_points[entry_point_index]
