@@ -64,6 +64,7 @@ pub fn parse_gltf(
     for scene in document.scenes() {
         let mut meshes = vec![];
         for node in scene.nodes() {
+            // TODO visit node.children() and collect meshes
             match node.mesh() {
                 None => {}
                 Some(mesh) => {
