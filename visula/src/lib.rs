@@ -111,24 +111,32 @@ where
     });
 }
 
-pub fn run_with_config<F, S>(_config: RunConfig, init: F)
-where
-    F: FnMut(&mut Application) -> S + 'static,
-    S: Simulation + 'static,
-{
+pub fn initialize_panic_hook() {
     #[cfg(target_arch = "wasm32")]
     {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    }
+}
+
+pub fn initialize_logger() {
+    #[cfg(target_arch = "wasm32")]
+    {
         console_log::init().expect("could not initialize logger");
     }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        env_logger::init();
+    }
+}
 
+pub fn initialize_event_loop_and_window(_config: RunConfig) -> (EventLoop<CustomEvent>, Window) {
     let event_loop = EventLoopBuilder::<CustomEvent>::with_user_event().build();
     let mut builder = winit::window::WindowBuilder::new();
     builder = builder.with_title("Visula");
 
     #[cfg(not(target_arch = "wasm32"))]
-    println!(
-        "NOTE: Ignoring canvas name on non-wasm platforms: '{}'",
+    log::info!(
+        "Ignoring canvas name on non-wasm platforms: '{}'",
         _config.canvas_name
     );
 
@@ -151,6 +159,7 @@ where
             canvas_existed = true;
         }
     }
+
     let window = builder.build(&event_loop).unwrap();
     #[cfg(target_arch = "wasm32")]
     {
@@ -167,18 +176,8 @@ where
         }
     }
 
-    log::info!("Initializing application");
-
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        env_logger::init();
-        // Temporarily avoid srgb formats for the swapchain on the web
-        pollster::block_on(start(event_loop, window, init))
-    }
-
     #[cfg(target_arch = "wasm32")]
     {
-        // TODO should be enough with one proxy
         use std::cell::RefCell;
         use std::rc::Rc;
         let drop_proxy_main = Rc::new(RefCell::new(event_loop.create_proxy()));
@@ -262,7 +261,28 @@ where
         drag_enter.forget();
         drag_over.forget();
         drop_callback.forget();
+    }
 
+    (event_loop, window)
+}
+
+pub fn run_with_config<F, S>(_config: RunConfig, init: F)
+where
+    F: FnMut(&mut Application) -> S + 'static,
+    S: Simulation + 'static,
+{
+    initialize_logger();
+    let (event_loop, window) = initialize_event_loop_and_window(_config);
+
+    log::info!("Initializing application");
+
+    #[cfg(target_arch = "wasm32")]
+    {
         wasm_bindgen_futures::spawn_local(start(event_loop, window, init))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        pollster::block_on(start(event_loop, window, init))
     }
 }
