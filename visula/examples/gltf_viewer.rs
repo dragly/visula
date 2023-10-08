@@ -16,7 +16,7 @@ struct Cli {
 }
 
 struct Simulation {
-    mesh: MeshPipeline,
+    mesh_pipelines: Vec<MeshPipeline>,
 }
 
 #[derive(Debug)]
@@ -42,31 +42,34 @@ impl Simulation {
         let mut reader = BufReader::new(file);
         let gltf_file = parse_gltf(&mut reader, application)?;
 
-        let mut mesh = MeshPipeline::new(
-            &application.rendering_descriptor(),
-            &MeshDelegate {
-                position: Vec3::new(0.0, 0.0, 0.0).into(),
-                rotation: Quat::IDENTITY.into(),
-            },
-        )
-        .unwrap();
-        let GltfMesh {
-            vertex_buffer,
-            index_buffer,
-            index_count,
-        } = gltf_file
+        let mesh_pipelines: Vec<MeshPipeline> = gltf_file
             .scenes
             .into_iter()
-            .next()
-            .unwrap()
-            .meshes
-            .into_iter()
-            .next()
-            .unwrap();
-        mesh.vertex_count = index_count;
-        mesh.vertex_buffer = vertex_buffer;
-        mesh.index_buffer = index_buffer;
-        Ok(Simulation { mesh })
+            .flat_map(|scene| scene.meshes.into_iter())
+            .map(|mesh| {
+                let mut mesh_pipeline = MeshPipeline::new(
+                    &application.rendering_descriptor(),
+                    &MeshDelegate {
+                        position: Vec3::new(0.0, 0.0, 0.0).into(),
+                        rotation: Quat::IDENTITY.into(),
+                    },
+                )
+                .unwrap();
+                let GltfMesh {
+                    vertex_buffer,
+                    index_buffer,
+                    index_count,
+                } = mesh;
+
+                mesh_pipeline.vertex_count = index_count;
+                mesh_pipeline.vertex_buffer = vertex_buffer;
+                mesh_pipeline.index_buffer = index_buffer;
+                mesh_pipeline
+            })
+            .collect();
+        let pipeline_count = mesh_pipelines.len();
+        println!("Collected {pipeline_count} meshes");
+        Ok(Simulation { mesh_pipelines })
     }
 }
 
@@ -76,7 +79,9 @@ impl visula::Simulation for Simulation {
     fn update(&mut self, _application: &visula::Application) {}
 
     fn render(&mut self, data: &mut RenderData) {
-        self.mesh.render(data);
+        for pipeline in &self.mesh_pipelines {
+            pipeline.render(data);
+        }
     }
 }
 
