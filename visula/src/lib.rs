@@ -1,13 +1,23 @@
 #[cfg(target_arch = "wasm32")]
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{JsCast, JsValue};
 #[cfg(target_arch = "wasm32")]
 use web_sys::HtmlCanvasElement;
 #[cfg(target_arch = "wasm32")]
 use winit::dpi::LogicalSize;
+use winit::event_loop::EventLoop;
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::WindowBuilderExtWebSys;
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::WindowExtWebSys;
+#[cfg(target_arch = "wasm32")]
+use winit::platform::web::EventLoopExtWebSys;
+
+#[cfg(target_arch = "wasm32")]
+use js_sys::Uint8Array;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+
+use winit::window::Window;
 
 use winit::{
     event::Event,
@@ -19,7 +29,6 @@ pub mod camera;
 pub mod custom_event;
 pub mod drop_event;
 pub mod error;
-pub mod init_wgpu;
 pub mod io;
 pub mod pipelines;
 pub mod primitives;
@@ -27,11 +36,6 @@ pub mod render_pass;
 pub mod rendering_descriptor;
 pub mod simulation;
 pub mod vec_to_buffer;
-
-#[cfg(not(target_arch = "wasm32"))]
-pub mod setup_other;
-#[cfg(target_arch = "wasm32")]
-pub mod setup_wasm;
 
 pub use application::Application;
 pub use camera::controller::{CameraController, CameraControllerResponse};
@@ -76,7 +80,40 @@ where
     )
 }
 
-pub fn run_with_config<F, S>(_config: RunConfig, mut init: F)
+pub async fn start<F, S>(event_loop: EventLoop<CustomEvent>, window: Window, mut init_simulation: F)
+where
+    F: FnMut(&mut Application) -> S + 'static,
+    S: Simulation + 'static,
+{
+    let mut application = Application::new(window).await;
+
+    let mut simulation: S = init_simulation(&mut application);
+
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = ControlFlow::Poll;
+        match event {
+            event => match event {
+                Event::RedrawEventsCleared => {
+                    application.window.request_redraw();
+                }
+                Event::RedrawRequested(_) => {
+                    application.render(&mut simulation);
+                }
+                Event::MainEventsCleared => {
+                    application.update();
+                    simulation.update(&mut application);
+                }
+                event => {
+                    if !application.handle_event(&event, control_flow) {
+                        simulation.handle_event(&mut application, &event);
+                    }
+                }
+            },
+        }
+    });
+}
+
+pub fn run_with_config<F, S>(_config: RunConfig, init: F)
 where
     F: FnMut(&mut Application) -> S + 'static,
     S: Simulation + 'static,
@@ -133,9 +170,13 @@ where
         }
     }
 
+    log::info!("Initializing application");
+
     #[cfg(not(target_arch = "wasm32"))]
     {
-        setup_other::setup_other(window, proxy);
+        env_logger::init();
+        // Temporarily avoid srgb formats for the swapchain on the web
+        pollster::block_on(start(event_loop, window, init))
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -144,42 +185,87 @@ where
         use std::cell::RefCell;
         use std::rc::Rc;
         let drop_proxy_main = Rc::new(RefCell::new(event_loop.create_proxy()));
-        setup_wasm::setup_wasm(window, proxy, drop_proxy_main);
-    }
+        log::info!("Start");
+        use winit::platform::web::WindowExtWebSys;
+        let drag_enter = Closure::wrap(Box::new(|event: &web_sys::Event| {
+            event.prevent_default();
+            log::info!("Drag enter!");
+        }) as Box<dyn FnMut(&web_sys::Event)>);
+        let drag_over = Closure::wrap(Box::new(|event: &web_sys::Event| {
+            event.prevent_default();
+            log::info!("Drag over!");
+        }) as Box<dyn FnMut(&web_sys::Event)>);
 
-    log::info!("Initializing application");
-
-    let mut application: Option<Application> = None;
-    let mut simulation: Option<S> = None;
-
-    event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Poll;
-        match event {
-            Event::UserEvent(CustomEvent::Ready(mut app)) => {
-                simulation = Some(init(&mut app));
-                application = Some(*app);
-            }
-            event => {
-                if let (Some(app), Some(sim)) = (&mut application, &mut simulation) {
-                    match event {
-                        Event::RedrawEventsCleared => {
-                            app.window.request_redraw();
-                        }
-                        Event::RedrawRequested(_) => {
-                            app.render(sim);
-                        }
-                        Event::MainEventsCleared => {
-                            app.update();
-                            sim.update(app);
-                        }
-                        event => {
-                            if !app.handle_event(&event, control_flow) {
-                                sim.handle_event(app, &event);
+        let drop_callback = Closure::wrap(Box::new(move |event: &web_sys::Event| {
+            event.prevent_default();
+            let drag_event_ref: &web_sys::DragEvent = JsCast::unchecked_from_js_ref(event);
+            let drag_event = drag_event_ref.clone();
+            match drag_event.data_transfer() {
+                None => {}
+                Some(data_transfer) => match data_transfer.files() {
+                    None => {}
+                    Some(files) => {
+                        log::info!("Files {:?}", files.length());
+                        for i in 0..files.length() {
+                            if let Some(file) = files.item(i) {
+                                log::info!("Processing file {i}");
+                                let drop_proxy_ref = Rc::clone(&drop_proxy_main);
+                                let name = file.name();
+                                let read_callback =
+                                    Closure::wrap(Box::new(move |array_buffer: JsValue| {
+                                        let array = Uint8Array::new(&array_buffer);
+                                        let bytes: Vec<u8> = array.to_vec();
+                                        let event_result = (*drop_proxy_ref)
+                                            .borrow_mut()
+                                            .send_event(CustomEvent::DropEvent(DropEvent {
+                                                name: name.clone(),
+                                                bytes,
+                                            }));
+                                        log::info!("Sent event");
+                                        match event_result {
+                                            Ok(_) => {}
+                                            Err(_) => {
+                                                log::error!(
+                                            "Could not register drop event! Event loop closed?"
+                                        );
+                                            }
+                                        }
+                                    })
+                                        as Box<dyn FnMut(JsValue)>);
+                                let _ = file.array_buffer().then(&read_callback);
+                                read_callback.forget();
                             }
                         }
                     }
-                }
+                },
             }
-        }
-    });
+        }) as Box<dyn FnMut(&web_sys::Event)>);
+
+        log::info!("Setting up drag and drop features");
+        web_sys::window()
+            .and_then(|win| {
+                win.set_ondragenter(Some(JsCast::unchecked_from_js_ref(drag_enter.as_ref())));
+                win.set_ondragover(Some(JsCast::unchecked_from_js_ref(drag_over.as_ref())));
+                win.set_ondrop(Some(JsCast::unchecked_from_js_ref(drop_callback.as_ref())));
+                win.document()
+            })
+            .expect("could not set up window");
+
+        // From the rustwasm documentation:
+        //
+        // The instance of `Closure` that we created will invalidate its
+        // corresponding JS callback whenever it is dropped, so if we were to
+        // normally return from `main` then our registered closure will
+        // raise an exception when invoked.
+        //
+        // Normally we'd store the handle to later get dropped at an appropriate
+        // time but for now we want it to be a global handler so we use the
+        // `forget` method to drop it without invalidating the closure. Note that
+        // this is leaking memory in Rust, so this should be done judiciously!
+        drag_enter.forget();
+        drag_over.forget();
+        drop_callback.forget();
+
+        wasm_bindgen_futures::spawn_local(start(event_loop, window, init))
+    }
 }
