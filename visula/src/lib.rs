@@ -6,11 +6,11 @@ use web_sys::HtmlCanvasElement;
 use winit::dpi::LogicalSize;
 use winit::event_loop::EventLoop;
 #[cfg(target_arch = "wasm32")]
+use winit::platform::web::EventLoopExtWebSys;
+#[cfg(target_arch = "wasm32")]
 use winit::platform::web::WindowBuilderExtWebSys;
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::WindowExtWebSys;
-#[cfg(target_arch = "wasm32")]
-use winit::platform::web::EventLoopExtWebSys;
 
 #[cfg(target_arch = "wasm32")]
 use js_sys::Uint8Array;
@@ -92,23 +92,21 @@ where
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
         match event {
-            event => match event {
-                Event::RedrawEventsCleared => {
-                    application.window.request_redraw();
+            Event::RedrawEventsCleared => {
+                application.window.request_redraw();
+            }
+            Event::RedrawRequested(_) => {
+                application.render(&mut simulation);
+            }
+            Event::MainEventsCleared => {
+                application.update();
+                simulation.update(&application);
+            }
+            event => {
+                if !application.handle_event(&event, control_flow) {
+                    simulation.handle_event(&mut application, &event);
                 }
-                Event::RedrawRequested(_) => {
-                    application.render(&mut simulation);
-                }
-                Event::MainEventsCleared => {
-                    application.update();
-                    simulation.update(&mut application);
-                }
-                event => {
-                    if !application.handle_event(&event, control_flow) {
-                        simulation.handle_event(&mut application, &event);
-                    }
-                }
-            },
+            }
         }
     });
 }
@@ -125,7 +123,6 @@ where
     }
 
     let event_loop = EventLoopBuilder::<CustomEvent>::with_user_event().build();
-    let proxy = event_loop.create_proxy();
     let mut builder = winit::window::WindowBuilder::new();
     builder = builder.with_title("Visula");
 
