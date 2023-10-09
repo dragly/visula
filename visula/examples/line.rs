@@ -1,7 +1,12 @@
 use bytemuck::{Pod, Zeroable};
 
-use visula::{Expression, InstanceBuffer, LineDelegate, Lines, RenderData};
+use visula::{
+    initialize_event_loop_and_window, initialize_logger, Application, Expression, InstanceBuffer,
+    LineDelegate, Lines, RenderData,
+};
 use visula_derive::Instance;
+use wgpu::Color;
+use winit::{event::Event, event_loop::ControlFlow};
 
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
@@ -51,10 +56,7 @@ impl Simulation {
             line_data,
         })
     }
-}
 
-impl visula::Simulation for Simulation {
-    type Error = Error;
     fn update(&mut self, application: &visula::Application) {
         self.line_buffer
             .update(&application.device, &application.queue, &self.line_data);
@@ -65,6 +67,47 @@ impl visula::Simulation for Simulation {
     }
 }
 
+async fn run() {
+    initialize_logger();
+    let (event_loop, window) = initialize_event_loop_and_window();
+    let mut application = Application::new(window).await;
+
+    let mut simulation = Simulation::new(&mut application).expect("Failed to init simulation");
+
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = ControlFlow::Poll;
+        match event {
+            Event::RedrawEventsCleared => {
+                application.window.request_redraw();
+            }
+            Event::RedrawRequested(_) => {
+                let frame = application.next_frame();
+                let mut encoder = application.encoder();
+
+                {
+                    let view = application.begin_render_pass(&frame, &mut encoder, Color::BLACK);
+                    simulation.render(&mut RenderData {
+                        view: &view,
+                        depth_texture: &application.depth_texture,
+                        encoder: &mut encoder,
+                        camera: &application.camera,
+                    });
+                }
+
+                application.queue.submit(Some(encoder.finish()));
+                frame.present();
+            }
+            Event::MainEventsCleared => {
+                application.update();
+                simulation.update(&application);
+            }
+            event => {
+                application.handle_event(&event, control_flow);
+            }
+        }
+    });
+}
+
 fn main() {
-    visula::run(|app| Simulation::new(app).expect("Initializing simulation failed"));
+    visula::spawn(run());
 }
