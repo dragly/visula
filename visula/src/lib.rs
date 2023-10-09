@@ -17,6 +17,7 @@ use js_sys::Uint8Array;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
+use std::future::Future;
 use winit::window::Window;
 
 use winit::{
@@ -129,7 +130,15 @@ pub fn initialize_logger() {
     }
 }
 
-pub fn initialize_event_loop_and_window(_config: RunConfig) -> (EventLoop<CustomEvent>, Window) {
+pub fn initialize_event_loop_and_window() -> (EventLoop<CustomEvent>, Window) {
+    initialize_event_loop_and_window_with_config(RunConfig {
+        canvas_name: "glcanvas".to_string(),
+    })
+}
+
+pub fn initialize_event_loop_and_window_with_config(
+    _config: RunConfig,
+) -> (EventLoop<CustomEvent>, Window) {
     let event_loop = EventLoopBuilder::<CustomEvent>::with_user_event().build();
     let mut builder = winit::window::WindowBuilder::new();
     builder = builder.with_title("Visula");
@@ -266,23 +275,28 @@ pub fn initialize_event_loop_and_window(_config: RunConfig) -> (EventLoop<Custom
     (event_loop, window)
 }
 
+pub fn spawn<F>(f: F)
+where
+    F: Future,
+{
+    #[cfg(target_arch = "wasm32")]
+    {
+        wasm_bindgen_futures::spawn_local(f);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        pollster::block_on(f);
+    }
+}
+
 pub fn run_with_config<F, S>(_config: RunConfig, init: F)
 where
     F: FnMut(&mut Application) -> S + 'static,
     S: Simulation + 'static,
 {
     initialize_logger();
-    let (event_loop, window) = initialize_event_loop_and_window(_config);
+    let (event_loop, window) = initialize_event_loop_and_window_with_config(_config);
 
-    log::info!("Initializing application");
-
-    #[cfg(target_arch = "wasm32")]
-    {
-        wasm_bindgen_futures::spawn_local(start(event_loop, window, init))
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        pollster::block_on(start(event_loop, window, init))
-    }
+    spawn(start(event_loop, window, init));
 }
