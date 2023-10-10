@@ -23,6 +23,8 @@ use winit::{
     event::{ElementState, Event, MouseButton, WindowEvent},
 };
 
+const BOUNDARY: f32 = 20.0;
+
 #[derive(Clone, Debug, EnumIter, PartialEq)]
 pub enum Tool {
     Select,
@@ -211,6 +213,7 @@ struct Simulation {
     mesh_instance_buffer: InstanceBuffer<MeshInstanceData>,
     lines: Lines,
     line_buffer: InstanceBuffer<BondData>,
+    boundaries: Lines,
     iterations: u32,
     mesh: MeshPipeline,
 }
@@ -242,6 +245,14 @@ struct BondData {
 
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
+struct LineData {
+    start: Vec3,
+    end: Vec3,
+    _padding: [f32; 2],
+}
+
+#[repr(C, align(16))]
+#[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct MeshInstanceData {
     position: Vec3,
     _padding: f32,
@@ -257,6 +268,7 @@ impl Simulation {
         let mesh_instance_buffer = InstanceBuffer::<MeshInstanceData>::new(&application.device);
         let sphere = sphere_buffer.instance();
         let line = line_buffer.instance();
+
         let mesh_instance = mesh_instance_buffer.instance();
         let spheres = Spheres::new(
             &application.rendering_descriptor(),
@@ -277,6 +289,44 @@ impl Simulation {
             },
         )
         .unwrap();
+
+        let mut boundary_buffer = InstanceBuffer::<LineData>::new(&application.device);
+        let boundary = boundary_buffer.instance();
+        let boundaries = Lines::new(
+            &application.rendering_descriptor(),
+            &LineDelegate {
+                start: boundary.start,
+                end: boundary.end,
+                width: 0.3.into(),
+                alpha: 1.0.into(),
+            },
+        )
+        .unwrap();
+
+        let boundary_data = [
+            LineData {
+                start: Vec3::new(-BOUNDARY, 0.0, -BOUNDARY),
+                end: Vec3::new(BOUNDARY, 0.0, -BOUNDARY),
+                _padding: Default::default(),
+            },
+            LineData {
+                start: Vec3::new(-BOUNDARY, 0.0, -BOUNDARY),
+                end: Vec3::new(-BOUNDARY, 0.0, BOUNDARY),
+                _padding: Default::default(),
+            },
+            LineData {
+                start: Vec3::new(BOUNDARY, 0.0, -BOUNDARY),
+                end: Vec3::new(BOUNDARY, 0.0, BOUNDARY),
+                _padding: Default::default(),
+            },
+            LineData {
+                start: Vec3::new(-BOUNDARY, 0.0, BOUNDARY),
+                end: Vec3::new(BOUNDARY, 0.0, BOUNDARY),
+                _padding: Default::default(),
+            },
+        ];
+
+        boundary_buffer.update(&application.device, &application.queue, &boundary_data);
 
         let mut reader = Cursor::new(include_bytes!("./boid.glb"));
         let gltf_file = parse_gltf(&mut reader, application).expect("Could not parse GLTF");
@@ -387,6 +437,7 @@ impl Simulation {
             sphere_buffer,
             lines,
             line_buffer,
+            boundaries,
             tool: Tool::ExcitatoryNeuron,
             previous_creation: None,
             connection_tool: None,
@@ -848,7 +899,6 @@ impl visula::Simulation for Simulation {
                     Mat3::from_rotation_y(boid.angular_velocity * dt as f32 / 180.0 * PI);
                 boid.velocity = rotation * boid.velocity;
                 boid.angular_velocity -= boid.angular_velocity * dt as f32 / 0.1;
-                const BOUNDARY: f32 = 30.0;
 
                 if position.position.x < -BOUNDARY {
                     boid.velocity.x *= -1.0;
@@ -989,6 +1039,7 @@ impl visula::Simulation for Simulation {
         self.spheres.render(data);
         self.mesh.render(data);
         self.lines.render(data);
+        self.boundaries.render(data);
     }
 
     fn gui(&mut self, context: &egui::Context) {
