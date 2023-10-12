@@ -1,0 +1,21 @@
+[package]
+name = "visula-pyo3"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "visula_pyo3"
+crate-type = ["cdylib"]
+
+[dependencies]
+visula = { path = "../visula" }
+visula_core = { path = "../visula_core" }
+visula_derive = { path = "../visula_derive" }
+bytemuck = { workspace = true }
+wgpu = { workspace = true }
+winit = { workspace = true }
+egui = { workspace = true }
+egui_wgpu_backend = { workspace = true }
+egui_winit_platform = { workspace = true }
+pyo3 = "0.19.0"
