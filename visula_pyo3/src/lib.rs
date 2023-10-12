@@ -1,89 +1,159 @@
+use itertools::Itertools;
+use std::sync::{Arc, Mutex};
+
 use bytemuck::{Pod, Zeroable};
-use pyo3::{prelude::*, buffer::PyBuffer};
+use pyo3::{buffer::PyBuffer, prelude::*};
 use visula::{
-    initialize_event_loop_and_window, initialize_logger, Application, Expression, InstanceBuffer,
-    LineDelegate, Lines, RenderData, Spheres, SphereDelegate,
+    initialize_event_loop_and_window, initialize_logger, Application, CustomEvent, Expression,
+    InstanceBuffer, LineDelegate, Lines, RenderData, SphereDelegate, Spheres,
 };
-use visula_core::glam::Vec3;
+use visula_core::glam::{Vec3, Vec4};
 use visula_derive::Instance;
 use wgpu::Color;
-use winit::{event::Event, event_loop::ControlFlow};
+use winit::{
+    event::Event,
+    event_loop::{ControlFlow, EventLoop},
+    window::Window,
+};
 
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
-struct LineData {
-    position_a: [f32; 3],
-    position_b: [f32; 3],
-    _padding: [f32; 2],
+struct SphereData {
+    position: [f32; 3],
+    _padding: f32,
 }
 
 #[derive(Debug)]
 struct Error {}
 
-struct Simulation {
-    lines: Lines,
-    line_buffer: InstanceBuffer<LineData>,
-    line_data: Vec<LineData>,
+async fn run(spheres: Spheres) {}
+
+#[repr(C, align(16))]
+#[derive(Clone, Copy, Instance, Pod, Zeroable)]
+struct PointData {
+    position: Vec3,
+    _padding: f32,
 }
 
-impl Simulation {
-    fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
-        let line_buffer = InstanceBuffer::<LineData>::new(&application.device);
-        let line = line_buffer.instance();
+#[pyclass(name = "Points", unsendable)]
+struct PyPoints {
+    buffer: InstanceBuffer<PointData>,
+    pybuffer: PyBuffer<f64>,
+    instance: PointDataInstance,
+    #[pyo3(get)]
+    position: PyExpression,
+}
 
-        let lines = Lines::new(
-            &application.rendering_descriptor(),
-            &LineDelegate {
-                start: line.position_a.clone(),
-                end: line.position_b,
-                width: {
-                    let a: Expression = 1.0.into();
-                    a + 1.0 + 2.0
-                },
-                alpha: 1.0.into(),
-            },
-        )
-        .unwrap();
-
-        let spheres = Spheres::new(
-            &application.rendering_descriptor(),
-            &SphereDelegate {
-                position: line.position_a.clone(),
-                radius: 3.0.into(),
-                color: Vec3::new(1.0, 0.0, 1.0).into(),
-            },
-        )
-        .unwrap();
-
-        let line_data = vec![LineData {
-            position_a: [-10.0, 0.0, 0.0],
-            position_b: [10.0, 0.0, 0.0],
-            _padding: [0.0; 2],
-        }];
-
-        Ok(Simulation {
-            lines,
-            line_buffer,
-            line_data,
-        })
+#[pymethods]
+impl PyPoints {
+    #[new]
+    fn new(positions: PyBuffer<f64>) -> Self {
+        let buffer = InstanceBuffer::<PointData>::new();
+        let instance = buffer.instance();
+        let position = PyExpression {
+            inner: instance.position.clone(),
+        };
+        Self {
+            pybuffer: positions,
+            buffer,
+            instance,
+            position,
+        }
     }
 
-    fn update(&mut self, application: &visula::Application) {
-        self.line_buffer
-            .update(&application.device, &application.queue, &self.line_data);
-    }
-
-    fn render(&mut self, data: &mut RenderData) {
-        self.lines.render(data);
+    fn update(&mut self, py: Python, buffer: PyBuffer<f64>) {
+        //self.buffer.update(device, queue, data);
+        self.pybuffer = buffer;
     }
 }
 
-async fn run() {
+#[pyclass(name = "Expression", unsendable)]
+#[derive(Clone)]
+struct PyExpression {
+    inner: Expression,
+}
+
+#[pyclass(name = "Spheres", unsendable)]
+#[derive(Clone)]
+struct PySpheres {
+    #[pyo3(get, set)]
+    position: PyExpression,
+    #[pyo3(get, set)]
+    radius: PyExpression,
+    #[pyo3(get, set)]
+    color: PyExpression,
+}
+
+fn convert(py: Python, obj: PyObject) -> PyExpression {
+    if let Ok(x) = obj.extract::<f32>(py) {
+        return PyExpression { inner: x.into() };
+    }
+    if let Ok(x) = obj.extract::<Vec<f32>>(py) {
+        if x.len() == 3 {
+            return PyExpression {
+                inner: Vec3::new(x[0], x[1], x[2]).into(),
+            };
+        } else if x.len() == 4 {
+            return PyExpression {
+                inner: Vec4::new(x[0], x[1], x[2], x[3]).into(),
+            };
+        } else {
+            panic!("Vec of length {} are not supported", x.len());
+        }
+    }
+    obj.extract(py).expect("Extract failed")
+}
+
+#[pymethods]
+impl PySpheres {
+    #[new]
+    fn new(py: Python, position: PyObject, radius: PyObject, color: PyObject) -> Self {
+        Self {
+            position: convert(py, position),
+            radius: convert(py, radius),
+            color: convert(py, color),
+        }
+    }
+}
+
+#[pyfunction]
+fn spawn(py: Python, pyspheres: PySpheres, points: &mut PyPoints) -> PyResult<()> {
     initialize_logger();
     let (event_loop, window) = initialize_event_loop_and_window();
-    let mut application = Application::new(window).await;
+    let mut application = pollster::block_on(async { Application::new(window).await });
 
-    let mut simulation = Simulation::new(&mut application).expect("Failed to init simulation");
+    let spheres = Spheres::new(
+        &application.rendering_descriptor(),
+        &SphereDelegate {
+            position: pyspheres.position.inner,
+            radius: pyspheres.radius.inner,
+            color: pyspheres.color.inner,
+        },
+    )
+    .expect("Failed to create spheres");
+
+    dbg!(points.pybuffer.shape());
+
+    let point_data: Vec<PointData> = points
+        .pybuffer
+        .to_vec(py)
+        .expect("Cannot convert to vec")
+        .iter()
+        .map(|&v| v as f32)
+        .chunks(3)
+        .into_iter()
+        .map(|x| {
+            let v: Vec<f32> = x.collect();
+            PointData {
+                position: Vec3::new(v[0], v[1], v[2]),
+                _padding: Default::default(),
+            }
+        })
+        .collect();
+
+    points
+        .buffer
+        .update(&application.device, &application.queue, &point_data);
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -97,12 +167,13 @@ async fn run() {
 
                 {
                     let view = application.begin_render_pass(&frame, &mut encoder, Color::BLACK);
-                    simulation.render(&mut RenderData {
+                    let mut render_data = RenderData {
                         view: &view,
                         depth_texture: &application.depth_texture,
                         encoder: &mut encoder,
                         camera: &application.camera,
-                    });
+                    };
+                    spheres.render(&mut render_data);
                 }
 
                 application.queue.submit(Some(encoder.finish()));
@@ -110,7 +181,6 @@ async fn run() {
             }
             Event::MainEventsCleared => {
                 application.update();
-                simulation.update(&application);
             }
             event => {
                 application.handle_event(&event, control_flow);
@@ -119,16 +189,36 @@ async fn run() {
     });
 }
 
-#[pyfunction]
-fn spawn(py: Python, buffer: PyBuffer<f64>) -> PyResult<()> {
-    dbg!(buffer.shape());
-    dbg!(buffer.to_vec(py).unwrap());
-    Ok(visula::spawn(run()))
-}
-
 #[pymodule]
 fn visula_pyo3(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(spawn, m)?)?;
+    m.add_class::<PyExpression>()?;
+    m.add_class::<PyPoints>()?;
+    m.add_class::<PySpheres>()?;
     Ok(())
 }
 
+//#[pyclass(name = "Application", unsendable)]
+//struct PyApplication {
+//inner: Application,
+//event_loop: EventLoop<CustomEvent>,
+//window: Window,
+//}
+
+//#[pymethods]
+//impl PyApplication {
+//#[new]
+//fn new() -> Self {
+//initialize_logger();
+//let (event_loop, window) = initialize_event_loop_and_window();
+//let application = pollster::block_on(async {
+//let mut application = Application::new(window).await;
+//application
+//});
+//Self {
+//event_loop,
+//window,
+//inner: application,
+//}
+//}
+//}

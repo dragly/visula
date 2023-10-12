@@ -49,9 +49,7 @@ pub use render_pass::*;
 pub use rendering_descriptor::RenderingDescriptor;
 pub use simulation::*;
 
-pub use visula_core::{
-    glam, naga, uuid, wgpu, Expression, InstanceBuffer, InstanceDeviceExt, UniformBuffer,
-};
+pub use visula_core::{glam, naga, uuid, wgpu, Expression, InstanceBuffer, UniformBuffer};
 
 pub use egui;
 pub use wasm_bindgen;
