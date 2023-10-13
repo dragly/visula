@@ -134,17 +134,18 @@ pub fn initialize_event_loop_and_window() -> (EventLoop<CustomEvent>, Window) {
     })
 }
 
-pub fn initialize_event_loop_and_window_with_config(
-    _config: RunConfig,
-) -> (EventLoop<CustomEvent>, Window) {
-    let event_loop = EventLoopBuilder::<CustomEvent>::with_user_event().build();
+pub fn create_event_loop() -> EventLoop<CustomEvent> {
+    EventLoopBuilder::<CustomEvent>::with_user_event().build()
+}
+
+pub fn create_window(config: RunConfig, event_loop: &EventLoop<CustomEvent>) -> Window {
     let mut builder = winit::window::WindowBuilder::new();
     builder = builder.with_title("Visula");
 
     #[cfg(not(target_arch = "wasm32"))]
     log::info!(
         "Ignoring canvas name on non-wasm platforms: '{}'",
-        _config.canvas_name
+        config.canvas_name
     );
 
     #[cfg(target_arch = "wasm32")]
@@ -269,6 +270,15 @@ pub fn initialize_event_loop_and_window_with_config(
         drag_over.forget();
         drop_callback.forget();
     }
+
+    window
+}
+
+pub fn initialize_event_loop_and_window_with_config(
+    config: RunConfig,
+) -> (EventLoop<CustomEvent>, Window) {
+    let event_loop = create_event_loop();
+    let window = create_window(config, &event_loop);
 
     (event_loop, window)
 }

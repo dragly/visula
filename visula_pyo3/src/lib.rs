@@ -1,11 +1,13 @@
 use itertools::Itertools;
 use std::sync::{Arc, Mutex};
+use winit::platform::run_return::EventLoopExtRunReturn;
 
 use bytemuck::{Pod, Zeroable};
 use pyo3::{buffer::PyBuffer, prelude::*};
 use visula::{
-    initialize_event_loop_and_window, initialize_logger, Application, CustomEvent, Expression,
-    InstanceBuffer, LineDelegate, Lines, RenderData, SphereDelegate, Spheres,
+    application, create_event_loop, create_window, initialize_event_loop_and_window,
+    initialize_logger, Application, CustomEvent, Expression, InstanceBuffer, LineDelegate, Lines,
+    RenderData, RunConfig, SphereDelegate, Spheres,
 };
 use visula_core::glam::{Vec3, Vec4};
 use visula_derive::Instance;
@@ -116,12 +118,38 @@ impl PySpheres {
     }
 }
 
-#[pyfunction]
-fn spawn(py: Python, pyspheres: PySpheres, points: &mut PyPoints) -> PyResult<()> {
-    initialize_logger();
-    let (event_loop, window) = initialize_event_loop_and_window();
-    let mut application = pollster::block_on(async { Application::new(window).await });
+#[pyclass(name = "Application", unsendable)]
+struct PyApplication {
+    event_loop: EventLoop<CustomEvent>,
+}
 
+#[pymethods]
+impl PyApplication {
+    #[new]
+    fn new() -> Self {
+        initialize_logger();
+        let event_loop = create_event_loop();
+        Self { event_loop }
+    }
+}
+
+#[pyfunction]
+fn spawn(
+    py: Python,
+    pyapplication: &mut PyApplication,
+    pyspheres: PySpheres,
+    points: &mut PyPoints,
+) -> PyResult<()> {
+    let PyApplication { event_loop } = pyapplication;
+    let window = create_window(
+        RunConfig {
+            canvas_name: "none".to_owned(),
+        },
+        event_loop,
+    );
+    // TODO consider making the application retained so that not all the wgpu initialization needs
+    // to be re-done
+    let mut application = pollster::block_on(async { Application::new(window).await });
     let spheres = Spheres::new(
         &application.rendering_descriptor(),
         &SphereDelegate {
@@ -153,7 +181,7 @@ fn spawn(py: Python, pyspheres: PySpheres, points: &mut PyPoints) -> PyResult<()
         .buffer
         .update(&application.device, &application.queue, &point_data);
 
-    event_loop.run(move |event, _, control_flow| {
+    event_loop.run_return(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
         match event {
             Event::RedrawEventsCleared => {
@@ -177,6 +205,9 @@ fn spawn(py: Python, pyspheres: PySpheres, points: &mut PyPoints) -> PyResult<()
                 application.queue.submit(Some(encoder.finish()));
                 frame.present();
             }
+            Event::LoopDestroyed => {
+                println!("Bye!");
+            }
             Event::MainEventsCleared => {
                 application.update();
             }
@@ -185,29 +216,11 @@ fn spawn(py: Python, pyspheres: PySpheres, points: &mut PyPoints) -> PyResult<()
             }
         }
     });
-}
-
-#[pyclass(name = "Application", unsendable)]
-struct PyApplication {
-    inner: Application,
-    event_loop: EventLoop<CustomEvent>,
-}
-
-#[pymethods]
-impl PyApplication {
-    #[new]
-    fn new() -> Self {
-        initialize_logger();
-        let (event_loop, window) = initialize_event_loop_and_window();
-        let application = pollster::block_on(async { Application::new(window).await });
-        Self {
-            event_loop,
-            inner: application,
-        }
-    }
+    Ok(())
 }
 
 #[pymodule]
+#[pyo3(name="_visula_pyo3")]
 fn visula_pyo3(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(spawn, m)?)?;
     m.add_class::<PyExpression>()?;
