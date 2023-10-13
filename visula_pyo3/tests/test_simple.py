@@ -3,9 +3,10 @@ from typing import Any
 from visula_pyo3 import spawn, Expression, Points, Spheres
 import numpy as np
 
-x = np.linspace(0, 10, 100)
-y = np.sin(x)
-z = np.cos(x)
+t = np.linspace(0, 2*3.14, 10000)
+x = np.cos(t)**3 + t
+y = np.sin(t)**3
+z = np.cos(t)**3
 positions = 10.0 * np.array([x, y, z]).T
 
 points = Points(positions)

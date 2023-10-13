@@ -132,8 +132,6 @@ fn spawn(py: Python, pyspheres: PySpheres, points: &mut PyPoints) -> PyResult<()
     )
     .expect("Failed to create spheres");
 
-    dbg!(points.pybuffer.shape());
-
     let point_data: Vec<PointData> = points
         .pybuffer
         .to_vec(py)
@@ -189,36 +187,32 @@ fn spawn(py: Python, pyspheres: PySpheres, points: &mut PyPoints) -> PyResult<()
     });
 }
 
+#[pyclass(name = "Application", unsendable)]
+struct PyApplication {
+    inner: Application,
+    event_loop: EventLoop<CustomEvent>,
+}
+
+#[pymethods]
+impl PyApplication {
+    #[new]
+    fn new() -> Self {
+        initialize_logger();
+        let (event_loop, window) = initialize_event_loop_and_window();
+        let application = pollster::block_on(async { Application::new(window).await });
+        Self {
+            event_loop,
+            inner: application,
+        }
+    }
+}
+
 #[pymodule]
 fn visula_pyo3(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(spawn, m)?)?;
     m.add_class::<PyExpression>()?;
     m.add_class::<PyPoints>()?;
     m.add_class::<PySpheres>()?;
+    m.add_class::<PyApplication>()?;
     Ok(())
 }
-
-//#[pyclass(name = "Application", unsendable)]
-//struct PyApplication {
-//inner: Application,
-//event_loop: EventLoop<CustomEvent>,
-//window: Window,
-//}
-
-//#[pymethods]
-//impl PyApplication {
-//#[new]
-//fn new() -> Self {
-//initialize_logger();
-//let (event_loop, window) = initialize_event_loop_and_window();
-//let application = pollster::block_on(async {
-//let mut application = Application::new(window).await;
-//application
-//});
-//Self {
-//event_loop,
-//window,
-//inner: application,
-//}
-//}
-//}
