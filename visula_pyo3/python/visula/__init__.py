@@ -1,2 +1,2 @@
-from ._visula_pyo3 import Expression, Points, Spheres
+from ._visula_pyo3 import Spheres
 from .figure import Figure

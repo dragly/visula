@@ -1,9 +1,8 @@
-use itertools::Itertools;
-use std::sync::{Arc, Mutex};
-use winit::platform::run_return::EventLoopExtRunReturn;
-
 use bytemuck::{Pod, Zeroable};
+use itertools::Itertools;
+use numpy::{Ix2, PyArray, convert::IntoPyArray, convert::ToPyArray};
 use pyo3::{buffer::PyBuffer, prelude::*};
+use std::sync::{Arc, Mutex};
 use visula::{
     application, create_event_loop, create_window, initialize_event_loop_and_window,
     initialize_logger, Application, CustomEvent, Expression, InstanceBuffer, LineDelegate, Lines,
@@ -12,6 +11,7 @@ use visula::{
 use visula_core::glam::{Vec3, Vec4};
 use visula_derive::Instance;
 use wgpu::Color;
+use winit::platform::run_return::EventLoopExtRunReturn;
 use winit::{
     event::Event,
     event_loop::{ControlFlow, EventLoop},
@@ -37,73 +37,57 @@ struct PointData {
     _padding: f32,
 }
 
-#[pyclass(name = "Points", unsendable)]
-struct PyPoints {
-    buffer: InstanceBuffer<PointData>,
-    pybuffer: PyBuffer<f64>,
-    instance: PointDataInstance,
-    #[pyo3(get)]
-    position: PyExpression,
-}
-
-#[pymethods]
-impl PyPoints {
-    #[new]
-    fn new(positions: PyBuffer<f64>) -> Self {
-        let buffer = InstanceBuffer::<PointData>::new();
-        let instance = buffer.instance();
-        let position = PyExpression {
-            inner: instance.position.clone(),
-        };
-        Self {
-            pybuffer: positions,
-            buffer,
-            instance,
-            position,
-        }
-    }
-
-    fn update(&mut self, py: Python, buffer: PyBuffer<f64>) {
-        //self.buffer.update(device, queue, data);
-        self.pybuffer = buffer;
-    }
-}
-
-#[pyclass(name = "Expression", unsendable)]
-#[derive(Clone)]
-struct PyExpression {
-    inner: Expression,
-}
-
 #[pyclass(name = "Spheres", unsendable)]
 #[derive(Clone)]
 struct PySpheres {
     #[pyo3(get, set)]
-    position: PyExpression,
+    position: PyObject,
     #[pyo3(get, set)]
-    radius: PyExpression,
+    radius: PyObject,
     #[pyo3(get, set)]
-    color: PyExpression,
+    color: PyObject,
 }
 
-fn convert(py: Python, obj: PyObject) -> PyExpression {
+fn convert(py: Python, application: &Application, obj: PyObject) -> Expression {
+    if let Ok(x) = obj.extract::<PyBuffer<f64>>(py) {
+        // TODO optimize the case where the same PyBuffer has already
+        // been written to a wgpu Buffer, for instance by creating
+        // a cache
+        let mut buffer = InstanceBuffer::<PointData>::new();
+        let instance = buffer.instance();
+        let point_data: Vec<PointData> = x
+            .to_vec(py)
+            .expect("Cannot convert to vec")
+            .iter()
+            .map(|&v| v as f32)
+            .chunks(3)
+            .into_iter()
+            .map(|x| {
+                let v: Vec<f32> = x.collect();
+                PointData {
+                    position: Vec3::new(v[0], v[1], v[2]),
+                    _padding: Default::default(),
+                }
+            })
+            .collect();
+
+        buffer.update(&application.device, &application.queue, &point_data);
+
+        return instance.position;
+    }
     if let Ok(x) = obj.extract::<f32>(py) {
-        return PyExpression { inner: x.into() };
+        return x.into();
     }
     if let Ok(x) = obj.extract::<Vec<f32>>(py) {
         if x.len() == 3 {
-            return PyExpression {
-                inner: Vec3::new(x[0], x[1], x[2]).into(),
-            };
+            return Vec3::new(x[0], x[1], x[2]).into();
         } else if x.len() == 4 {
-            return PyExpression {
-                inner: Vec4::new(x[0], x[1], x[2], x[3]).into(),
-            };
+            return Vec4::new(x[0], x[1], x[2], x[3]).into();
         } else {
             panic!("Vec of length {} are not supported", x.len());
         }
     }
-    obj.extract(py).expect("Extract failed")
+    unimplemented!("No support for obj")
 }
 
 #[pymethods]
@@ -111,9 +95,9 @@ impl PySpheres {
     #[new]
     fn new(py: Python, position: PyObject, radius: PyObject, color: PyObject) -> Self {
         Self {
-            position: convert(py, position),
-            radius: convert(py, radius),
-            color: convert(py, color),
+            position,
+            radius,
+            color,
         }
     }
 }
@@ -134,12 +118,7 @@ impl PyApplication {
 }
 
 #[pyfunction]
-fn spawn(
-    py: Python,
-    pyapplication: &mut PyApplication,
-    pyspheres: PySpheres,
-    points: &mut PyPoints,
-) -> PyResult<()> {
+fn show(py: Python, pyapplication: &mut PyApplication, pyspheres: PySpheres) -> PyResult<()> {
     let PyApplication { event_loop } = pyapplication;
     let window = create_window(
         RunConfig {
@@ -153,33 +132,12 @@ fn spawn(
     let spheres = Spheres::new(
         &application.rendering_descriptor(),
         &SphereDelegate {
-            position: pyspheres.position.inner,
-            radius: pyspheres.radius.inner,
-            color: pyspheres.color.inner,
+            position: convert(py, &application, pyspheres.position),
+            radius: convert(py, &application, pyspheres.radius),
+            color: convert(py, &application, pyspheres.color),
         },
     )
     .expect("Failed to create spheres");
-
-    let point_data: Vec<PointData> = points
-        .pybuffer
-        .to_vec(py)
-        .expect("Cannot convert to vec")
-        .iter()
-        .map(|&v| v as f32)
-        .chunks(3)
-        .into_iter()
-        .map(|x| {
-            let v: Vec<f32> = x.collect();
-            PointData {
-                position: Vec3::new(v[0], v[1], v[2]),
-                _padding: Default::default(),
-            }
-        })
-        .collect();
-
-    points
-        .buffer
-        .update(&application.device, &application.queue, &point_data);
 
     event_loop.run_return(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -220,11 +178,9 @@ fn spawn(
 }
 
 #[pymodule]
-#[pyo3(name="_visula_pyo3")]
+#[pyo3(name = "_visula_pyo3")]
 fn visula_pyo3(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(spawn, m)?)?;
-    m.add_class::<PyExpression>()?;
-    m.add_class::<PyPoints>()?;
+    m.add_function(wrap_pyfunction!(show, m)?)?;
     m.add_class::<PySpheres>()?;
     m.add_class::<PyApplication>()?;
     Ok(())

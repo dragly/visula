@@ -1,7 +1,7 @@
-from ._visula_pyo3 import Application, spawn, Expression, Points, Spheres
+from ._visula_pyo3 import show
 from .application import Visula
 
 class Figure:
-    def show(self, spheres, points):
+    def show(self, spheres):
         app = Visula.application()
-        spawn(app, spheres, points)
+        show(app, spheres)
