@@ -4,9 +4,9 @@ use itertools::Itertools;
 use pyo3::{buffer::PyBuffer, prelude::*};
 
 use visula::{
-    create_event_loop, create_window,
-    initialize_logger, Application, CustomEvent, Expression, InstanceBuffer, LineDelegate, Lines,
-    PyLineDelegate, PySphereDelegate, RenderData, Renderable, RunConfig, SphereDelegate, Spheres,
+    create_event_loop, create_window, initialize_logger, Application, CustomEvent, Expression,
+    InstanceBuffer, LineDelegate, Lines, PyLineDelegate, PySphereDelegate, RenderData, Renderable,
+    RunConfig, SphereDelegate, Spheres,
 };
 use visula_core::glam::{Vec3, Vec4};
 use visula_derive::Instance;
