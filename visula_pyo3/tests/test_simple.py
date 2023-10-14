@@ -1,5 +1,3 @@
-from dataclasses import dataclass, field
-from typing import Any
 from visula import LineDelegate, SphereDelegate, Figure
 import numpy as np
 

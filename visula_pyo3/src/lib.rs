@@ -1,10 +1,10 @@
 use bytemuck::{Pod, Zeroable};
 use itertools::Itertools;
-use numpy::{convert::IntoPyArray, convert::ToPyArray, Ix2, PyArray};
+
 use pyo3::{buffer::PyBuffer, prelude::*};
-use std::sync::{Arc, Mutex};
+
 use visula::{
-    application, create_event_loop, create_window, initialize_event_loop_and_window,
+    create_event_loop, create_window,
     initialize_logger, Application, CustomEvent, Expression, InstanceBuffer, LineDelegate, Lines,
     PyLineDelegate, PySphereDelegate, RenderData, Renderable, RunConfig, SphereDelegate, Spheres,
 };
@@ -15,7 +15,6 @@ use winit::platform::run_return::EventLoopExtRunReturn;
 use winit::{
     event::Event,
     event_loop::{ControlFlow, EventLoop},
-    window::Window,
 };
 
 #[repr(C, align(16))]
@@ -27,8 +26,6 @@ struct SphereData {
 
 #[derive(Debug)]
 struct Error {}
-
-async fn run(spheres: Spheres) {}
 
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
@@ -169,9 +166,6 @@ fn show(py: Python, pyapplication: &mut PyApplication, renderables: Vec<PyObject
 
                 application.queue.submit(Some(encoder.finish()));
                 frame.present();
-            }
-            Event::LoopDestroyed => {
-                println!("Bye!");
             }
             Event::MainEventsCleared => {
                 application.update();
