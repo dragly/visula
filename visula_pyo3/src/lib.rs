@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use visula::{
     application, create_event_loop, create_window, initialize_event_loop_and_window,
     initialize_logger, Application, CustomEvent, Expression, InstanceBuffer, LineDelegate, Lines,
-    RenderData, Renderable, RunConfig, SphereDelegate, Spheres,
+    PyLineDelegate, PySphereDelegate, RenderData, Renderable, RunConfig, SphereDelegate, Spheres,
 };
 use visula_core::glam::{Vec3, Vec4};
 use visula_derive::Instance;
@@ -38,30 +38,6 @@ struct PointData {
 }
 
 // TODO generate the renderables from the delegates
-
-#[pyclass(name = "Spheres", unsendable)]
-#[derive(Clone)]
-struct PySpheres {
-    #[pyo3(get, set)]
-    position: PyObject,
-    #[pyo3(get, set)]
-    radius: PyObject,
-    #[pyo3(get, set)]
-    color: PyObject,
-}
-
-#[pyclass(name = "Lines", unsendable)]
-#[derive(Clone)]
-struct PyLines {
-    #[pyo3(get, set)]
-    start: PyObject,
-    #[pyo3(get, set)]
-    end: PyObject,
-    #[pyo3(get, set)]
-    width: PyObject,
-    #[pyo3(get, set)]
-    alpha: PyObject,
-}
 
 fn convert(py: Python, application: &Application, obj: &PyObject) -> Expression {
     if let Ok(x) = obj.extract::<PyBuffer<f64>>(py) {
@@ -105,31 +81,6 @@ fn convert(py: Python, application: &Application, obj: &PyObject) -> Expression 
     unimplemented!("No support for obj")
 }
 
-#[pymethods]
-impl PySpheres {
-    #[new]
-    fn new(py: Python, position: PyObject, radius: PyObject, color: PyObject) -> Self {
-        Self {
-            position,
-            radius,
-            color,
-        }
-    }
-}
-
-#[pymethods]
-impl PyLines {
-    #[new]
-    fn new(py: Python, start: PyObject, end: PyObject, width: PyObject, alpha: PyObject) -> Self {
-        Self {
-            start,
-            end,
-            width,
-            alpha,
-        }
-    }
-}
-
 #[pyclass(name = "Application", unsendable)]
 struct PyApplication {
     event_loop: EventLoop<CustomEvent>,
@@ -161,7 +112,8 @@ fn show(py: Python, pyapplication: &mut PyApplication, renderables: Vec<PyObject
     let spheres_list: Vec<Box<dyn Renderable>> = renderables
         .iter()
         .map(|renderable| -> Box<dyn Renderable> {
-            if let Ok(pysphere) = renderable.extract::<PySpheres>(py) {
+            // TODO automate the conversion
+            if let Ok(pysphere) = renderable.extract::<PySphereDelegate>(py) {
                 return Box::new(
                     Spheres::new(
                         &application.rendering_descriptor(),
@@ -174,7 +126,7 @@ fn show(py: Python, pyapplication: &mut PyApplication, renderables: Vec<PyObject
                     .expect("Failed to create spheres"),
                 );
             }
-            if let Ok(pylines) = renderable.extract::<PyLines>(py) {
+            if let Ok(pylines) = renderable.extract::<PyLineDelegate>(py) {
                 return Box::new(
                     Lines::new(
                         &application.rendering_descriptor(),
@@ -236,8 +188,8 @@ fn show(py: Python, pyapplication: &mut PyApplication, renderables: Vec<PyObject
 #[pyo3(name = "_visula_pyo3")]
 fn visula_pyo3(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(show, m)?)?;
-    m.add_class::<PyLines>()?;
-    m.add_class::<PySpheres>()?;
+    m.add_class::<PyLineDelegate>()?;
+    m.add_class::<PySphereDelegate>()?;
     m.add_class::<PyApplication>()?;
     Ok(())
 }

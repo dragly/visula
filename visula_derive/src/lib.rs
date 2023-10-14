@@ -8,8 +8,15 @@ type TokenStream2 = proc_macro2::TokenStream;
 pub fn delegate(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as syn::Item);
     let result = match input {
-        syn::Item::Struct(ItemStruct { ident, fields, .. }) => {
+        syn::Item::Struct(ItemStruct {
+            ident: struct_ident,
+            fields,
+            ..
+        }) => {
             let mut field_modifications: Vec<TokenStream2> = Vec::new();
+            let mut pyo3_fields: Vec<TokenStream2> = Vec::new();
+            let mut pyo3_attributes: Vec<TokenStream2> = Vec::new();
+            let mut pyo3_field_names: Vec<TokenStream2> = Vec::new();
             match fields {
                 Fields::Named(FieldsNamed { named, .. }) => {
                     for (index, field) in named.iter().enumerate() {
@@ -33,12 +40,47 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                                 }
                             },
                         });
+
+                        pyo3_fields.push(quote! {
+                            #[pyo3(get, set)]
+                            pub #ident : ::pyo3::PyObject,
+                        });
+                        pyo3_attributes.push(quote! {
+                            #ident : ::pyo3::PyObject,
+                        });
+                        pyo3_field_names.push(quote! {
+                            #ident,
+                        });
                     }
                 }
                 _ => unimplemented!(),
             };
+            let pyclass_struct_name = format_ident!("Py{}", struct_ident);
+            let pyclass_attribute: TokenStream2 = format!(
+                "#[::pyo3::pyclass(name = \"{}\", unsendable)]",
+                struct_ident
+            )
+            .parse()
+            .unwrap();
             quote! {
-                impl #ident {
+                #pyclass_attribute
+                #[derive(Clone)]
+                pub struct #pyclass_struct_name {
+                    #(#pyo3_fields)*
+                }
+
+
+                #[::pyo3::pymethods]
+                impl #pyclass_struct_name {
+                    #[new]
+                    fn new(py: ::pyo3::Python, #(#pyo3_attributes)*) -> Self {
+                        Self {
+                            #(#pyo3_field_names)*
+                        }
+                    }
+                }
+
+                impl #struct_ident {
                     fn inject(&self, shader_variable_name: &str, module: &mut ::naga::Module, binding_builder: &mut BindingBuilder) {
                         let entry_point_index = binding_builder.entry_point_index;
                         let variable = module.entry_points[entry_point_index]

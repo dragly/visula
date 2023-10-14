@@ -18,7 +18,7 @@ winit = { workspace = true }
 egui = { workspace = true }
 egui_wgpu_backend = { workspace = true }
 egui_winit_platform = { workspace = true }
-pyo3 = "0.20.0"
-pollster = "0.3.0"
-itertools = "0.11.0"
-numpy = { version = "0.20.0", features = ["nalgebra"] }
+pyo3 = { workspace = true }
+numpy = { workspace = true }
+pollster = { workspace = true }
+itertools = { workspace = true }

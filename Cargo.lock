@@ -1198,15 +1198,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "itertools"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
-dependencies = [
- "either",
-]
-
-[[package]]
 name = "itertools-num"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1939,12 +1930,6 @@ dependencies = [
  "flate2",
  "miniz_oxide 0.7.1",
 ]
-
-[[package]]
-name = "pollster"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5da3b0203fd7ee5720aa0b5e790b591aa5d3f41c3ed2c34a3a393382198af2f7"
 
 [[package]]
 name = "pollster"
@@ -2805,16 +2790,18 @@ dependencies = [
  "glam",
  "gltf",
  "hecs",
- "itertools 0.10.5",
+ "itertools",
  "itertools-num",
  "js-sys",
  "log",
  "naga",
  "ndarray",
  "num",
+ "numpy",
  "oxifive",
- "pollster 0.2.5",
+ "pollster",
  "proc-macro2",
+ "pyo3",
  "quote",
  "rand 0.8.5",
  "slotmap",
@@ -2840,9 +2827,9 @@ dependencies = [
  "egui",
  "egui_wgpu_backend",
  "egui_winit_platform",
- "itertools 0.11.0",
+ "itertools",
  "numpy",
- "pollster 0.3.0",
+ "pollster",
  "pyo3",
  "visula",
  "visula_core",

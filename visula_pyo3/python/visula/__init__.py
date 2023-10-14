@@ -1,2 +1,2 @@
-from ._visula_pyo3 import Lines, Spheres
+from ._visula_pyo3 import LineDelegate, SphereDelegate
 from .figure import Figure

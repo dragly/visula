@@ -18,6 +18,10 @@ winit = { version = "0.28" }
 egui = "0.22"
 egui_wgpu_backend = "0.25.0"
 egui_winit_platform = "0.19"
+pyo3 = "0.20.0"
+numpy = { version = "0.20.0", features = ["nalgebra"] }
+pollster = "0.3.0"
+itertools = "0.10.5"
 
 [profile.optimized-dev]
 inherits = "dev"
