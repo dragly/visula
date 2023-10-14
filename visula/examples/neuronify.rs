@@ -1,3 +1,4 @@
+use visula::Renderable;
 use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::io::Cursor;

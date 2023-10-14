@@ -1,11 +1,9 @@
-use std::time::{Duration, Instant};
-
 use bytemuck::{Pod, Zeroable};
-
-use itertools_num::linspace;
-use structopt::StructOpt;
-
 use glam::Vec3;
+use itertools_num::linspace;
+use std::time::{Duration, Instant};
+use structopt::StructOpt;
+use visula::Renderable;
 use visula::{
     InstanceBuffer, InstanceDeviceExt, LineDelegate, Lines, RenderData, SphereDelegate, Spheres,
     UniformBuffer,

@@ -1,3 +1,4 @@
+use visula::Renderable;
 use std::{fs::File, io::Cursor, path::Path};
 
 use bytemuck::{Pod, Zeroable};

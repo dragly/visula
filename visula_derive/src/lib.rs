@@ -63,6 +63,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
             .parse()
             .unwrap();
             quote! {
+                #[cfg(not(target_arch = "wasm32"))]
                 #pyclass_attribute
                 #[derive(Clone)]
                 pub struct #pyclass_struct_name {
@@ -70,6 +71,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                 }
 
 
+                #[cfg(not(target_arch = "wasm32"))]
                 #[::pyo3::pymethods]
                 impl #pyclass_struct_name {
                     #[new]

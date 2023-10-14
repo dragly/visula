@@ -1,3 +1,4 @@
+use visula::Renderable;
 use bytemuck::{Pod, Zeroable};
 use cgmath::{InnerSpace, SquareMatrix};
 use slotmap::{DefaultKey, SlotMap};

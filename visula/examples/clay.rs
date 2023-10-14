@@ -8,7 +8,7 @@ use cgmath::InnerSpace;
 use itertools_num::linspace;
 use structopt::StructOpt;
 
-use visula::{InstanceBuffer, RenderData, SphereDelegate, Spheres, UniformBuffer, Vector3};
+use visula::{InstanceBuffer, RenderData, SphereDelegate, Spheres, UniformBuffer, Vector3, Renderable};
 use visula_derive::{Instance, Uniform};
 
 #[derive(StructOpt)]

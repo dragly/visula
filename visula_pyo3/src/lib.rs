@@ -41,7 +41,7 @@ fn convert(py: Python, application: &Application, obj: &PyObject) -> Expression 
         // TODO optimize the case where the same PyBuffer has already
         // been written to a wgpu Buffer, for instance by creating
         // a cache
-        let mut buffer = InstanceBuffer::<PointData>::new();
+        let mut buffer = InstanceBuffer::<PointData>::new(&application.device);
         let instance = buffer.instance();
         let point_data: Vec<PointData> = x
             .to_vec(py)

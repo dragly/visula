@@ -222,14 +222,7 @@ impl Renderable for Spheres {
             .binding_builder
             .bindings
             .values()
-            .map(|v| {
-                (
-                    v,
-                    Ref::map(v.inner.borrow(), |v| {
-                        v.buffer.as_ref().expect("Buffer not set!")
-                    }),
-                )
-            })
+            .map(|v| (v, Ref::map(v.inner.borrow(), |v| &v.buffer)))
             .collect();
         let uniforms: Vec<Ref<wgpu::BindGroup>> = self
             .binding_builder

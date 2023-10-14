@@ -1,3 +1,4 @@
+use visula::Renderable;
 use visula::{
     Camera, CameraController, CameraControllerResponse, Expression, InstanceBuffer, LineDelegate,
     Lines, RenderData, RenderingDescriptor,

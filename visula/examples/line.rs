@@ -1,5 +1,5 @@
 use bytemuck::{Pod, Zeroable};
-
+use visula::Renderable;
 use visula::{
     initialize_event_loop_and_window, initialize_logger, Application, Expression, InstanceBuffer,
     LineDelegate, Lines, RenderData,

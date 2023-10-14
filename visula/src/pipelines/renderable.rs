@@ -1,5 +1,5 @@
 use crate::RenderData;
 
 pub trait Renderable {
-    fn render(&self, render_data: &mut RenderData) -> ();
+    fn render(&self, render_data: &mut RenderData);
 }
