@@ -37,6 +37,8 @@ struct PointData {
     _padding: f32,
 }
 
+// TODO generate the renderables from the delegates
+
 #[pyclass(name = "Spheres", unsendable)]
 #[derive(Clone)]
 struct PySpheres {
