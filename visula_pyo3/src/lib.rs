@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use visula::{
     application, create_event_loop, create_window, initialize_event_loop_and_window,
     initialize_logger, Application, CustomEvent, Expression, InstanceBuffer, LineDelegate, Lines,
-    RenderData, RunConfig, SphereDelegate, Spheres,
+    RenderData, Renderable, RunConfig, SphereDelegate, Spheres,
 };
 use visula_core::glam::{Vec3, Vec4};
 use visula_derive::Instance;
@@ -46,6 +46,19 @@ struct PySpheres {
     radius: PyObject,
     #[pyo3(get, set)]
     color: PyObject,
+}
+
+#[pyclass(name = "Lines", unsendable)]
+#[derive(Clone)]
+struct PyLines {
+    #[pyo3(get, set)]
+    start: PyObject,
+    #[pyo3(get, set)]
+    end: PyObject,
+    #[pyo3(get, set)]
+    width: PyObject,
+    #[pyo3(get, set)]
+    alpha: PyObject,
 }
 
 fn convert(py: Python, application: &Application, obj: &PyObject) -> Expression {
@@ -102,6 +115,19 @@ impl PySpheres {
     }
 }
 
+#[pymethods]
+impl PyLines {
+    #[new]
+    fn new(py: Python, start: PyObject, end: PyObject, width: PyObject, alpha: PyObject) -> Self {
+        Self {
+            start,
+            end,
+            width,
+            alpha,
+        }
+    }
+}
+
 #[pyclass(name = "Application", unsendable)]
 struct PyApplication {
     event_loop: EventLoop<CustomEvent>,
@@ -118,7 +144,7 @@ impl PyApplication {
 }
 
 #[pyfunction]
-fn show(py: Python, pyapplication: &mut PyApplication, pyspheres: Vec<PySpheres>) -> PyResult<()> {
+fn show(py: Python, pyapplication: &mut PyApplication, renderables: Vec<PyObject>) -> PyResult<()> {
     let PyApplication { event_loop } = pyapplication;
     let window = create_window(
         RunConfig {
@@ -130,18 +156,37 @@ fn show(py: Python, pyapplication: &mut PyApplication, pyspheres: Vec<PySpheres>
     // to be re-done
     let mut application = pollster::block_on(async { Application::new(window).await });
 
-    let spheres_list = pyspheres
+    let spheres_list: Vec<Box<dyn Renderable>> = renderables
         .iter()
-        .map(|pysphere| {
-            Spheres::new(
-                &application.rendering_descriptor(),
-                &SphereDelegate {
-                    position: convert(py, &application, &pysphere.position),
-                    radius: convert(py, &application, &pysphere.radius),
-                    color: convert(py, &application, &pysphere.color),
-                },
-            )
-            .expect("Failed to create spheres")
+        .map(|renderable| -> Box<dyn Renderable> {
+            if let Ok(pysphere) = renderable.extract::<PySpheres>(py) {
+                return Box::new(
+                    Spheres::new(
+                        &application.rendering_descriptor(),
+                        &SphereDelegate {
+                            position: convert(py, &application, &pysphere.position),
+                            radius: convert(py, &application, &pysphere.radius),
+                            color: convert(py, &application, &pysphere.color),
+                        },
+                    )
+                    .expect("Failed to create spheres"),
+                );
+            }
+            if let Ok(pylines) = renderable.extract::<PyLines>(py) {
+                return Box::new(
+                    Lines::new(
+                        &application.rendering_descriptor(),
+                        &LineDelegate {
+                            start: convert(py, &application, &pylines.start),
+                            end: convert(py, &application, &pylines.end),
+                            width: convert(py, &application, &pylines.width),
+                            alpha: convert(py, &application, &pylines.alpha),
+                        },
+                    )
+                    .expect("Failed to create spheres"),
+                );
+            }
+            unimplemented!("TODO")
         })
         .collect_vec();
 
@@ -189,6 +234,7 @@ fn show(py: Python, pyapplication: &mut PyApplication, pyspheres: Vec<PySpheres>
 #[pyo3(name = "_visula_pyo3")]
 fn visula_pyo3(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(show, m)?)?;
+    m.add_class::<PyLines>()?;
     m.add_class::<PySpheres>()?;
     m.add_class::<PyApplication>()?;
     Ok(())

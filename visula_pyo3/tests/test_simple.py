@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Any
-from visula import Spheres, Figure
+from visula import Lines, Spheres, Figure
 import numpy as np
 
 t = np.linspace(0, 2*3.14, 10000)
@@ -28,9 +28,10 @@ positions = 10.0 * np.array([x, y, z]).T
 
 fig = Figure()
 
-spheres2 = Spheres(
-    position=positions,
-    radius=1.0,
-    color=[0.0, 1.0, 1.0],
+lines = Lines(
+    start=positions[:-1],
+    end=positions[1:],
+    width=1.0,
+    alpha=1.0,
 )
-fig.show([spheres, spheres2])
+fig.show([spheres, lines])

@@ -1,6 +1,6 @@
 use crate::rendering_descriptor::RenderingDescriptor;
 use crate::simulation::RenderData;
-use crate::DefaultRenderPassDescriptor;
+use crate::{DefaultRenderPassDescriptor, Renderable};
 use bytemuck::{Pod, Zeroable};
 use naga::{back::wgsl::WriterFlags, valid::ValidationFlags};
 use std::cell::Ref;
@@ -183,8 +183,8 @@ impl Spheres {
     }
 }
 
-impl Spheres {
-    pub fn render(
+impl Renderable for Spheres {
+    fn render(
         &self,
         RenderData {
             encoder,
