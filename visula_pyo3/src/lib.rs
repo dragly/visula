@@ -1,6 +1,6 @@
 use bytemuck::{Pod, Zeroable};
 use itertools::Itertools;
-use numpy::{Ix2, PyArray, convert::IntoPyArray, convert::ToPyArray};
+use numpy::{convert::IntoPyArray, convert::ToPyArray, Ix2, PyArray};
 use pyo3::{buffer::PyBuffer, prelude::*};
 use std::sync::{Arc, Mutex};
 use visula::{
@@ -48,7 +48,7 @@ struct PySpheres {
     color: PyObject,
 }
 
-fn convert(py: Python, application: &Application, obj: PyObject) -> Expression {
+fn convert(py: Python, application: &Application, obj: &PyObject) -> Expression {
     if let Ok(x) = obj.extract::<PyBuffer<f64>>(py) {
         // TODO optimize the case where the same PyBuffer has already
         // been written to a wgpu Buffer, for instance by creating
@@ -118,7 +118,7 @@ impl PyApplication {
 }
 
 #[pyfunction]
-fn show(py: Python, pyapplication: &mut PyApplication, pyspheres: PySpheres) -> PyResult<()> {
+fn show(py: Python, pyapplication: &mut PyApplication, pyspheres: Vec<PySpheres>) -> PyResult<()> {
     let PyApplication { event_loop } = pyapplication;
     let window = create_window(
         RunConfig {
@@ -129,15 +129,21 @@ fn show(py: Python, pyapplication: &mut PyApplication, pyspheres: PySpheres) -> 
     // TODO consider making the application retained so that not all the wgpu initialization needs
     // to be re-done
     let mut application = pollster::block_on(async { Application::new(window).await });
-    let spheres = Spheres::new(
-        &application.rendering_descriptor(),
-        &SphereDelegate {
-            position: convert(py, &application, pyspheres.position),
-            radius: convert(py, &application, pyspheres.radius),
-            color: convert(py, &application, pyspheres.color),
-        },
-    )
-    .expect("Failed to create spheres");
+
+    let spheres_list = pyspheres
+        .iter()
+        .map(|pysphere| {
+            Spheres::new(
+                &application.rendering_descriptor(),
+                &SphereDelegate {
+                    position: convert(py, &application, &pysphere.position),
+                    radius: convert(py, &application, &pysphere.radius),
+                    color: convert(py, &application, &pysphere.color),
+                },
+            )
+            .expect("Failed to create spheres")
+        })
+        .collect_vec();
 
     event_loop.run_return(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -157,7 +163,9 @@ fn show(py: Python, pyapplication: &mut PyApplication, pyspheres: PySpheres) -> 
                         encoder: &mut encoder,
                         camera: &application.camera,
                     };
-                    spheres.render(&mut render_data);
+                    for spheres in &spheres_list {
+                        spheres.render(&mut render_data);
+                    }
                 }
 
                 application.queue.submit(Some(encoder.finish()));

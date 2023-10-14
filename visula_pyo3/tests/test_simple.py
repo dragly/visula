@@ -16,7 +16,7 @@ spheres = Spheres(
     radius=1.0,
     color=[1.0, 0.0, 1.0],
 )
-fig.show(spheres)
+fig.show([spheres])
 
 print("Hello")
 
@@ -28,9 +28,9 @@ positions = 10.0 * np.array([x, y, z]).T
 
 fig = Figure()
 
-spheres = Spheres(
+spheres2 = Spheres(
     position=positions,
     radius=1.0,
     color=[0.0, 1.0, 1.0],
 )
-fig.show(spheres)
+fig.show([spheres, spheres2])
