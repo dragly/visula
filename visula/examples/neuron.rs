@@ -1,6 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 use cgmath::{InnerSpace, SquareMatrix};
 use slotmap::{DefaultKey, SlotMap};
+use visula::Renderable;
 
 use glam::Vec3;
 use visula::{

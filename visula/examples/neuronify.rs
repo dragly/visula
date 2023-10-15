@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::io::Cursor;
 use std::iter::FromIterator;
+use visula::Renderable;
 
 use bytemuck::{Pod, Zeroable};
 use cgmath::prelude::*;

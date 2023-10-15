@@ -3,7 +3,8 @@ use cgmath::{InnerSpace, SquareMatrix};
 use glam::Vec3;
 use itertools::iproduct;
 use visula::{
-    CustomEvent, Expression, InstanceBuffer, LineDelegate, Lines, RenderData, UniformBuffer,
+    CustomEvent, Expression, InstanceBuffer, LineDelegate, Lines, RenderData, Renderable,
+    UniformBuffer,
 };
 use visula_derive::{Instance, Uniform};
 use winit::event::{Event, WindowEvent};

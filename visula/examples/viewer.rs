@@ -1,4 +1,5 @@
 use std::{fs::File, io::Cursor, path::Path};
+use visula::Renderable;
 
 use bytemuck::{Pod, Zeroable};
 use glam::{Quat, Vec3};

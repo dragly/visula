@@ -1,5 +1,5 @@
 use crate::rendering_descriptor::RenderingDescriptor;
-use crate::{DefaultRenderPassDescriptor, RenderData};
+use crate::{DefaultRenderPassDescriptor, RenderData, Renderable};
 use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
 use naga::back::wgsl::WriterFlags;
@@ -200,8 +200,10 @@ impl Lines {
             binding_builder,
         })
     }
+}
 
-    pub fn render(
+impl Renderable for Lines {
+    fn render(
         &self,
         RenderData {
             encoder,

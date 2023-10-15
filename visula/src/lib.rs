@@ -136,26 +136,31 @@ pub fn initialize_event_loop_and_window() -> (EventLoop<CustomEvent>, Window) {
     })
 }
 
-pub fn initialize_event_loop_and_window_with_config(
-    _config: RunConfig,
-) -> (EventLoop<CustomEvent>, Window) {
-    let event_loop = EventLoopBuilder::<CustomEvent>::with_user_event().build();
+pub fn create_event_loop() -> EventLoop<CustomEvent> {
+    EventLoopBuilder::<CustomEvent>::with_user_event().build()
+}
+
+pub fn create_window(config: RunConfig, event_loop: &EventLoop<CustomEvent>) -> Window {
     let mut builder = winit::window::WindowBuilder::new();
     builder = builder.with_title("Visula");
 
     #[cfg(not(target_arch = "wasm32"))]
-    log::info!(
-        "Ignoring canvas name on non-wasm platforms: '{}'",
-        _config.canvas_name
-    );
+    {
+        log::info!(
+            "Ignoring canvas name on non-wasm platforms: '{}'",
+            config.canvas_name
+        );
+        builder.build(event_loop).unwrap()
+    }
 
     #[cfg(target_arch = "wasm32")]
-    let mut canvas_existed = false;
-    #[cfg(target_arch = "wasm32")]
     {
-        let window = web_sys::window().expect("no global `window` exists");
-        let document = window.document().expect("should have a document on window");
-        if let Some(canvas) = document.get_element_by_id(&_config.canvas_name) {
+        let mut canvas_existed = false;
+        let web_window = web_sys::window().expect("no global `window` exists");
+        let document = web_window
+            .document()
+            .expect("should have a document on window");
+        if let Some(canvas) = document.get_element_by_id(&config.canvas_name) {
             let canvas = canvas
                 .dyn_into::<HtmlCanvasElement>()
                 .expect("could not cast to HtmlCanvasElement");
@@ -167,11 +172,7 @@ pub fn initialize_event_loop_and_window_with_config(
             builder = builder.with_canvas(Some(canvas));
             canvas_existed = true;
         }
-    }
-
-    let window = builder.build(&event_loop).unwrap();
-    #[cfg(target_arch = "wasm32")]
-    {
+        let window = builder.build(event_loop).unwrap();
         if !canvas_existed {
             web_sys::window()
                 .expect("no global `window` exists")
@@ -183,10 +184,6 @@ pub fn initialize_event_loop_and_window_with_config(
                 .ok()
                 .expect("couldn't append canvas to document body");
         }
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    {
         use std::cell::RefCell;
         use std::rc::Rc;
         let drop_proxy_main = Rc::new(RefCell::new(event_loop.create_proxy()));
@@ -270,14 +267,22 @@ pub fn initialize_event_loop_and_window_with_config(
         drag_enter.forget();
         drag_over.forget();
         drop_callback.forget();
+        window
     }
+}
+
+pub fn initialize_event_loop_and_window_with_config(
+    config: RunConfig,
+) -> (EventLoop<CustomEvent>, Window) {
+    let event_loop = create_event_loop();
+    let window = create_window(config, &event_loop);
 
     (event_loop, window)
 }
 
 pub fn spawn<F>(f: F)
 where
-    F: Future,
+    F: Future<Output = ()> + 'static,
 {
     #[cfg(target_arch = "wasm32")]
     {
