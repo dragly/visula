@@ -1,6 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 use itertools::Itertools;
 
+use pyo3::types::{PyDict, PyFunction};
 use pyo3::{buffer::PyBuffer, prelude::*};
 
 use visula::{
@@ -11,6 +12,7 @@ use visula::{
 use visula_core::glam::{Vec3, Vec4};
 use visula_derive::Instance;
 use wgpu::Color;
+use winit::event::{ElementState, MouseButton, WindowEvent};
 use winit::platform::run_return::EventLoopExtRunReturn;
 use winit::{
     event::Event,
@@ -94,7 +96,12 @@ impl PyApplication {
 }
 
 #[pyfunction]
-fn show(py: Python, pyapplication: &mut PyApplication, renderables: Vec<PyObject>) -> PyResult<()> {
+fn show(
+    py: Python,
+    pyapplication: &mut PyApplication,
+    renderables: Vec<PyObject>,
+    callback: &PyFunction,
+) -> PyResult<()> {
     let PyApplication { event_loop } = pyapplication;
     let window = create_window(
         RunConfig {
@@ -171,7 +178,29 @@ fn show(py: Python, pyapplication: &mut PyApplication, renderables: Vec<PyObject
                 application.update();
             }
             event => {
-                application.handle_event(&event, control_flow);
+                if !(application.handle_event(&event, control_flow)) {
+                    match event {
+                        Event::WindowEvent {
+                            event: window_event,
+                            ..
+                        } => match window_event {
+                            WindowEvent::MouseInput {
+                                state: ElementState::Released,
+                                button: MouseButton::Left,
+                                ..
+                            } => {
+                                let kwargs = PyDict::new(py);
+                                kwargs.set_item("first", "hello").expect("Failed to insert");
+                                kwargs.set_item("second", "world").expect("Failed to insert");
+                                callback
+                                    .call((), Some(kwargs))
+                                    .expect("Could not call callback");
+                            }
+                            _ => {}
+                        },
+                        _ => {}
+                    }
+                }
             }
         }
     });
