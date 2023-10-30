@@ -39,6 +39,32 @@ struct PointData {
 // TODO generate the renderables from the delegates
 
 fn convert(py: Python, application: &Application, obj: &PyObject) -> Expression {
+    if let Ok(x) = obj.extract::<PyBuffer<f64>>(py) {
+        // TODO optimize the case where the same PyBuffer has already
+        // been written to a wgpu Buffer, for instance by creating
+        // a cache
+        let mut buffer = InstanceBuffer::<PointData>::new(&application.device);
+        let instance = buffer.instance();
+        let point_data: Vec<PointData> = x
+            .to_vec(py)
+            .expect("Cannot convert to vec")
+            .iter()
+            .copied()
+            .chunks(3)
+            .into_iter()
+            .map(|x| {
+                let v: Vec<f64> = x.collect();
+                PointData {
+                    position: [v[0] as f32, v[1] as f32, v[2] as f32],
+                    _padding: Default::default(),
+                }
+            })
+            .collect();
+
+        buffer.update(&application.device, &application.queue, &point_data);
+
+        return instance.position;
+    }
     if let Ok(x) = obj.extract::<PyBuffer<f32>>(py) {
         // TODO optimize the case where the same PyBuffer has already
         // been written to a wgpu Buffer, for instance by creating
