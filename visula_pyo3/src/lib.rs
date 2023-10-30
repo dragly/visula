@@ -32,14 +32,14 @@ struct Error {}
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct PointData {
-    position: Vec3,
+    position: [f32; 3],
     _padding: f32,
 }
 
 // TODO generate the renderables from the delegates
 
 fn convert(py: Python, application: &Application, obj: &PyObject) -> Expression {
-    if let Ok(x) = obj.extract::<PyBuffer<f64>>(py) {
+    if let Ok(x) = obj.extract::<PyBuffer<f32>>(py) {
         // TODO optimize the case where the same PyBuffer has already
         // been written to a wgpu Buffer, for instance by creating
         // a cache
@@ -49,13 +49,13 @@ fn convert(py: Python, application: &Application, obj: &PyObject) -> Expression 
             .to_vec(py)
             .expect("Cannot convert to vec")
             .iter()
-            .map(|&v| v as f32)
+            .copied()
             .chunks(3)
             .into_iter()
             .map(|x| {
                 let v: Vec<f32> = x.collect();
                 PointData {
-                    position: Vec3::new(v[0], v[1], v[2]),
+                    position: [v[0], v[1], v[2]],
                     _padding: Default::default(),
                 }
             })
@@ -179,26 +179,24 @@ fn show(
             }
             event => {
                 if !(application.handle_event(&event, control_flow)) {
-                    match event {
-                        Event::WindowEvent {
-                            event: window_event,
-                            ..
-                        } => match window_event {
+                    if let Event::WindowEvent {
+                        event:
                             WindowEvent::MouseInput {
                                 state: ElementState::Released,
                                 button: MouseButton::Left,
                                 ..
-                            } => {
-                                let kwargs = PyDict::new(py);
-                                kwargs.set_item("first", "hello").expect("Failed to insert");
-                                kwargs.set_item("second", "world").expect("Failed to insert");
-                                callback
-                                    .call((), Some(kwargs))
-                                    .expect("Could not call callback");
-                            }
-                            _ => {}
-                        },
-                        _ => {}
+                            },
+                        ..
+                    } = event
+                    {
+                        let kwargs = PyDict::new(py);
+                        kwargs.set_item("first", "hello").expect("Failed to insert");
+                        kwargs
+                            .set_item("second", "world")
+                            .expect("Failed to insert");
+                        callback
+                            .call((), Some(kwargs))
+                            .expect("Could not call callback");
                     }
                 }
             }
