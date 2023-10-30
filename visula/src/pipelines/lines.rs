@@ -2,6 +2,7 @@ use crate::rendering_descriptor::RenderingDescriptor;
 use crate::{DefaultRenderPassDescriptor, RenderData, Renderable};
 use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
+use itertools::Itertools;
 use naga::back::wgsl::WriterFlags;
 use naga::valid::ValidationFlags;
 use std::cell::Ref;
@@ -150,11 +151,12 @@ impl Lines {
                 },
             ],
         };
-        let mut layouts = binding_builder
-            .bindings
-            .values()
+        let sorted_bindings = binding_builder.sorted_bindings();
+        let mut layouts = sorted_bindings
+            .iter()
             .map(|binding| binding.layout.build())
-            .collect();
+            .collect_vec();
+
         let buffers = {
             let mut buffers = vec![vertex_buffer_layout];
             buffers.append(&mut layouts);

@@ -8,6 +8,7 @@ use wgpu::{util::DeviceExt, Device, Queue};
 
 use crate::Instance;
 
+#[derive(Debug)]
 pub struct InstanceBufferInner {
     pub label: String,
     pub buffer: wgpu::Buffer,
