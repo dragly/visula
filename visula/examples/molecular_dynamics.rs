@@ -230,12 +230,12 @@ impl Simulation {
         let settings_buffer = UniformBuffer::new_with_init(&application.device, &settings_data);
         let settings = settings_buffer.uniform();
         let pos = particle.position.clone();
-        let color_data = (0..(count.pow(3))).map(|_| {
-            ColorData {
+        let color_data = (0..(count.pow(3)))
+            .map(|_| ColorData {
                 value: Vec3::new(1.0, 0.5, 1.0),
                 _padding: Default::default(),
-            }
-        }).collect_vec();
+            })
+            .collect_vec();
         let mut color_buffer = application.device.create_instance_buffer::<ColorData>();
         let color = color_buffer.instance();
         color_buffer.update(&application.device, &application.queue, &color_data);
