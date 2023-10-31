@@ -229,7 +229,6 @@ impl Simulation {
         };
         let settings_buffer = UniformBuffer::new_with_init(&application.device, &settings_data);
         let settings = settings_buffer.uniform();
-        let pos = particle.position.clone();
         let color_data = (0..(count.pow(3)))
             .map(|_| ColorData {
                 value: Vec3::new(1.0, 0.5, 1.0),
@@ -242,9 +241,8 @@ impl Simulation {
         let spheres = Spheres::new(
             &application.rendering_descriptor(),
             &SphereDelegate {
-                position: pos,
+                position: particle.position,
                 radius: 1.0 + settings.radius,
-                //color: particle.position / 40.0 + glam::Vec3::new(0.1, 0.3, 0.8),
                 color: color.value,
             },
         )
