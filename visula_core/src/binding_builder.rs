@@ -103,7 +103,7 @@ impl BindingBuilder {
     }
 
     pub fn sorted_bindings(&self) -> Vec<BufferBinding> {
-        let mut sorted_bindings = self.bindings.values().map(|b| b.clone()).collect_vec();
+        let mut sorted_bindings = self.bindings.values().cloned().collect_vec();
 
         sorted_bindings.sort_by(|a, b| a.slot.cmp(&b.slot));
         sorted_bindings
