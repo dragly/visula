@@ -1,5 +1,6 @@
 use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
+use itertools::Itertools;
 use itertools_num::linspace;
 use std::time::{Duration, Instant};
 use structopt::StructOpt;
@@ -182,6 +183,13 @@ struct Settings {
     _padding: f32,
 }
 
+#[repr(C, align(16))]
+#[derive(Clone, Copy, Debug, Instance, Pod, Zeroable)]
+struct ColorData {
+    value: glam::Vec3,
+    _padding: f32,
+}
+
 struct BoundingBox {
     min: Vec3,
     max: Vec3,
@@ -221,13 +229,21 @@ impl Simulation {
         };
         let settings_buffer = UniformBuffer::new_with_init(&application.device, &settings_data);
         let settings = settings_buffer.uniform();
-        let pos = particle.position.clone();
+        let color_data = (0..(count.pow(3)))
+            .map(|_| ColorData {
+                value: Vec3::new(1.0, 0.5, 1.0),
+                _padding: Default::default(),
+            })
+            .collect_vec();
+        let mut color_buffer = application.device.create_instance_buffer::<ColorData>();
+        let color = color_buffer.instance();
+        color_buffer.update(&application.device, &application.queue, &color_data);
         let spheres = Spheres::new(
             &application.rendering_descriptor(),
             &SphereDelegate {
-                position: pos,
+                position: particle.position,
                 radius: 1.0 + settings.radius,
-                color: particle.position / 40.0 + glam::Vec3::new(0.1, 0.3, 0.8),
+                color: color.value,
             },
         )
         .unwrap();

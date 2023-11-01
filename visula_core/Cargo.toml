@@ -12,3 +12,4 @@ naga = {workspace = true}
 uuid = {workspace = true}
 log = {workspace = true}
 bytemuck = {workspace = true}
+itertools = {workspace = true}

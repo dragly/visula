@@ -438,8 +438,6 @@ pub fn vertex_attr(input: TokenStream) -> TokenStream {
     let mut sizes = Vec::new();
     let mut shader_location: u32 = 0;
 
-    //let mut fields = Vec::new();
-
     match input.data {
         Data::Struct(ref data) => match data.fields {
             Fields::Named(ref fields) => {

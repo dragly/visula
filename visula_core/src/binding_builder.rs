@@ -1,4 +1,5 @@
 use crate::{InstanceBufferInner, UniformBufferInner};
+use itertools::Itertools;
 use naga::Module;
 use naga::{Expression, Handle};
 use std::cell::RefCell;
@@ -8,6 +9,7 @@ use wgpu::{
     BindGroup, BindGroupLayout, BufferAddress, VertexAttribute, VertexBufferLayout, VertexStepMode,
 };
 
+#[derive(Clone, Debug)]
 pub struct VertexBufferLayoutBuilder {
     pub array_stride: BufferAddress,
     pub step_mode: VertexStepMode,
@@ -24,10 +26,12 @@ impl VertexBufferLayoutBuilder {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct BufferBindingField {
     pub function_argument: u32,
 }
 
+#[derive(Clone, Debug)]
 pub struct BufferBinding {
     pub slot: u32,
     pub fields: Vec<BufferBindingField>,
@@ -96,5 +100,12 @@ impl BindingBuilder {
             current_slot,
             current_bind_group,
         }
+    }
+
+    pub fn sorted_bindings(&self) -> Vec<BufferBinding> {
+        let mut sorted_bindings = self.bindings.values().cloned().collect_vec();
+
+        sorted_bindings.sort_by(|a, b| a.slot.cmp(&b.slot));
+        sorted_bindings
     }
 }

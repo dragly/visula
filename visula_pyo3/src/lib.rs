@@ -1,6 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 use itertools::Itertools;
 
+use pyo3::types::{PyDict, PyFunction};
 use pyo3::{buffer::PyBuffer, prelude::*};
 
 use visula::{
@@ -11,6 +12,7 @@ use visula::{
 use visula_core::glam::{Vec3, Vec4};
 use visula_derive::Instance;
 use wgpu::Color;
+use winit::event::{ElementState, MouseButton, WindowEvent};
 use winit::platform::run_return::EventLoopExtRunReturn;
 use winit::{
     event::Event,
@@ -30,7 +32,7 @@ struct Error {}
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct PointData {
-    position: Vec3,
+    position: [f32; 3],
     _padding: f32,
 }
 
@@ -47,13 +49,39 @@ fn convert(py: Python, application: &Application, obj: &PyObject) -> Expression 
             .to_vec(py)
             .expect("Cannot convert to vec")
             .iter()
-            .map(|&v| v as f32)
+            .copied()
+            .chunks(3)
+            .into_iter()
+            .map(|x| {
+                let v: Vec<f64> = x.collect();
+                PointData {
+                    position: [v[0] as f32, v[1] as f32, v[2] as f32],
+                    _padding: Default::default(),
+                }
+            })
+            .collect();
+
+        buffer.update(&application.device, &application.queue, &point_data);
+
+        return instance.position;
+    }
+    if let Ok(x) = obj.extract::<PyBuffer<f32>>(py) {
+        // TODO optimize the case where the same PyBuffer has already
+        // been written to a wgpu Buffer, for instance by creating
+        // a cache
+        let mut buffer = InstanceBuffer::<PointData>::new(&application.device);
+        let instance = buffer.instance();
+        let point_data: Vec<PointData> = x
+            .to_vec(py)
+            .expect("Cannot convert to vec")
+            .iter()
+            .copied()
             .chunks(3)
             .into_iter()
             .map(|x| {
                 let v: Vec<f32> = x.collect();
                 PointData {
-                    position: Vec3::new(v[0], v[1], v[2]),
+                    position: [v[0], v[1], v[2]],
                     _padding: Default::default(),
                 }
             })
@@ -94,7 +122,12 @@ impl PyApplication {
 }
 
 #[pyfunction]
-fn show(py: Python, pyapplication: &mut PyApplication, renderables: Vec<PyObject>) -> PyResult<()> {
+fn show(
+    py: Python,
+    pyapplication: &mut PyApplication,
+    renderables: Vec<PyObject>,
+    callback: &PyFunction,
+) -> PyResult<()> {
     let PyApplication { event_loop } = pyapplication;
     let window = create_window(
         RunConfig {
@@ -171,7 +204,27 @@ fn show(py: Python, pyapplication: &mut PyApplication, renderables: Vec<PyObject
                 application.update();
             }
             event => {
-                application.handle_event(&event, control_flow);
+                if !(application.handle_event(&event, control_flow)) {
+                    if let Event::WindowEvent {
+                        event:
+                            WindowEvent::MouseInput {
+                                state: ElementState::Released,
+                                button: MouseButton::Left,
+                                ..
+                            },
+                        ..
+                    } = event
+                    {
+                        let kwargs = PyDict::new(py);
+                        kwargs.set_item("first", "hello").expect("Failed to insert");
+                        kwargs
+                            .set_item("second", "world")
+                            .expect("Failed to insert");
+                        callback
+                            .call((), Some(kwargs))
+                            .expect("Could not call callback");
+                    }
+                }
             }
         }
     });

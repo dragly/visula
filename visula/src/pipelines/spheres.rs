@@ -2,6 +2,7 @@ use crate::rendering_descriptor::RenderingDescriptor;
 use crate::simulation::RenderData;
 use crate::{DefaultRenderPassDescriptor, Renderable};
 use bytemuck::{Pod, Zeroable};
+use itertools::Itertools;
 use naga::{back::wgsl::WriterFlags, valid::ValidationFlags};
 use std::cell::Ref;
 use std::mem::size_of;
@@ -131,16 +132,18 @@ impl Spheres {
                 shader_location: 0,
             }],
         };
-        let mut layouts = binding_builder
-            .bindings
-            .values()
+        let sorted_bindings = binding_builder.sorted_bindings();
+        let mut layouts = sorted_bindings
+            .iter()
             .map(|binding| binding.layout.build())
-            .collect();
+            .collect_vec();
+
         let buffers = {
             let mut buffers = vec![vertex_buffer_layout];
             buffers.append(&mut layouts);
             buffers
         };
+
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("spheres render pipeline"),
             layout: Some(&pipeline_layout),
