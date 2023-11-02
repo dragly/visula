@@ -214,9 +214,9 @@ fn show(
                     Spheres::new(
                         &pyapplication.application.rendering_descriptor(),
                         &SphereDelegate {
-                            position: convert(py, &pyapplication, pysphere.position).inner,
-                            radius: convert(py, &pyapplication, pysphere.radius).inner,
-                            color: convert(py, &pyapplication, pysphere.color).inner,
+                            position: convert(py, pyapplication, pysphere.position).inner,
+                            radius: convert(py, pyapplication, pysphere.radius).inner,
+                            color: convert(py, pyapplication, pysphere.color).inner,
                         },
                     )
                     .expect("Failed to create spheres"),
@@ -227,10 +227,10 @@ fn show(
                     Lines::new(
                         &pyapplication.application.rendering_descriptor(),
                         &LineDelegate {
-                            start: convert(py, &pyapplication, pylines.start).inner,
-                            end: convert(py, &pyapplication, pylines.end).inner,
-                            width: convert(py, &pyapplication, pylines.width).inner,
-                            alpha: convert(py, &pyapplication, pylines.alpha).inner,
+                            start: convert(py, pyapplication, pylines.start).inner,
+                            end: convert(py, pyapplication, pylines.end).inner,
+                            width: convert(py, pyapplication, pylines.width).inner,
+                            alpha: convert(py, pyapplication, pylines.alpha).inner,
                         },
                     )
                     .expect("Failed to create spheres"),
