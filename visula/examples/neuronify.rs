@@ -291,7 +291,7 @@ impl Simulation {
         )
         .unwrap();
 
-        let mut boundary_buffer = InstanceBuffer::<LineData>::new(&application.device);
+        let boundary_buffer = InstanceBuffer::<LineData>::new(&application.device);
         let boundary = boundary_buffer.instance();
         let boundaries = Lines::new(
             &application.rendering_descriptor(),

@@ -66,7 +66,7 @@ impl<T: Instance + Pod> InstanceBuffer<T> {
         }
     }
 
-    pub fn update(&mut self, device: &Device, queue: &Queue, data: &[T]) {
+    pub fn update(&self, device: &Device, queue: &Queue, data: &[T]) {
         let mut inner = self.inner.borrow_mut();
         log::trace!("Update buffer '{}' with length {}", inner.label, data.len());
         if data.len() == inner.count {

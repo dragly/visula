@@ -132,7 +132,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let line = line_buffer.instance();
 
     let mut camera_controller = CameraController::new(&window);
-    let mut camera = Camera::new(&device);
+    let camera = Camera::new(&device);
 
     let lines = Lines::new(
         &RenderingDescriptor {
