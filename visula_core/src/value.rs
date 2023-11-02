@@ -46,6 +46,9 @@ pub enum Expression {
         exponent: ExpressionInner,
     },
     Floor(ExpressionInner),
+    Cos(ExpressionInner),
+    Sin(ExpressionInner),
+    Tan(ExpressionInner),
 }
 
 impl Expression {
@@ -66,6 +69,15 @@ impl Expression {
 
     pub fn floor(&self) -> Expression {
         Expression::Floor(self.into())
+    }
+    pub fn cos(&self) -> Expression {
+        Expression::Cos(self.into())
+    }
+    pub fn sin(&self) -> Expression {
+        Expression::Sin(self.into())
+    }
+    pub fn tan(&self) -> Expression {
+        Expression::Tan(self.into())
     }
 }
 
@@ -277,6 +289,54 @@ impl Expression {
                         naga::Span::default(),
                     )
             }
+            Expression::Cos(value) => {
+                let arg = value.setup(module, binding_builder);
+                module.entry_points[binding_builder.entry_point_index]
+                    .function
+                    .expressions
+                    .append(
+                        naga::Expression::Math {
+                            fun: naga::MathFunction::Cos,
+                            arg,
+                            arg1: None,
+                            arg2: None,
+                            arg3: None,
+                        },
+                        naga::Span::default(),
+                    )
+            }
+            Expression::Sin(value) => {
+                let arg = value.setup(module, binding_builder);
+                module.entry_points[binding_builder.entry_point_index]
+                    .function
+                    .expressions
+                    .append(
+                        naga::Expression::Math {
+                            fun: naga::MathFunction::Sin,
+                            arg,
+                            arg1: None,
+                            arg2: None,
+                            arg3: None,
+                        },
+                        naga::Span::default(),
+                    )
+            }
+            Expression::Tan(value) => {
+                let arg = value.setup(module, binding_builder);
+                module.entry_points[binding_builder.entry_point_index]
+                    .function
+                    .expressions
+                    .append(
+                        naga::Expression::Math {
+                            fun: naga::MathFunction::Tan,
+                            arg,
+                            arg1: None,
+                            arg2: None,
+                            arg3: None,
+                        },
+                        naga::Span::default(),
+                    )
+            }
             Expression::Pow { base, exponent } => {
                 let arg = base.setup(module, binding_builder);
                 let arg1 = Some(exponent.setup(module, binding_builder));
@@ -395,6 +455,15 @@ impl std::fmt::Debug for Expression {
             }
             Expression::Pow { .. } => {
                 write!(fmt, "Pow")?;
+            }
+            Expression::Sin(_) => {
+                write!(fmt, "Sin")?;
+            }
+            Expression::Cos(_) => {
+                write!(fmt, "Cos")?;
+            }
+            Expression::Tan(_) => {
+                write!(fmt, "Tan")?;
             }
         }
         Ok(())

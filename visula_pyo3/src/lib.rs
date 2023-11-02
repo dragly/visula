@@ -32,8 +32,8 @@ struct Error {}
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct PointData {
-    position: [f32; 3],
-    _padding: f32,
+    position: f32,
+    _padding: [f32; 3],
 }
 
 #[pyclass(name = "Expression", unsendable)]
@@ -85,6 +85,22 @@ impl PyExpression {
             inner: self.inner.clone().pow(other.inner.clone()),
         }
     }
+
+    fn cos(&self) -> PyExpression {
+        Self {
+            inner: self.inner.cos(),
+        }
+    }
+    fn sin(&self) -> PyExpression {
+        Self {
+            inner: self.inner.sin(),
+        }
+    }
+    fn tan(&self) -> PyExpression {
+        Self {
+            inner: self.inner.tan(),
+        }
+    }
 }
 
 #[pyclass(unsendable)]
@@ -104,14 +120,11 @@ impl PyInstanceBuffer {
             .expect("Cannot convert to vec")
             .iter()
             .copied()
-            .chunks(3)
+            //.chunks(3)
             .into_iter()
-            .map(|x| {
-                let v: Vec<f64> = x.collect();
-                PointData {
-                    position: [v[0] as f32, v[1] as f32, v[2] as f32],
-                    _padding: Default::default(),
-                }
+            .map(|x| PointData {
+                position: x as f32,
+                _padding: Default::default(),
             })
             .collect();
         buffer.update(&application.device, &application.queue, &point_data);
@@ -133,14 +146,10 @@ impl PyInstanceBuffer {
             .expect("Cannot convert to vec")
             .iter()
             .copied()
-            .chunks(3)
             .into_iter()
-            .map(|x| {
-                let v: Vec<f64> = x.collect();
-                PointData {
-                    position: [v[0] as f32, v[1] as f32, v[2] as f32],
-                    _padding: Default::default(),
-                }
+            .map(|x| PointData {
+                position: x as f32,
+                _padding: Default::default(),
             })
             .collect();
         self.inner
@@ -152,6 +161,17 @@ impl PyInstanceBuffer {
         PyExpression {
             inner: self.inner.instance().position,
         }
+    }
+}
+
+#[pyfunction]
+fn vec3(x: &PyExpression, y: &PyExpression, z: &PyExpression) -> PyExpression {
+    PyExpression {
+        inner: Expression::Vector3 {
+            x: x.inner.clone().into(),
+            y: y.inner.clone().into(),
+            z: z.inner.clone().into(),
+        },
     }
 }
 
@@ -177,14 +197,10 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: PyObject) -> PyExpres
             .expect("Cannot convert to vec")
             .iter()
             .copied()
-            .chunks(3)
             .into_iter()
-            .map(|x| {
-                let v: Vec<f64> = x.collect();
-                PointData {
-                    position: [v[0] as f32, v[1] as f32, v[2] as f32],
-                    _padding: Default::default(),
-                }
+            .map(|x| PointData {
+                position: x as f32,
+                _padding: Default::default(),
             })
             .collect();
 
@@ -204,14 +220,10 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: PyObject) -> PyExpres
             .expect("Cannot convert to vec")
             .iter()
             .copied()
-            .chunks(3)
             .into_iter()
-            .map(|x| {
-                let v: Vec<f32> = x.collect();
-                PointData {
-                    position: [v[0], v[1], v[2]],
-                    _padding: Default::default(),
-                }
+            .map(|x| PointData {
+                position: x,
+                _padding: Default::default(),
             })
             .collect();
 
@@ -391,6 +403,7 @@ fn visula_pyo3(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(testme, m)?)?;
     m.add_function(wrap_pyfunction!(testyou, m)?)?;
     m.add_function(wrap_pyfunction!(convert, m)?)?;
+    m.add_function(wrap_pyfunction!(vec3, m)?)?;
     m.add_class::<PyLineDelegate>()?;
     m.add_class::<PySphereDelegate>()?;
     m.add_class::<PyExpression>()?;
