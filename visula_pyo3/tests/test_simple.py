@@ -1,4 +1,4 @@
-from visula import LineDelegate, SphereDelegate, Figure
+from visula import LineDelegate, SphereDelegate, Figure, Expression
 import numpy as np
 
 t = np.linspace(0, 2*3.14, 10000)
@@ -7,8 +7,10 @@ y = np.sin(t)**3
 z = np.cos(t)**3
 positions = 10.0 * np.array([x, y, z]).T
 
+position = Expression(positions)
+
 spheres = SphereDelegate(
-    position=positions,
+    position=position,
     radius=1.0,
     color=[1.0, 0.0, 1.0],
 )
