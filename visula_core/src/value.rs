@@ -1,6 +1,6 @@
 use std::{
     fmt::{Error, Formatter},
-    ops::{Add, Deref, Div, Mul, Neg, Sub},
+    ops::{Add, Deref, Div, Mul, Neg, Rem, Sub},
 };
 
 use crate::{BindingBuilder, InstanceField, UniformField};
@@ -45,6 +45,7 @@ pub enum Expression {
         base: ExpressionInner,
         exponent: ExpressionInner,
     },
+    Floor(ExpressionInner),
 }
 
 impl Expression {
@@ -61,6 +62,10 @@ impl Expression {
 
     pub fn length(&self) -> Expression {
         Expression::Length(self.into())
+    }
+
+    pub fn floor(&self) -> Expression {
+        Expression::Floor(self.into())
     }
 }
 
@@ -240,6 +245,22 @@ impl Expression {
                         naga::Span::default(),
                     )
             }
+            Expression::Floor(value) => {
+                let arg = value.setup(module, binding_builder);
+                module.entry_points[binding_builder.entry_point_index]
+                    .function
+                    .expressions
+                    .append(
+                        naga::Expression::Math {
+                            fun: naga::MathFunction::Floor,
+                            arg,
+                            arg1: None,
+                            arg2: None,
+                            arg3: None,
+                        },
+                        naga::Span::default(),
+                    )
+            }
             Expression::Exp(value) => {
                 let arg = value.setup(module, binding_builder);
                 module.entry_points[binding_builder.entry_point_index]
@@ -365,6 +386,9 @@ impl std::fmt::Debug for Expression {
             }
             Expression::Length(_) => {
                 write!(fmt, "Length")?;
+            }
+            Expression::Floor(_) => {
+                write!(fmt, "Floor")?;
             }
             Expression::Exp(_) => {
                 write!(fmt, "Exp")?;
@@ -589,6 +613,34 @@ impl Mul<&Expression> for &Expression {
 
     fn mul(self, other: &Expression) -> Expression {
         self.clone() * other.clone()
+    }
+}
+
+impl Rem<Expression> for Expression {
+    type Output = Expression;
+
+    fn rem(self, other: Expression) -> Expression {
+        Expression::BinaryOperator {
+            left: ExpressionInner::new(self),
+            right: ExpressionInner::new(other),
+            operator: naga::BinaryOperator::Modulo,
+        }
+    }
+}
+
+impl Rem<&Expression> for Expression {
+    type Output = Expression;
+
+    fn rem(self, other: &Expression) -> Expression {
+        self % other.clone()
+    }
+}
+
+impl Rem<&Expression> for &Expression {
+    type Output = Expression;
+
+    fn rem(self, other: &Expression) -> Expression {
+        self.clone() % other.clone()
     }
 }
 

@@ -36,9 +36,68 @@ struct PointData {
     _padding: f32,
 }
 
-// TODO generate the renderables from the delegates
+#[pyclass(name = "Expression", unsendable)]
+#[derive(Clone)]
+struct PyExpression {
+    inner: Expression,
+}
 
-fn convert(py: Python, application: &Application, obj: &PyObject) -> Expression {
+#[pymethods]
+impl PyExpression {
+    fn add(&self, other: &PyExpression) -> PyExpression {
+        PyExpression {
+            inner: self.inner.clone() + other.inner.clone(),
+        }
+    }
+
+    fn sub(&self, other: &PyExpression) -> PyExpression {
+        PyExpression {
+            inner: self.inner.clone() - other.inner.clone(),
+        }
+    }
+
+    fn mul(&self, other: &PyExpression) -> PyExpression {
+        PyExpression {
+            inner: self.inner.clone() * other.inner.clone(),
+        }
+    }
+
+    fn truediv(&self, other: &PyExpression) -> PyExpression {
+        PyExpression {
+            inner: self.inner.clone() / other.inner.clone(),
+        }
+    }
+
+    fn floordiv(&self, other: &PyExpression) -> PyExpression {
+        PyExpression {
+            inner: (self.inner.clone() / other.inner.clone()).floor(),
+        }
+    }
+
+    fn modulo(&self, other: &PyExpression) -> PyExpression {
+        PyExpression {
+            inner: self.inner.clone() % other.inner.clone(),
+        }
+    }
+
+    fn pow(&self, other: &PyExpression) -> PyExpression {
+        PyExpression {
+            inner: self.inner.clone().pow(other.inner.clone()),
+        }
+    }
+}
+
+#[pyfunction]
+fn convert(py: Python, pyapplication: &PyApplication, obj: PyObject) -> PyExpression {
+    let PyApplication { application, .. } = pyapplication;
+    if let Ok(expr) = obj.extract::<PyExpression>(py) {
+        return expr;
+    }
+    if let Ok(inner) = obj.getattr(py, "inner") {
+        if let Ok(expr) = inner.extract::<PyExpression>(py) {
+            return expr;
+        }
+    }
     if let Ok(x) = obj.extract::<PyBuffer<f64>>(py) {
         // TODO optimize the case where the same PyBuffer has already
         // been written to a wgpu Buffer, for instance by creating
@@ -63,9 +122,10 @@ fn convert(py: Python, application: &Application, obj: &PyObject) -> Expression 
 
         buffer.update(&application.device, &application.queue, &point_data);
 
-        return instance.position;
-    }
-    if let Ok(x) = obj.extract::<PyBuffer<f32>>(py) {
+        return PyExpression {
+            inner: instance.position,
+        };
+    } else if let Ok(x) = obj.extract::<PyBuffer<f32>>(py) {
         // TODO optimize the case where the same PyBuffer has already
         // been written to a wgpu Buffer, for instance by creating
         // a cache
@@ -89,26 +149,30 @@ fn convert(py: Python, application: &Application, obj: &PyObject) -> Expression 
 
         buffer.update(&application.device, &application.queue, &point_data);
 
-        return instance.position;
-    }
-    if let Ok(x) = obj.extract::<f32>(py) {
-        return x.into();
-    }
-    if let Ok(x) = obj.extract::<Vec<f32>>(py) {
+        return PyExpression {
+            inner: instance.position,
+        };
+    } else if let Ok(x) = obj.extract::<f32>(py) {
+        return PyExpression { inner: x.into() };
+    } else if let Ok(x) = obj.extract::<Vec<f32>>(py) {
         if x.len() == 3 {
-            return Vec3::new(x[0], x[1], x[2]).into();
+            return PyExpression {
+                inner: Vec3::new(x[0], x[1], x[2]).into(),
+            };
         } else if x.len() == 4 {
-            return Vec4::new(x[0], x[1], x[2], x[3]).into();
-        } else {
-            panic!("Vec of length {} are not supported", x.len());
+            return PyExpression {
+                inner: Vec4::new(x[0], x[1], x[2], x[3]).into(),
+            };
         }
+        unimplemented!("Vec of length {} are not supported", x.len());
     }
-    unimplemented!("No support for obj")
+    unimplemented!("No support for obj: {obj}")
 }
 
 #[pyclass(name = "Application", unsendable)]
-struct PyApplication {
+pub struct PyApplication {
     event_loop: EventLoop<CustomEvent>,
+    application: Application,
 }
 
 #[pymethods]
@@ -117,7 +181,17 @@ impl PyApplication {
     fn new() -> Self {
         initialize_logger();
         let event_loop = create_event_loop();
-        Self { event_loop }
+        let window = create_window(
+            RunConfig {
+                canvas_name: "none".to_owned(),
+            },
+            &event_loop,
+        );
+        let application = pollster::block_on(async { Application::new(window).await });
+        Self {
+            event_loop,
+            application,
+        }
     }
 }
 
@@ -128,16 +202,8 @@ fn show(
     renderables: Vec<PyObject>,
     callback: &PyFunction,
 ) -> PyResult<()> {
-    let PyApplication { event_loop } = pyapplication;
-    let window = create_window(
-        RunConfig {
-            canvas_name: "none".to_owned(),
-        },
-        event_loop,
-    );
     // TODO consider making the application retained so that not all the wgpu initialization needs
     // to be re-done
-    let mut application = pollster::block_on(async { Application::new(window).await });
 
     let spheres_list: Vec<Box<dyn Renderable>> = renderables
         .iter()
@@ -146,11 +212,11 @@ fn show(
             if let Ok(pysphere) = renderable.extract::<PySphereDelegate>(py) {
                 return Box::new(
                     Spheres::new(
-                        &application.rendering_descriptor(),
+                        &pyapplication.application.rendering_descriptor(),
                         &SphereDelegate {
-                            position: convert(py, &application, &pysphere.position),
-                            radius: convert(py, &application, &pysphere.radius),
-                            color: convert(py, &application, &pysphere.color),
+                            position: convert(py, pyapplication, pysphere.position).inner,
+                            radius: convert(py, pyapplication, pysphere.radius).inner,
+                            color: convert(py, pyapplication, pysphere.color).inner,
                         },
                     )
                     .expect("Failed to create spheres"),
@@ -159,12 +225,12 @@ fn show(
             if let Ok(pylines) = renderable.extract::<PyLineDelegate>(py) {
                 return Box::new(
                     Lines::new(
-                        &application.rendering_descriptor(),
+                        &pyapplication.application.rendering_descriptor(),
                         &LineDelegate {
-                            start: convert(py, &application, &pylines.start),
-                            end: convert(py, &application, &pylines.end),
-                            width: convert(py, &application, &pylines.width),
-                            alpha: convert(py, &application, &pylines.alpha),
+                            start: convert(py, pyapplication, pylines.start).inner,
+                            end: convert(py, pyapplication, pylines.end).inner,
+                            width: convert(py, pyapplication, pylines.width).inner,
+                            alpha: convert(py, pyapplication, pylines.alpha).inner,
                         },
                     )
                     .expect("Failed to create spheres"),
@@ -173,6 +239,11 @@ fn show(
             unimplemented!("TODO")
         })
         .collect_vec();
+
+    let PyApplication {
+        event_loop,
+        application,
+    } = pyapplication;
 
     event_loop.run_return(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -235,8 +306,10 @@ fn show(
 #[pyo3(name = "_visula_pyo3")]
 fn visula_pyo3(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(show, m)?)?;
+    m.add_function(wrap_pyfunction!(convert, m)?)?;
     m.add_class::<PyLineDelegate>()?;
     m.add_class::<PySphereDelegate>()?;
+    m.add_class::<PyExpression>()?;
     m.add_class::<PyApplication>()?;
     Ok(())
 }
