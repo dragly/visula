@@ -235,7 +235,7 @@ impl Simulation {
                 _padding: Default::default(),
             })
             .collect_vec();
-        let mut color_buffer = application.device.create_instance_buffer::<ColorData>();
+        let color_buffer = application.device.create_instance_buffer::<ColorData>();
         let color = color_buffer.instance();
         color_buffer.update(&application.device, &application.queue, &color_data);
         let spheres = Spheres::new(
