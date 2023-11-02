@@ -190,7 +190,7 @@ impl Application {
         self.camera.update(&camera_uniforms, &self.queue);
     }
 
-    pub fn next_frame(&mut self) -> SurfaceTexture {
+    pub fn next_frame(&self) -> SurfaceTexture {
         match self.surface.get_current_texture() {
             Ok(frame) => frame,
             Err(_) => {
@@ -202,13 +202,13 @@ impl Application {
         }
     }
 
-    pub fn encoder(&mut self) -> CommandEncoder {
+    pub fn encoder(&self) -> CommandEncoder {
         self.device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None })
     }
 
     pub fn begin_render_pass(
-        &mut self,
+        &self,
         frame: &SurfaceTexture,
         encoder: &mut CommandEncoder,
         clear_color: Color,

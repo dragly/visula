@@ -21,6 +21,9 @@ class Expression:
         o = _ensure_expression(other)
         return Expression(self.inner.add(o))
 
+    def __radd__(self, other) -> Expression:
+        return self + other
+
     def __sub__(self, other) -> Expression:
         o = _ensure_expression(other)
         return Expression(self.inner.sub(o))
@@ -28,6 +31,9 @@ class Expression:
     def __mul__(self, other) -> Expression:
         o = _ensure_expression(other)
         return Expression(self.inner.mul(o))
+
+    def __rmul__(self, other) -> Expression:
+        return self + other
 
     def __truediv__(self, other) -> Expression:
         o = _ensure_expression(other)

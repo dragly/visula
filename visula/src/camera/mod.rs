@@ -55,7 +55,7 @@ impl Camera {
         }
     }
 
-    pub fn update(&mut self, uniforms: &CameraUniforms, queue: &wgpu::Queue) {
+    pub fn update(&self, uniforms: &CameraUniforms, queue: &wgpu::Queue) {
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[*uniforms]));
     }
 }

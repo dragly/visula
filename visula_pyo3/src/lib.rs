@@ -87,6 +87,74 @@ impl PyExpression {
     }
 }
 
+#[pyclass(unsendable)]
+struct PyInstanceBuffer {
+    inner: InstanceBuffer<PointData>,
+}
+
+#[pymethods]
+impl PyInstanceBuffer {
+    #[new]
+    fn new(py: Python, pyapplication: &PyApplication, obj: PyObject) -> Self {
+        let PyApplication { application, .. } = pyapplication;
+        let x = obj.extract::<PyBuffer<f64>>(py).expect("Could not extract");
+        let mut buffer = InstanceBuffer::<PointData>::new(&application.device);
+        let point_data: Vec<PointData> = x
+            .to_vec(py)
+            .expect("Cannot convert to vec")
+            .iter()
+            .copied()
+            .chunks(3)
+            .into_iter()
+            .map(|x| {
+                let v: Vec<f64> = x.collect();
+                PointData {
+                    position: [v[0] as f32, v[1] as f32, v[2] as f32],
+                    _padding: Default::default(),
+                }
+            })
+            .collect();
+        buffer.update(&application.device, &application.queue, &point_data);
+        PyInstanceBuffer { inner: buffer }
+    }
+
+    fn update_buffer(
+        &self,
+        py: Python,
+        pyapplication: &PyApplication,
+        data: PyObject,
+    ) -> PyResult<()> {
+        println!("Updating in Rust...");
+        let PyApplication { application, .. } = pyapplication;
+        let x = data
+            .extract::<PyBuffer<f64>>(py)
+            .expect("Could not extract");
+        let point_data: Vec<PointData> = x
+            .to_vec(py)
+            .expect("Cannot convert to vec")
+            .iter()
+            .copied()
+            .chunks(3)
+            .into_iter()
+            .map(|x| {
+                let v: Vec<f64> = x.collect();
+                PointData {
+                    position: [v[0] as f32, v[1] as f32, v[2] as f32],
+                    _padding: Default::default(),
+                }
+            })
+            .collect();
+        self.inner
+            .update(&application.device, &application.queue, &point_data);
+        Ok(())
+    }
+
+    fn dummy(&self, py: Python, pyapplication: &PyApplication) -> PyResult<()> {
+        println!("Dummy in Rust...");
+        Ok(())
+    }
+}
+
 #[pyfunction]
 fn convert(py: Python, pyapplication: &PyApplication, obj: PyObject) -> PyExpression {
     let PyApplication { application, .. } = pyapplication;
@@ -169,89 +237,101 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: PyObject) -> PyExpres
     unimplemented!("No support for obj: {obj}")
 }
 
-#[pyclass(name = "Application", unsendable)]
+#[pyclass(unsendable)]
 pub struct PyApplication {
-    event_loop: EventLoop<CustomEvent>,
     application: Application,
+}
+
+#[pyclass(unsendable)]
+pub struct PyEventLoop {
+    event_loop: EventLoop<CustomEvent>,
+}
+
+#[pymethods]
+impl PyEventLoop {
+    #[new]
+    fn new() -> Self {
+        initialize_logger();
+        let event_loop = create_event_loop();
+        Self { event_loop }
+    }
 }
 
 #[pymethods]
 impl PyApplication {
     #[new]
-    fn new() -> Self {
-        initialize_logger();
-        let event_loop = create_event_loop();
+    fn new(event_loop: &PyEventLoop) -> Self {
         let window = create_window(
             RunConfig {
                 canvas_name: "none".to_owned(),
             },
-            &event_loop,
+            &event_loop.event_loop,
         );
         let application = pollster::block_on(async { Application::new(window).await });
-        Self {
-            event_loop,
-            application,
-        }
+        Self { application }
     }
 }
 
 #[pyfunction]
 fn show(
     py: Python,
-    pyapplication: &mut PyApplication,
+    py_event_loop: &mut PyEventLoop,
+    py_application: &PyCell<PyApplication>,
     renderables: Vec<PyObject>,
-    callback: &PyFunction,
+    update: &PyFunction,
 ) -> PyResult<()> {
     // TODO consider making the application retained so that not all the wgpu initialization needs
     // to be re-done
 
-    let spheres_list: Vec<Box<dyn Renderable>> = renderables
-        .iter()
-        .map(|renderable| -> Box<dyn Renderable> {
-            // TODO automate the conversion
-            if let Ok(pysphere) = renderable.extract::<PySphereDelegate>(py) {
-                return Box::new(
-                    Spheres::new(
-                        &pyapplication.application.rendering_descriptor(),
-                        &SphereDelegate {
-                            position: convert(py, &pyapplication, pysphere.position).inner,
-                            radius: convert(py, &pyapplication, pysphere.radius).inner,
-                            color: convert(py, &pyapplication, pysphere.color).inner,
-                        },
-                    )
-                    .expect("Failed to create spheres"),
-                );
-            }
-            if let Ok(pylines) = renderable.extract::<PyLineDelegate>(py) {
-                return Box::new(
-                    Lines::new(
-                        &pyapplication.application.rendering_descriptor(),
-                        &LineDelegate {
-                            start: convert(py, &pyapplication, pylines.start).inner,
-                            end: convert(py, &pyapplication, pylines.end).inner,
-                            width: convert(py, &pyapplication, pylines.width).inner,
-                            alpha: convert(py, &pyapplication, pylines.alpha).inner,
-                        },
-                    )
-                    .expect("Failed to create spheres"),
-                );
-            }
-            unimplemented!("TODO")
-        })
-        .collect_vec();
+    let spheres_list: Vec<Box<dyn Renderable>> = {
+        let application = py_application.borrow_mut();
+        renderables
+            .iter()
+            .map(|renderable| -> Box<dyn Renderable> {
+                // TODO automate the conversion
+                if let Ok(pysphere) = renderable.extract::<PySphereDelegate>(py) {
+                    return Box::new(
+                        Spheres::new(
+                            &application.application.rendering_descriptor(),
+                            &SphereDelegate {
+                                position: convert(py, &application, pysphere.position).inner,
+                                radius: convert(py, &application, pysphere.radius).inner,
+                                color: convert(py, &application, pysphere.color).inner,
+                            },
+                        )
+                        .expect("Failed to create spheres"),
+                    );
+                }
+                if let Ok(pylines) = renderable.extract::<PyLineDelegate>(py) {
+                    return Box::new(
+                        Lines::new(
+                            &application.application.rendering_descriptor(),
+                            &LineDelegate {
+                                start: convert(py, &application, pylines.start).inner,
+                                end: convert(py, &application, pylines.end).inner,
+                                width: convert(py, &application, pylines.width).inner,
+                                alpha: convert(py, &application, pylines.alpha).inner,
+                            },
+                        )
+                        .expect("Failed to create spheres"),
+                    );
+                }
+                unimplemented!("TODO")
+            })
+            .collect_vec()
+    };
 
-    let PyApplication {
-        event_loop,
-        application,
-    } = pyapplication;
+    let PyEventLoop { event_loop } = py_event_loop;
 
+    let mut updated = 0;
     event_loop.run_return(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
         match event {
             Event::RedrawEventsCleared => {
-                application.window.request_redraw();
+                py_application.borrow().application.window.request_redraw();
             }
             Event::RedrawRequested(_) => {
+                let application = &py_application.borrow().application;
                 let frame = application.next_frame();
                 let mut encoder = application.encoder();
 
@@ -272,44 +352,51 @@ fn show(
                 frame.present();
             }
             Event::MainEventsCleared => {
-                application.update();
+                let result = update.call((), None);
+                if let Err(err) = result {
+                    println!("Could not call update: {:?}", err);
+                    println!("{}", err.traceback(py).unwrap().format().unwrap());
+                }
+
+                py_application.borrow_mut().application.update();
             }
             event => {
-                if !(application.handle_event(&event, control_flow)) {
-                    if let Event::WindowEvent {
-                        event:
-                            WindowEvent::MouseInput {
-                                state: ElementState::Released,
-                                button: MouseButton::Left,
-                                ..
-                            },
-                        ..
-                    } = event
-                    {
-                        let kwargs = PyDict::new(py);
-                        kwargs.set_item("first", "hello").expect("Failed to insert");
-                        kwargs
-                            .set_item("second", "world")
-                            .expect("Failed to insert");
-                        callback
-                            .call((), Some(kwargs))
-                            .expect("Could not call callback");
-                    }
-                }
+                py_application
+                    .borrow_mut()
+                    .application
+                    .handle_event(&event, control_flow);
             }
         }
     });
     Ok(())
 }
 
+#[pyfunction]
+fn testme(update: &PyFunction) {
+    println!("Called testme");
+    let result = update.call((), None);
+    if let Err(err) = result {
+        println!("Could not call update: {:?}", err);
+    }
+}
+
+#[pyfunction]
+fn testyou() {
+    println!("Called testyou");
+}
+
 #[pymodule]
 #[pyo3(name = "_visula_pyo3")]
 fn visula_pyo3(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(show, m)?)?;
+    m.add_function(wrap_pyfunction!(testme, m)?)?;
+    m.add_function(wrap_pyfunction!(testyou, m)?)?;
     m.add_function(wrap_pyfunction!(convert, m)?)?;
     m.add_class::<PyLineDelegate>()?;
     m.add_class::<PySphereDelegate>()?;
     m.add_class::<PyExpression>()?;
     m.add_class::<PyApplication>()?;
+    m.add_class::<PyEventLoop>()?;
+    m.add_class::<PyInstanceBuffer>()?;
     Ok(())
 }
