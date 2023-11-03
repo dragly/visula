@@ -3,6 +3,7 @@ from .figure import Figure
 from .expression import Expression, vec3
 from .instance_buffer import InstanceBuffer
 from .math import cos, sin, tan
+from .uniform import Uniform
 
 __all__ = [
     "LineDelegate",

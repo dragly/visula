@@ -12,6 +12,7 @@ crate-type = ["cdylib"]
 visula = { path = "../visula" }
 visula_core = { path = "../visula_core" }
 visula_derive = { path = "../visula_derive" }
+byteorder = { version = "1.5.0" }
 bytemuck = { workspace = true }
 wgpu = { workspace = true }
 winit = { workspace = true }

@@ -1,5 +1,9 @@
 use bytemuck::{Pod, Zeroable};
+use byteorder::{LittleEndian, WriteBytesExt};
 use itertools::Itertools;
+use std::cell::RefCell;
+use std::io::Cursor;
+use std::rc::Rc;
 
 use pyo3::types::PyFunction;
 use pyo3::{buffer::PyBuffer, prelude::*};
@@ -10,8 +14,10 @@ use visula::{
     RunConfig, SphereDelegate, Spheres,
 };
 use visula_core::glam::{Vec3, Vec4};
+use visula_core::uuid::Uuid;
+use visula_core::UniformBufferInner;
 use visula_derive::Instance;
-use wgpu::Color;
+use wgpu::{BufferUsages, Color};
 
 use winit::platform::run_return::EventLoopExtRunReturn;
 use winit::{
@@ -101,6 +107,76 @@ impl PyExpression {
             inner: self.inner.tan(),
         }
     }
+}
+
+#[pyclass(unsendable)]
+struct PyUniformBuffer {
+    inner: Rc<RefCell<UniformBufferInner>>,
+}
+
+#[pymethods]
+impl PyUniformBuffer {
+    #[new]
+    fn new(py: Python, pyapplication: &PyApplication, size: usize, label: &str) -> Self {
+        let PyApplication { application, .. } = pyapplication;
+
+        let usage = BufferUsages::UNIFORM | BufferUsages::COPY_DST;
+        let buffer = application.device.create_buffer(&wgpu::BufferDescriptor {
+            mapped_at_creation: false,
+            size: size as u64,
+            label: Some(label),
+            usage,
+        });
+
+        let bind_group_layout =
+            application
+                .device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: None,
+                    entries: &[wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    }],
+                });
+
+        let bind_group = application
+            .device
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                label: None,
+                layout: &bind_group_layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: buffer.as_entire_binding(),
+                }],
+            });
+
+        Self {
+            inner: Rc::new(RefCell::new(UniformBufferInner {
+                label: label.into(),
+                buffer,
+                handle: Uuid::new_v4(),
+                bind_group,
+                bind_group_layout: Rc::new(bind_group_layout),
+            })),
+        }
+    }
+
+    fn update(&self, py: Python, pyapplication: &PyApplication, buffer: PyBuffer<u8>) {
+        let PyApplication { application, .. } = pyapplication;
+        let data = buffer.to_vec(py).expect("Could not turn PyBuffer into vec");
+        let inner = self.inner.borrow_mut();
+        println!("Data {:?}", data);
+        application.queue.write_buffer(&inner.buffer, 0, &data);
+    }
+
+    // TODO: Create instance on Rust side that
+    // includes the relevant code to generate the shader
 }
 
 #[pyclass(unsendable)]
@@ -410,5 +486,6 @@ fn visula_pyo3(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyApplication>()?;
     m.add_class::<PyEventLoop>()?;
     m.add_class::<PyInstanceBuffer>()?;
+    m.add_class::<PyUniformBuffer>()?;
     Ok(())
 }
