@@ -36,7 +36,7 @@ parameters.update()
 def create_particles(t, a, b, c):
     a = 10.0 * vl.cos(a)
     b = 100.0 * vl.sin(b)
-    c = 50.0 * vl.cos(c)
+    c = 50.0 * vl.cos(b)
     d = 8000
     x = vl.cos(a * t) + vl.cos(b * t) / 2.0 + vl.sin(c * t) / 3.0 + vl.cos(d * t) / 20.0
     y = vl.sin(a * t) + vl.sin(b * t) / 2.0 + vl.cos(c * t) / 3.0 + vl.sin(d * t) / 20.0
