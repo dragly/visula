@@ -4,19 +4,22 @@ from typing import Type
 
 from .application import Visula
 from .expression import Expression
-from ._visula_pyo3 import PyUniformBuffer
+from ._visula_pyo3 import PyUniformBuffer, PyUniformField
 import numpy as np
 
 
 @dataclass
 class Uniform:
     def __init__(self):
-        size = 0
+        total_size = 0
+        uniform_fields= []
         for field in fields(self):
-            size += np.dtype(field.type).itemsize
+            size = np.dtype(field.type).itemsize
+            total_size += size
+            uniform_fields.append(PyUniformField("float", size))
 
         self._inner = PyUniformBuffer(Visula.application(), size, "pyuniformbuffer")
-        self._size = size
+        self._size = total_size
         self._buffer = np.zeros(self._size, dtype=np.uint8)
 
     def instance(self):

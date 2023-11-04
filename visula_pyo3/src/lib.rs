@@ -15,7 +15,7 @@ use visula::{
 };
 use visula_core::glam::{Vec3, Vec4};
 use visula_core::uuid::Uuid;
-use visula_core::UniformBufferInner;
+use visula_core::{UniformBufferInner, UniformField};
 use visula_derive::Instance;
 use wgpu::{BufferUsages, Color};
 
@@ -109,16 +109,25 @@ impl PyExpression {
     }
 }
 
+#[pyclass]
+struct PyUniformField {
+    pub ty: String,
+    pub size: usize,
+}
+
 #[pyclass(unsendable)]
 struct PyUniformBuffer {
     inner: Rc<RefCell<UniformBufferInner>>,
+    fields: Vec<PyUniformField>,
 }
 
 #[pymethods]
 impl PyUniformBuffer {
     #[new]
-    fn new(py: Python, pyapplication: &PyApplication, size: usize, label: &str) -> Self {
+    fn new(py: Python, pyapplication: &PyApplication, fields: Vec<PyUniformField>, label: &str) -> Self {
         let PyApplication { application, .. } = pyapplication;
+
+        let size = fields.iter().fold(0, |acc, field| acc + field.size);
 
         let usage = BufferUsages::UNIFORM | BufferUsages::COPY_DST;
         let buffer = application.device.create_buffer(&wgpu::BufferDescriptor {
@@ -164,6 +173,7 @@ impl PyUniformBuffer {
                 bind_group,
                 bind_group_layout: Rc::new(bind_group_layout),
             })),
+            fields,
         }
     }
 
@@ -173,6 +183,75 @@ impl PyUniformBuffer {
         let inner = self.inner.borrow_mut();
         println!("Data {:?}", data);
         application.queue.write_buffer(&inner.buffer, 0, &data);
+    }
+
+    fn field(&self, py: Python, pyapplication: &PyApplication, field_index: usize) -> PyExpression {
+        PyExpression {
+            inner: Expression::UniformField(UniformField {
+                field_index,
+                bind_group_layout: self.inner.borrow().bind_group_layout.clone(),
+                buffer_handle: self.inner.borrow().handle,
+                inner: self.inner.clone(),
+                integrate_buffer: Self::integrate,
+            }),
+        }
+    }
+
+    fn integrate(
+        inner: &std::rc::Rc<std::cell::RefCell<visula_core::UniformBufferInner>>,
+        handle: &::visula_core::uuid::Uuid,
+        module: &mut ::visula_core::naga::Module,
+        binding_builder: &mut visula_core::BindingBuilder,
+        bind_group_layout: &std::rc::Rc<::visula_core::wgpu::BindGroupLayout>,
+    )
+    {
+        if binding_builder.uniforms.contains_key(&handle.clone()) {
+            return;
+        };
+
+        let entry_point_index = binding_builder.entry_point_index;
+        let previous_shader_location_offset = binding_builder.shader_location_offset;
+        let slot = binding_builder.current_slot;
+        let bind_group = binding_builder.current_bind_group;
+
+        //#(#uniform_field_types_init)*
+
+        //let uniform_type = module.types.insert(
+            //::visula_core::naga::Type {
+                //name: Some(stringify!(#uniform_struct_name).into()),
+                //inner: ::visula_core::naga::TypeInner::Struct {
+                    //members: vec![
+                        //#(#uniform_fields),*
+                    //],
+                    //span: ::std::mem::size_of::<#uniform_struct_name>() as u32,
+                //},
+            //},
+            //::visula_core::naga::Span::default(),
+        //);
+        //let uniform_variable = module.global_variables.append(
+            //::visula_core::naga::GlobalVariable {
+                //name: Some(stringify!(#name).to_lowercase().into()),
+                //binding: Some(::visula_core::naga::ResourceBinding {
+                    //group: bind_group,
+                    //binding: 0,
+                //}),
+                //space: ::visula_core::naga::AddressSpace::Uniform,
+                //ty: uniform_type,
+                //init: None,
+            //},
+            //::visula_core::naga::Span::default(),
+        //);
+        //let settings_expression = module.entry_points[entry_point_index]
+            //.function
+            //.expressions
+            //.append(::visula_core::naga::Expression::GlobalVariable(uniform_variable), ::visula_core::naga::Span::default());
+
+        //binding_builder.uniforms.insert(handle.clone(), visula_core::UniformBinding {
+            //expression: settings_expression,
+            //bind_group_layout: bind_group_layout.clone(),
+            //inner: inner.clone(),
+        //});
+        //binding_builder.current_bind_group += 1;
     }
 
     // TODO: Create instance on Rust side that
