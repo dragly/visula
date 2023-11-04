@@ -36,13 +36,10 @@ parameters = Parameters(
 parameters_uniform = parameters.instance()
 parameters.update()
 
-print(parameters_uniform.a)
-
-
 def create_particles(t, a, b, c):
-    a = 10.0 * vl.cos(a)
-    b = 100.0 * vl.sin(b)
-    c = 50.0 * vl.cos(b)
+    a = 10.0 * vl.cos(parameters_uniform.a)
+    b = 100.0 * vl.sin(parameters_uniform.b)
+    c = 50.0 * vl.cos(parameters_uniform.c)
     d = 8000
     x = vl.cos(a * t) + vl.cos(b * t) / 2.0 + vl.sin(c * t) / 3.0 + vl.cos(d * t) / 20.0
     y = vl.sin(a * t) + vl.sin(b * t) / 2.0 + vl.cos(c * t) / 3.0 + vl.sin(d * t) / 20.0
@@ -67,11 +64,10 @@ def update():
     global a
     global b
     global c
-    a += 0.00001
-    b += 0.000001
-    c += 0.00001
-    # positions = create_particles(a, b, c)
-    # position.update(positions)
+    parameters.a += 0.001
+    parameters.b += 0.001
+    parameters.c += 0.001
+    parameters.update()
 
 
 fig.show([spheres], update=update)

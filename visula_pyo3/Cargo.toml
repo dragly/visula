@@ -23,3 +23,5 @@ pyo3 = { workspace = true }
 numpy = { workspace = true }
 pollster = { workspace = true }
 itertools = { workspace = true }
+naga = { workspace = true }
+uuid = { workspace = true }

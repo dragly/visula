@@ -378,7 +378,7 @@ impl Expression {
             Expression::UniformField(field) => {
                 let inner = field.inner.borrow();
                 if !binding_builder.bindings.contains_key(&field.buffer_handle) {
-                    (field.integrate_buffer)(
+                    (field.integrate_buffer.borrow())(
                         &field.inner,
                         &field.buffer_handle,
                         module,
