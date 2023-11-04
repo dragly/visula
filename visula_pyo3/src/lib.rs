@@ -9,9 +9,9 @@ use pyo3::types::PyFunction;
 use pyo3::{buffer::PyBuffer, prelude::*};
 
 use visula::{
-    create_event_loop, create_window, initialize_logger, Application, CustomEvent, Expression,
-    InstanceBuffer, LineDelegate, Lines, PyLineDelegate, PySphereDelegate, RenderData, Renderable,
-    RunConfig, SphereDelegate, Spheres,
+    application, create_event_loop, create_window, initialize_logger, Application, CustomEvent,
+    Expression, InstanceBuffer, LineDelegate, Lines, PyLineDelegate, PySphereDelegate, RenderData,
+    Renderable, RunConfig, SphereDelegate, Spheres,
 };
 use visula_core::glam::{Vec3, Vec4};
 use visula_core::uuid::Uuid;
@@ -211,93 +211,96 @@ impl PyUniformBuffer {
         let fields = self.fields.clone();
         let name = self.name.clone();
         let size = self.size as u32;
-        let integrate =
-            move |inner: &std::rc::Rc<std::cell::RefCell<visula_core::UniformBufferInner>>,
-             handle: &::visula_core::uuid::Uuid,
-             module: &mut ::visula_core::naga::Module,
-             binding_builder: &mut visula_core::BindingBuilder,
-             bind_group_layout: &std::rc::Rc<::visula_core::wgpu::BindGroupLayout>| {
-                if binding_builder.uniforms.contains_key(&handle.clone()) {
-                    return;
-                };
+        let integrate = move |inner: &std::rc::Rc<
+            std::cell::RefCell<visula_core::UniformBufferInner>,
+        >,
+                              handle: &::visula_core::uuid::Uuid,
+                              module: &mut ::visula_core::naga::Module,
+                              binding_builder: &mut visula_core::BindingBuilder,
+                              bind_group_layout: &std::rc::Rc<
+            ::visula_core::wgpu::BindGroupLayout,
+        >| {
+            if binding_builder.uniforms.contains_key(&handle.clone()) {
+                return;
+            };
 
-                let entry_point_index = binding_builder.entry_point_index;
-                let previous_shader_location_offset = binding_builder.shader_location_offset;
-                let slot = binding_builder.current_slot;
-                let bind_group = binding_builder.current_bind_group;
+            let entry_point_index = binding_builder.entry_point_index;
+            let previous_shader_location_offset = binding_builder.shader_location_offset;
+            let slot = binding_builder.current_slot;
+            let bind_group = binding_builder.current_bind_group;
 
-                let mut uniform_field_definitions = vec![];
-                let mut offset = 0;
-                for field in &fields {
-                    let naga_type_inner = match field.ty.as_ref() {
-                        "float" => match field.size {
-                            4 => naga::TypeInner::Scalar {
-                                kind: naga::ScalarKind::Float,
-                                width: 4,
-                            },
-                            t => unimplemented!("Field type {:?} is not yet implemented", t),
+            let mut uniform_field_definitions = vec![];
+            let mut offset = 0;
+            for field in &fields {
+                let naga_type_inner = match field.ty.as_ref() {
+                    "float" => match field.size {
+                        4 => naga::TypeInner::Scalar {
+                            kind: naga::ScalarKind::Float,
+                            width: 4,
                         },
                         t => unimplemented!("Field type {:?} is not yet implemented", t),
-                    };
-
-                    let naga_type = naga::Type {
-                        name: None,
-                        inner: naga_type_inner,
-                    };
-
-                    let field_type = module
-                        .types
-                        .insert(naga_type, ::visula_core::naga::Span::default());
-                    uniform_field_definitions.push(::visula_core::naga::StructMember {
-                        name: Some(field.name.clone()),
-                        ty: field_type,
-                        binding: None,
-                        offset,
-                    });
-                    offset += field.size as u32;
-                }
-
-                let uniform_type = module.types.insert(
-                    ::visula_core::naga::Type {
-                        name: Some(name.clone()), // TODO increment a counter to avoid collisions?
-                        inner: ::visula_core::naga::TypeInner::Struct {
-                            members: uniform_field_definitions,
-                            span: size,
-                        },
                     },
+                    t => unimplemented!("Field type {:?} is not yet implemented", t),
+                };
+
+                let naga_type = naga::Type {
+                    name: None,
+                    inner: naga_type_inner,
+                };
+
+                let field_type = module
+                    .types
+                    .insert(naga_type, ::visula_core::naga::Span::default());
+                uniform_field_definitions.push(::visula_core::naga::StructMember {
+                    name: Some(field.name.clone()),
+                    ty: field_type,
+                    binding: None,
+                    offset,
+                });
+                offset += field.size as u32;
+            }
+
+            let uniform_type = module.types.insert(
+                ::visula_core::naga::Type {
+                    name: Some(name.clone()), // TODO increment a counter to avoid collisions?
+                    inner: ::visula_core::naga::TypeInner::Struct {
+                        members: uniform_field_definitions,
+                        span: size,
+                    },
+                },
+                ::visula_core::naga::Span::default(),
+            );
+            let uniform_variable = module.global_variables.append(
+                ::visula_core::naga::GlobalVariable {
+                    name: Some(name.to_lowercase().into()),
+                    binding: Some(::visula_core::naga::ResourceBinding {
+                        group: bind_group,
+                        binding: 0,
+                    }),
+                    space: ::visula_core::naga::AddressSpace::Uniform,
+                    ty: uniform_type,
+                    init: None,
+                },
+                ::visula_core::naga::Span::default(),
+            );
+            let uniform_expression = module.entry_points[entry_point_index]
+                .function
+                .expressions
+                .append(
+                    ::visula_core::naga::Expression::GlobalVariable(uniform_variable),
                     ::visula_core::naga::Span::default(),
                 );
-                let uniform_variable = module.global_variables.append(
-                    ::visula_core::naga::GlobalVariable {
-                        name: Some(name.to_lowercase().into()),
-                        binding: Some(::visula_core::naga::ResourceBinding {
-                            group: bind_group,
-                            binding: 0,
-                        }),
-                        space: ::visula_core::naga::AddressSpace::Uniform,
-                        ty: uniform_type,
-                        init: None,
-                    },
-                    ::visula_core::naga::Span::default(),
-                );
-                let uniform_expression = module.entry_points[entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        ::visula_core::naga::Expression::GlobalVariable(uniform_variable),
-                        ::visula_core::naga::Span::default(),
-                    );
 
-                binding_builder.uniforms.insert(
-                    handle.clone(),
-                    visula_core::UniformBinding {
-                        expression: uniform_expression,
-                        bind_group_layout: bind_group_layout.clone(),
-                        inner: inner.clone(),
-                    },
-                );
-                binding_builder.current_bind_group += 1;
-            };
+            binding_builder.uniforms.insert(
+                handle.clone(),
+                visula_core::UniformBinding {
+                    expression: uniform_expression,
+                    bind_group_layout: bind_group_layout.clone(),
+                    inner: inner.clone(),
+                },
+            );
+            binding_builder.current_bind_group += 1;
+        };
 
         PyExpression {
             inner: Expression::UniformField(UniformField {
@@ -563,6 +566,7 @@ fn show(
                     let view = application.begin_render_pass(&frame, &mut encoder, Color::BLACK);
                     let mut render_data = RenderData {
                         view: &view,
+                        multisampled_framebuffer: &application.multisampled_framebuffer,
                         depth_texture: &application.depth_texture,
                         encoder: &mut encoder,
                         camera: &application.camera,

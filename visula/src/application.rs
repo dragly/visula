@@ -24,6 +24,7 @@ pub struct Application {
     pub window: Window,
     pub camera_controller: CameraController,
     pub depth_texture: wgpu::TextureView,
+    pub multisampled_framebuffer: wgpu::TextureView,
     pub platform: Platform,
     pub egui_rpass: RenderPass,
     pub camera: Camera,
@@ -82,7 +83,7 @@ impl Application {
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
-            sample_count: 1,
+            sample_count: 4,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Depth32Float,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -90,6 +91,8 @@ impl Application {
             view_formats: &[],
         });
         let depth_texture = depth_texture_in.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &config, 4);
 
         let platform = Platform::new(PlatformDescriptor {
             physical_width: size.width,
@@ -111,10 +114,37 @@ impl Application {
             surface,
             window,
             depth_texture,
+            multisampled_framebuffer,
             camera,
             platform,
             egui_rpass,
         }
+    }
+
+    fn create_multisampled_framebuffer(
+        device: &wgpu::Device,
+        config: &wgpu::SurfaceConfiguration,
+        sample_count: u32,
+    ) -> wgpu::TextureView {
+        let multisampled_texture_extent = wgpu::Extent3d {
+            width: config.width,
+            height: config.height,
+            depth_or_array_layers: 1,
+        };
+        let multisampled_frame_descriptor = &wgpu::TextureDescriptor {
+            size: multisampled_texture_extent,
+            mip_level_count: 1,
+            sample_count,
+            dimension: wgpu::TextureDimension::D2,
+            format: config.view_formats[0],
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            label: None,
+            view_formats: &[],
+        };
+
+        device
+            .create_texture(multisampled_frame_descriptor)
+            .create_view(&wgpu::TextureViewDescriptor::default())
     }
 
     pub fn handle_event(
@@ -164,7 +194,7 @@ impl Application {
                         depth_or_array_layers: 1,
                     },
                     mip_level_count: 1,
-                    sample_count: 1,
+                    sample_count: 4,
                     dimension: wgpu::TextureDimension::D2,
                     format: wgpu::TextureFormat::Depth32Float,
                     usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -175,6 +205,8 @@ impl Application {
                     depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
                 self.config.width = size.width;
                 self.config.height = size.height;
+                self.multisampled_framebuffer =
+                    Self::create_multisampled_framebuffer(&self.device, &self.config, 4);
                 self.surface.configure(&self.device, &self.config);
             }
             _ => {}
@@ -221,8 +253,8 @@ impl Application {
             encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("clear"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
+                    view: &self.multisampled_framebuffer,
+                    resolve_target: Some(&view),
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(clear_color),
                         store: true,
@@ -278,6 +310,7 @@ impl Application {
             let view = self.begin_render_pass(&frame, &mut encoder, simulation.clear_color());
             simulation.render(&mut RenderData {
                 view: &view,
+                multisampled_framebuffer: &self.multisampled_framebuffer,
                 depth_texture: &self.depth_texture,
                 encoder: &mut encoder,
                 camera: &self.camera,

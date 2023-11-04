@@ -210,6 +210,7 @@ impl Renderable for Lines {
         RenderData {
             encoder,
             view,
+            multisampled_framebuffer,
             depth_texture,
             camera,
             ..
@@ -254,7 +255,7 @@ impl Renderable for Lines {
             .collect();
         {
             let default_render_pass =
-                DefaultRenderPassDescriptor::new("lines", view, depth_texture);
+                DefaultRenderPassDescriptor::new("lines", view, multisampled_framebuffer, depth_texture);
             let mut render_pass = encoder.begin_render_pass(&default_render_pass.build());
             render_pass.set_bind_group(0, &camera.bind_group, &[]);
 

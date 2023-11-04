@@ -9,6 +9,7 @@ use crate::CustomEvent;
 
 pub struct RenderData<'a> {
     pub view: &'a wgpu::TextureView,
+    pub multisampled_framebuffer: &'a wgpu::TextureView,
     pub depth_texture: &'a wgpu::TextureView,
     pub encoder: &'a mut wgpu::CommandEncoder,
     pub camera: &'a Camera,
