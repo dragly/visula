@@ -32,7 +32,7 @@ class Expression:
         return Expression(self.inner.mul(o))
 
     def __rmul__(self, other) -> Expression:
-        return self + other
+        return self * other
 
     def __truediv__(self, other) -> Expression:
         o = _ensure_expression(other)
