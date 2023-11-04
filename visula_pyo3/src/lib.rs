@@ -1,23 +1,23 @@
 use bytemuck::{Pod, Zeroable};
-use byteorder::{LittleEndian, WriteBytesExt};
+
 use itertools::Itertools;
 use std::cell::RefCell;
-use std::io::Cursor;
+
 use std::rc::Rc;
 
 use pyo3::types::PyFunction;
 use pyo3::{buffer::PyBuffer, prelude::*};
 
 use visula::{
-    application, create_event_loop, create_window, initialize_logger, Application, CustomEvent,
-    Expression, InstanceBuffer, LineDelegate, Lines, PyLineDelegate, PySphereDelegate, RenderData,
-    Renderable, RunConfig, SphereDelegate, Spheres,
+    create_event_loop, create_window, initialize_logger, Application, CustomEvent, Expression,
+    InstanceBuffer, LineDelegate, Lines, PyLineDelegate, PySphereDelegate, RenderData, Renderable,
+    RunConfig, SphereDelegate, Spheres,
 };
 use visula_core::glam::{Vec3, Vec4};
 use visula_core::uuid::Uuid;
-use visula_core::{BindingBuilder, UniformBufferInner, UniformField};
+use visula_core::{UniformBufferInner, UniformField};
 use visula_derive::Instance;
-use wgpu::{BindGroupLayout, BufferUsages, Color};
+use wgpu::{BufferUsages, Color};
 
 use winit::platform::run_return::EventLoopExtRunReturn;
 use winit::{
@@ -141,7 +141,7 @@ struct PyUniformBuffer {
 impl PyUniformBuffer {
     #[new]
     fn new(
-        py: Python,
+        _py: Python,
         pyapplication: &PyApplication,
         fields: Vec<PyUniformField>,
         name: &str,
@@ -225,8 +225,8 @@ impl PyUniformBuffer {
             };
 
             let entry_point_index = binding_builder.entry_point_index;
-            let previous_shader_location_offset = binding_builder.shader_location_offset;
-            let slot = binding_builder.current_slot;
+            let _previous_shader_location_offset = binding_builder.shader_location_offset;
+            let _slot = binding_builder.current_slot;
             let bind_group = binding_builder.current_bind_group;
 
             let mut uniform_field_definitions = vec![];
@@ -272,7 +272,7 @@ impl PyUniformBuffer {
             );
             let uniform_variable = module.global_variables.append(
                 ::visula_core::naga::GlobalVariable {
-                    name: Some(name.to_lowercase().into()),
+                    name: Some(name.to_lowercase()),
                     binding: Some(::visula_core::naga::ResourceBinding {
                         group: bind_group,
                         binding: 0,
@@ -292,7 +292,7 @@ impl PyUniformBuffer {
                 );
 
             binding_builder.uniforms.insert(
-                handle.clone(),
+                *handle,
                 visula_core::UniformBinding {
                     expression: uniform_expression,
                     bind_group_layout: bind_group_layout.clone(),
@@ -336,8 +336,6 @@ impl PyInstanceBuffer {
             .expect("Cannot convert to vec")
             .iter()
             .copied()
-            //.chunks(3)
-            .into_iter()
             .map(|x| PointData {
                 position: x as f32,
                 _padding: Default::default(),
@@ -362,7 +360,6 @@ impl PyInstanceBuffer {
             .expect("Cannot convert to vec")
             .iter()
             .copied()
-            .into_iter()
             .map(|x| PointData {
                 position: x as f32,
                 _padding: Default::default(),
@@ -413,7 +410,6 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: PyObject) -> PyExpres
             .expect("Cannot convert to vec")
             .iter()
             .copied()
-            .into_iter()
             .map(|x| PointData {
                 position: x as f32,
                 _padding: Default::default(),
@@ -436,7 +432,6 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: PyObject) -> PyExpres
             .expect("Cannot convert to vec")
             .iter()
             .copied()
-            .into_iter()
             .map(|x| PointData {
                 position: x,
                 _padding: Default::default(),

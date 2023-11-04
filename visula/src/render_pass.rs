@@ -14,7 +14,7 @@ impl<'b> DefaultRenderPassDescriptor<'b> {
         depth_texture: &'a wgpu::TextureView,
     ) -> DefaultRenderPassDescriptor<'a> {
         let color_attachments = [Some(wgpu::RenderPassColorAttachment {
-            view: &multisampled_framebuffer,
+            view: multisampled_framebuffer,
             resolve_target: Some(view),
             ops: wgpu::Operations {
                 load: wgpu::LoadOp::Load,

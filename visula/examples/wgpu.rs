@@ -40,6 +40,32 @@ fn create_depth_texture(device: &wgpu::Device, size: &PhysicalSize<u32>) -> wgpu
     depth_texture.create_view(&wgpu::TextureViewDescriptor::default())
 }
 
+fn create_multisampled_framebuffer(
+    device: &wgpu::Device,
+    config: &wgpu::SurfaceConfiguration,
+    sample_count: u32,
+) -> wgpu::TextureView {
+    let multisampled_texture_extent = wgpu::Extent3d {
+        width: config.width,
+        height: config.height,
+        depth_or_array_layers: 1,
+    };
+    let multisampled_frame_descriptor = &wgpu::TextureDescriptor {
+        size: multisampled_texture_extent,
+        mip_level_count: 1,
+        sample_count,
+        dimension: wgpu::TextureDimension::D2,
+        format: config.view_formats[0],
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        label: None,
+        view_formats: &[],
+    };
+
+    device
+        .create_texture(multisampled_frame_descriptor)
+        .create_view(&wgpu::TextureViewDescriptor::default())
+}
+
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let size = window.inner_size();
 
@@ -122,6 +148,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     surface.configure(&device, &config);
 
     let depth_texture = create_depth_texture(&device, &size);
+    let multisampled_framebuffer = create_multisampled_framebuffer(&device, &config, 4);
 
     let line_data = vec![LineData {
         position_a: [-10.0, 0.0, 0.0],
@@ -241,6 +268,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                 let mut render_data = RenderData {
                     view: &view,
+                    multisampled_framebuffer: &multisampled_framebuffer,
                     depth_texture: &depth_texture,
                     encoder: &mut encoder,
                     camera: &camera,

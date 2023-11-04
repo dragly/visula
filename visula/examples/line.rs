@@ -88,6 +88,7 @@ async fn run() {
                     let view = application.begin_render_pass(&frame, &mut encoder, Color::BLACK);
                     simulation.render(&mut RenderData {
                         view: &view,
+                        multisampled_framebuffer: &application.multisampled_framebuffer,
                         depth_texture: &application.depth_texture,
                         encoder: &mut encoder,
                         camera: &application.camera,

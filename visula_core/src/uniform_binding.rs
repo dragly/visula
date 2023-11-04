@@ -7,13 +7,17 @@ pub trait Uniform {
     fn uniform(inner: Rc<RefCell<UniformBufferInner>>) -> Self::Type;
 }
 
-type IntegrateUniform = Rc<RefCell<dyn Fn(
-    &Rc<RefCell<UniformBufferInner>>,
-    &uuid::Uuid,
-    &mut naga::Module,
-    &mut BindingBuilder,
-    &Rc<BindGroupLayout>,
-)>>;
+type IntegrateUniform = Rc<
+    RefCell<
+        dyn Fn(
+            &Rc<RefCell<UniformBufferInner>>,
+            &uuid::Uuid,
+            &mut naga::Module,
+            &mut BindingBuilder,
+            &Rc<BindGroupLayout>,
+        ),
+    >,
+>;
 
 #[derive(Clone)]
 pub struct UniformField {

@@ -18,8 +18,12 @@ impl Pipeline for InstancedPipeline {
             depth_texture,
             ..
         } = data;
-        let default_render_pass =
-            DefaultRenderPassDescriptor::new("instanced", view, multisampled_framebuffer, depth_texture);
+        let default_render_pass = DefaultRenderPassDescriptor::new(
+            "instanced",
+            view,
+            multisampled_framebuffer,
+            depth_texture,
+        );
         let mut render_pass = encoder.begin_render_pass(&default_render_pass.build());
         render_pass.set_pipeline(&self.render_pipeline);
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);

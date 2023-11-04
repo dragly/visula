@@ -254,8 +254,12 @@ impl Renderable for Lines {
             .map(|v| Ref::map(v.inner.borrow(), |m| &m.bind_group))
             .collect();
         {
-            let default_render_pass =
-                DefaultRenderPassDescriptor::new("lines", view, multisampled_framebuffer, depth_texture);
+            let default_render_pass = DefaultRenderPassDescriptor::new(
+                "lines",
+                view,
+                multisampled_framebuffer,
+                depth_texture,
+            );
             let mut render_pass = encoder.begin_render_pass(&default_render_pass.build());
             render_pass.set_bind_group(0, &camera.bind_group, &[]);
 
