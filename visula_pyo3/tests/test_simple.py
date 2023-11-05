@@ -11,7 +11,7 @@ from visula import LineDelegate, SphereDelegate, Figure, Expression, InstanceBuf
 import visula as vl
 import numpy as np
 
-count = 1000000
+count = 100000
 
 
 @dataclass
@@ -45,12 +45,12 @@ def create_particles(t, a, b, c):
     return positions
 
 
-t = InstanceBuffer(np.linspace(0, 3.14 * count / 10000, count))
+t = InstanceBuffer(np.linspace(0, 3.14 * count / 1000, count))
 position = create_particles(t, parameters_uniform.a, parameters_uniform.b, parameters_uniform.c)
 
 spheres = SphereDelegate(
     position=position,
-    radius=0.04,
+    radius=0.2,
     color=1.0 * position / 4.0 + 8.0 / 3.0,
 )
 
