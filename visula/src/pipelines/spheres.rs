@@ -173,7 +173,11 @@ impl Spheres {
                 stencil: wgpu::StencilState::default(),
                 bias: wgpu::DepthBiasState::default(),
             }),
-            multisample: wgpu::MultisampleState::default(),
+            multisample: wgpu::MultisampleState {
+                count: 4,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
             multiview: None,
         });
         Ok(Spheres {
@@ -192,6 +196,7 @@ impl Renderable for Spheres {
         RenderData {
             encoder,
             view,
+            multisampled_framebuffer,
             depth_texture,
             camera,
             ..
@@ -234,8 +239,12 @@ impl Renderable for Spheres {
             .map(|v| Ref::map(v.inner.borrow(), |m| &m.bind_group))
             .collect();
         {
-            let default_render_pass =
-                DefaultRenderPassDescriptor::new("spheres", view, depth_texture);
+            let default_render_pass = DefaultRenderPassDescriptor::new(
+                "spheres",
+                view,
+                multisampled_framebuffer,
+                depth_texture,
+            );
             let mut render_pass = encoder.begin_render_pass(&default_render_pass.build());
             render_pass.set_bind_group(0, &camera.bind_group, &[]);
 

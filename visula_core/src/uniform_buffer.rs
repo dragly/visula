@@ -121,6 +121,8 @@ impl<T: Pod> UniformBuffer<T> {
 impl<T: Uniform + Pod> UniformBuffer<T> {
     // TODO move T to Buffer<T>
     pub fn uniform(&self) -> T::Type {
+        // TODO: generalize the macro-generated code so that it can be built manually too (required
+        // for Python)
         T::uniform(self.inner.clone())
     }
 }

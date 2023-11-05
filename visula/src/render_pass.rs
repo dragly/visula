@@ -10,11 +10,12 @@ impl<'b> DefaultRenderPassDescriptor<'b> {
     pub fn new<'a>(
         label: &'a str,
         view: &'a wgpu::TextureView,
+        multisampled_framebuffer: &'a wgpu::TextureView,
         depth_texture: &'a wgpu::TextureView,
     ) -> DefaultRenderPassDescriptor<'a> {
         let color_attachments = [Some(wgpu::RenderPassColorAttachment {
-            view,
-            resolve_target: None,
+            view: multisampled_framebuffer,
+            resolve_target: Some(view),
             ops: wgpu::Operations {
                 load: wgpu::LoadOp::Load,
                 store: true,

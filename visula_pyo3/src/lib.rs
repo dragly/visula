@@ -1,5 +1,9 @@
 use bytemuck::{Pod, Zeroable};
+
 use itertools::Itertools;
+use std::cell::RefCell;
+
+use std::rc::Rc;
 
 use pyo3::types::PyFunction;
 use pyo3::{buffer::PyBuffer, prelude::*};
@@ -10,8 +14,10 @@ use visula::{
     RunConfig, SphereDelegate, Spheres,
 };
 use visula_core::glam::{Vec3, Vec4};
+use visula_core::uuid::Uuid;
+use visula_core::{UniformBufferInner, UniformField};
 use visula_derive::Instance;
-use wgpu::Color;
+use wgpu::{BufferUsages, Color};
 
 use winit::platform::run_return::EventLoopExtRunReturn;
 use winit::{
@@ -32,8 +38,8 @@ struct Error {}
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct PointData {
-    position: [f32; 3],
-    _padding: f32,
+    position: f32,
+    _padding: [f32; 3],
 }
 
 #[pyclass(name = "Expression", unsendable)]
@@ -85,6 +91,232 @@ impl PyExpression {
             inner: self.inner.clone().pow(other.inner.clone()),
         }
     }
+
+    fn cos(&self) -> PyExpression {
+        Self {
+            inner: self.inner.cos(),
+        }
+    }
+    fn sin(&self) -> PyExpression {
+        Self {
+            inner: self.inner.sin(),
+        }
+    }
+    fn tan(&self) -> PyExpression {
+        Self {
+            inner: self.inner.tan(),
+        }
+    }
+}
+
+#[pyclass]
+#[derive(Clone, Debug)]
+struct PyUniformField {
+    name: String,
+    ty: String,
+    size: usize,
+}
+
+#[pymethods]
+impl PyUniformField {
+    #[new]
+    fn new(name: &str, ty: &str, size: usize) -> Self {
+        PyUniformField {
+            name: name.to_owned(),
+            ty: ty.to_owned(),
+            size,
+        }
+    }
+}
+
+#[pyclass(unsendable)]
+struct PyUniformBuffer {
+    inner: Rc<RefCell<UniformBufferInner>>,
+    fields: Vec<PyUniformField>,
+    name: String,
+    size: usize,
+}
+
+#[pymethods]
+impl PyUniformBuffer {
+    #[new]
+    fn new(
+        _py: Python,
+        pyapplication: &PyApplication,
+        fields: Vec<PyUniformField>,
+        name: &str,
+    ) -> Self {
+        let PyApplication { application, .. } = pyapplication;
+
+        let size = fields.iter().fold(0, |acc, field| acc + field.size);
+
+        let usage = BufferUsages::UNIFORM | BufferUsages::COPY_DST;
+        let buffer = application.device.create_buffer(&wgpu::BufferDescriptor {
+            mapped_at_creation: false,
+            size: size as u64,
+            label: Some(name),
+            usage,
+        });
+
+        let bind_group_layout =
+            application
+                .device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: None,
+                    entries: &[wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    }],
+                });
+
+        let bind_group = application
+            .device
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                label: None,
+                layout: &bind_group_layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: buffer.as_entire_binding(),
+                }],
+            });
+
+        Self {
+            inner: Rc::new(RefCell::new(UniformBufferInner {
+                label: name.into(),
+                buffer,
+                handle: Uuid::new_v4(),
+                bind_group,
+                bind_group_layout: Rc::new(bind_group_layout),
+            })),
+            fields,
+            name: name.into(),
+            size,
+        }
+    }
+
+    fn update(&self, py: Python, pyapplication: &PyApplication, buffer: PyBuffer<u8>) {
+        let PyApplication { application, .. } = pyapplication;
+        let data = buffer.to_vec(py).expect("Could not turn PyBuffer into vec");
+        let inner = self.inner.borrow_mut();
+        application.queue.write_buffer(&inner.buffer, 0, &data);
+    }
+
+    fn field(&self, field_index: usize) -> PyExpression {
+        let fields = self.fields.clone();
+        let name = self.name.clone();
+        let size = self.size as u32;
+        let integrate = move |inner: &std::rc::Rc<
+            std::cell::RefCell<visula_core::UniformBufferInner>,
+        >,
+                              handle: &::visula_core::uuid::Uuid,
+                              module: &mut ::visula_core::naga::Module,
+                              binding_builder: &mut visula_core::BindingBuilder,
+                              bind_group_layout: &std::rc::Rc<
+            ::visula_core::wgpu::BindGroupLayout,
+        >| {
+            if binding_builder.uniforms.contains_key(&handle.clone()) {
+                return;
+            };
+
+            let entry_point_index = binding_builder.entry_point_index;
+            let _previous_shader_location_offset = binding_builder.shader_location_offset;
+            let _slot = binding_builder.current_slot;
+            let bind_group = binding_builder.current_bind_group;
+
+            let mut uniform_field_definitions = vec![];
+            let mut offset = 0;
+            for field in &fields {
+                let naga_type_inner = match field.ty.as_ref() {
+                    "float" => match field.size {
+                        4 => naga::TypeInner::Scalar {
+                            kind: naga::ScalarKind::Float,
+                            width: 4,
+                        },
+                        t => unimplemented!("Field type {:?} is not yet implemented", t),
+                    },
+                    t => unimplemented!("Field type {:?} is not yet implemented", t),
+                };
+
+                let naga_type = naga::Type {
+                    name: None,
+                    inner: naga_type_inner,
+                };
+
+                let field_type = module
+                    .types
+                    .insert(naga_type, ::visula_core::naga::Span::default());
+                uniform_field_definitions.push(::visula_core::naga::StructMember {
+                    name: Some(field.name.clone()),
+                    ty: field_type,
+                    binding: None,
+                    offset,
+                });
+                offset += field.size as u32;
+            }
+
+            let uniform_type = module.types.insert(
+                ::visula_core::naga::Type {
+                    name: Some(name.clone()), // TODO increment a counter to avoid collisions?
+                    inner: ::visula_core::naga::TypeInner::Struct {
+                        members: uniform_field_definitions,
+                        span: size,
+                    },
+                },
+                ::visula_core::naga::Span::default(),
+            );
+            let uniform_variable = module.global_variables.append(
+                ::visula_core::naga::GlobalVariable {
+                    name: Some(name.to_lowercase()),
+                    binding: Some(::visula_core::naga::ResourceBinding {
+                        group: bind_group,
+                        binding: 0,
+                    }),
+                    space: ::visula_core::naga::AddressSpace::Uniform,
+                    ty: uniform_type,
+                    init: None,
+                },
+                ::visula_core::naga::Span::default(),
+            );
+            let uniform_expression = module.entry_points[entry_point_index]
+                .function
+                .expressions
+                .append(
+                    ::visula_core::naga::Expression::GlobalVariable(uniform_variable),
+                    ::visula_core::naga::Span::default(),
+                );
+
+            binding_builder.uniforms.insert(
+                *handle,
+                visula_core::UniformBinding {
+                    expression: uniform_expression,
+                    bind_group_layout: bind_group_layout.clone(),
+                    inner: inner.clone(),
+                },
+            );
+            binding_builder.current_bind_group += 1;
+        };
+
+        PyExpression {
+            inner: Expression::UniformField(UniformField {
+                field_index,
+                bind_group_layout: self.inner.borrow().bind_group_layout.clone(),
+                buffer_handle: self.inner.borrow().handle,
+                inner: self.inner.clone(),
+                integrate_buffer: Rc::new(RefCell::new(integrate)),
+            }),
+        }
+    }
+}
+
+impl PyUniformBuffer {
+    // TODO: Create instance on Rust side that
+    // includes the relevant code to generate the shader
 }
 
 #[pyclass(unsendable)]
@@ -104,14 +336,9 @@ impl PyInstanceBuffer {
             .expect("Cannot convert to vec")
             .iter()
             .copied()
-            .chunks(3)
-            .into_iter()
-            .map(|x| {
-                let v: Vec<f64> = x.collect();
-                PointData {
-                    position: [v[0] as f32, v[1] as f32, v[2] as f32],
-                    _padding: Default::default(),
-                }
+            .map(|x| PointData {
+                position: x as f32,
+                _padding: Default::default(),
             })
             .collect();
         buffer.update(&application.device, &application.queue, &point_data);
@@ -133,14 +360,9 @@ impl PyInstanceBuffer {
             .expect("Cannot convert to vec")
             .iter()
             .copied()
-            .chunks(3)
-            .into_iter()
-            .map(|x| {
-                let v: Vec<f64> = x.collect();
-                PointData {
-                    position: [v[0] as f32, v[1] as f32, v[2] as f32],
-                    _padding: Default::default(),
-                }
+            .map(|x| PointData {
+                position: x as f32,
+                _padding: Default::default(),
             })
             .collect();
         self.inner
@@ -152,6 +374,17 @@ impl PyInstanceBuffer {
         PyExpression {
             inner: self.inner.instance().position,
         }
+    }
+}
+
+#[pyfunction]
+fn vec3(x: &PyExpression, y: &PyExpression, z: &PyExpression) -> PyExpression {
+    PyExpression {
+        inner: Expression::Vector3 {
+            x: x.inner.clone().into(),
+            y: y.inner.clone().into(),
+            z: z.inner.clone().into(),
+        },
     }
 }
 
@@ -177,14 +410,9 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: PyObject) -> PyExpres
             .expect("Cannot convert to vec")
             .iter()
             .copied()
-            .chunks(3)
-            .into_iter()
-            .map(|x| {
-                let v: Vec<f64> = x.collect();
-                PointData {
-                    position: [v[0] as f32, v[1] as f32, v[2] as f32],
-                    _padding: Default::default(),
-                }
+            .map(|x| PointData {
+                position: x as f32,
+                _padding: Default::default(),
             })
             .collect();
 
@@ -204,14 +432,9 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: PyObject) -> PyExpres
             .expect("Cannot convert to vec")
             .iter()
             .copied()
-            .chunks(3)
-            .into_iter()
-            .map(|x| {
-                let v: Vec<f32> = x.collect();
-                PointData {
-                    position: [v[0], v[1], v[2]],
-                    _padding: Default::default(),
-                }
+            .map(|x| PointData {
+                position: x,
+                _padding: Default::default(),
             })
             .collect();
 
@@ -338,6 +561,7 @@ fn show(
                     let view = application.begin_render_pass(&frame, &mut encoder, Color::BLACK);
                     let mut render_data = RenderData {
                         view: &view,
+                        multisampled_framebuffer: &application.multisampled_framebuffer,
                         depth_texture: &application.depth_texture,
                         encoder: &mut encoder,
                         camera: &application.camera,
@@ -391,11 +615,14 @@ fn visula_pyo3(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(testme, m)?)?;
     m.add_function(wrap_pyfunction!(testyou, m)?)?;
     m.add_function(wrap_pyfunction!(convert, m)?)?;
+    m.add_function(wrap_pyfunction!(vec3, m)?)?;
     m.add_class::<PyLineDelegate>()?;
     m.add_class::<PySphereDelegate>()?;
     m.add_class::<PyExpression>()?;
     m.add_class::<PyApplication>()?;
     m.add_class::<PyEventLoop>()?;
     m.add_class::<PyInstanceBuffer>()?;
+    m.add_class::<PyUniformBuffer>()?;
+    m.add_class::<PyUniformField>()?;
     Ok(())
 }

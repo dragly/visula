@@ -329,7 +329,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                                     inner: inner.clone(),
                                     field_index: #field_index,
                                     bind_group_layout: inner.borrow().bind_group_layout.clone(),
-                                    integrate_buffer: #uniform_struct_name::integrate,
+                                    integrate_buffer: ::std::rc::Rc::new(::std::cell::RefCell::new(#uniform_struct_name::integrate)),
                                 })
                             });
                             field_index += 1;

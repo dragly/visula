@@ -1,7 +1,6 @@
 from __future__ import annotations
-from dataclasses import dataclass
 from .application import Visula
-from ._visula_pyo3 import convert, Expression as _Expression
+from ._visula_pyo3 import convert, vec3 as _vec3, Expression as _Expression
 
 
 def _ensure_expression(other):
@@ -33,7 +32,7 @@ class Expression:
         return Expression(self.inner.mul(o))
 
     def __rmul__(self, other) -> Expression:
-        return self + other
+        return self * other
 
     def __truediv__(self, other) -> Expression:
         o = _ensure_expression(other)
@@ -50,3 +49,9 @@ class Expression:
     def __pow__(self, other) -> Expression:
         o = _ensure_expression(other)
         return Expression(self.inner.pow(o))
+
+def vec3(x, y, z):
+    x = _ensure_expression(x)
+    y = _ensure_expression(y)
+    z = _ensure_expression(z)
+    return Expression(_vec3(x, y, z))
