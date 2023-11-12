@@ -37,10 +37,13 @@ impl Application {
         // TODO remove this when https://github.com/gfx-rs/wgpu/issues/1492 is resolved
         let backends = wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all);
         let dx12_shader_compiler = wgpu::util::dx12_shader_compiler_from_env().unwrap_or_default();
+        let gles_minor_version = wgpu::util::gles_minor_version_from_env().unwrap_or_default();
 
         let instance = wgpu::Instance::new(InstanceDescriptor {
             backends,
             dx12_shader_compiler,
+            flags: wgpu::InstanceFlags::from_build_config().with_env(),
+            gles_minor_version,
         });
         let surface = unsafe { instance.create_surface(&window).unwrap() };
         let adapter = instance
@@ -257,17 +260,19 @@ impl Application {
                     resolve_target: Some(&view),
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(clear_color),
-                        store: true,
+                        store: wgpu::StoreOp::Store,
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &self.depth_texture,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(1.0),
-                        store: true,
+                        store: wgpu::StoreOp::Store,
                     }),
                     stencil_ops: None,
                 }),
+                occlusion_query_set: None,
+                timestamp_writes: None,
             });
         }
         view
