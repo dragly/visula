@@ -18,7 +18,7 @@ impl<'b> DefaultRenderPassDescriptor<'b> {
             resolve_target: Some(view),
             ops: wgpu::Operations {
                 load: wgpu::LoadOp::Load,
-                store: true,
+                store: wgpu::StoreOp::Store,
             },
         })];
         DefaultRenderPassDescriptor {
@@ -35,10 +35,12 @@ impl<'b> DefaultRenderPassDescriptor<'b> {
                 view: self.depth_texture,
                 depth_ops: Some(wgpu::Operations {
                     load: wgpu::LoadOp::Load,
-                    store: true,
+                    store: wgpu::StoreOp::Store,
                 }),
                 stencil_ops: None,
             }),
+            occlusion_query_set: None,
+            timestamp_writes: None,
         }
     }
 }
