@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::camera::Camera;
 use crate::custom_event::CustomEvent;
 use crate::rendering_descriptor::RenderingDescriptor;
@@ -28,6 +30,7 @@ pub struct Application {
     pub platform: Platform,
     pub egui_rpass: RenderPass,
     pub camera: Camera,
+    pub start_time: Instant,
 }
 
 impl Application {
@@ -97,13 +100,15 @@ impl Application {
 
         let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &config, 4);
 
-        let platform = Platform::new(PlatformDescriptor {
+        let mut platform = Platform::new(PlatformDescriptor {
             physical_width: size.width,
             physical_height: size.height,
             scale_factor: window.scale_factor(),
             font_definitions: FontDefinitions::default(),
             style: Default::default(),
         });
+        let start_time = Instant::now();
+        platform.update_time(start_time.elapsed().as_secs_f64());
 
         let egui_rpass = RenderPass::new(&device, config.format, 1);
 
@@ -121,6 +126,7 @@ impl Application {
             camera,
             platform,
             egui_rpass,
+            start_time,
         }
     }
 
@@ -155,6 +161,9 @@ impl Application {
         event: &Event<CustomEvent>,
         control_flow: &mut ControlFlow,
     ) -> bool {
+        self.platform
+            .update_time(self.start_time.elapsed().as_secs_f64());
+
         if let Event::WindowEvent {
             window_id,
             event: _event,
