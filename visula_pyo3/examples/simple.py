@@ -1,13 +1,5 @@
-# from visula._visula_pyo3 import testme, testyou
-
-# def callback():
-# print("Hello")
-# testyou()
-
-# testme(callback)
-
 from dataclasses import dataclass
-from visula import LineDelegate, SphereDelegate, Figure, Expression, InstanceBuffer, Uniform
+from visula import SphereDelegate, Figure, InstanceBuffer, Uniform
 import visula as vl
 import numpy as np
 
