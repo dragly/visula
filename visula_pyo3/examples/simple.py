@@ -8,12 +8,9 @@ count = 100000
 
 @dataclass
 class Parameters(Uniform):
-    a: np.float32
-    b: np.float32
-    c: np.float32
-
-    def __post_init__(self):
-        super().__init__()
+    a: float
+    b: float
+    c: float
 
 
 parameters = Parameters(
@@ -50,9 +47,6 @@ fig = Figure()
 
 
 def update():
-    global a
-    global b
-    global c
     parameters.a += 0.00001
     parameters.b += 0.000001
     parameters.c += 0.00001

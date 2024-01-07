@@ -8,13 +8,19 @@ from ._visula_pyo3 import PyUniformBuffer, PyUniformField
 import numpy as np
 
 
+def _target_type(ty: Type) -> Type:
+    if ty == float:
+        return np.float32
+    return ty
+
+
 @dataclass
 class Uniform:
-    def __init__(self):
+    def __post_init__(self):
         total_size = 0
-        uniform_fields= []
+        uniform_fields = []
         for field in fields(self):
-            size = np.dtype(field.type).itemsize
+            size = np.dtype(_target_type(field.type)).itemsize
             total_size += size
             uniform_fields.append(PyUniformField(name=field.name, ty="float", size=size))
 
@@ -33,8 +39,13 @@ class Uniform:
         offset = 0
         for field in fields(self):
             value = getattr(self, field.name)
-            size = np.dtype(field.type).itemsize
-            self._buffer[offset : (offset + size)] = np.frombuffer(field.type(value).tobytes(), dtype=np.uint8)
-            offset += np.dtype(field.type).itemsize
+            target_type = _target_type(field.type)
+            itemsize = np.dtype(target_type).itemsize
+
+            self._buffer[offset : (offset + itemsize)] = np.frombuffer(
+                target_type(value).tobytes(),
+                dtype=np.uint8,
+            )
+            offset += itemsize
 
         self._inner.update(Visula.application(), buffer=self._buffer)
