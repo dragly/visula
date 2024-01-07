@@ -122,4 +122,3 @@ jobs:
         with:
           command: upload
           args: --non-interactive --skip-existing *
-          working-directory: visula_pyo3
