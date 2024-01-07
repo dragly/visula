@@ -1,4 +1,6 @@
 use bytemuck::{Pod, Zeroable};
+use numpy::ndarray::Axis;
+use numpy::PyReadonlyArray2;
 
 use itertools::Itertools;
 use std::cell::RefCell;
@@ -38,6 +40,13 @@ struct Error {}
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct PointData {
+    position: [f32; 3],
+    _padding: f32,
+}
+
+#[repr(C, align(16))]
+#[derive(Clone, Copy, Instance, Pod, Zeroable)]
+struct FloatData {
     position: f32,
     _padding: [f32; 3],
 }
@@ -321,7 +330,7 @@ impl PyUniformBuffer {
 
 #[pyclass(unsendable)]
 struct PyInstanceBuffer {
-    inner: InstanceBuffer<PointData>,
+    inner: InstanceBuffer<FloatData>,
 }
 
 #[pymethods]
@@ -330,13 +339,13 @@ impl PyInstanceBuffer {
     fn new(py: Python, pyapplication: &PyApplication, obj: PyObject) -> Self {
         let PyApplication { application, .. } = pyapplication;
         let x = obj.extract::<PyBuffer<f64>>(py).expect("Could not extract");
-        let buffer = InstanceBuffer::<PointData>::new(&application.device);
-        let point_data: Vec<PointData> = x
+        let buffer = InstanceBuffer::<FloatData>::new(&application.device);
+        let point_data: Vec<FloatData> = x
             .to_vec(py)
             .expect("Cannot convert to vec")
             .iter()
             .copied()
-            .map(|x| PointData {
+            .map(|x| FloatData {
                 position: x as f32,
                 _padding: Default::default(),
             })
@@ -355,12 +364,12 @@ impl PyInstanceBuffer {
         let x = data
             .extract::<PyBuffer<f64>>(py)
             .expect("Could not extract");
-        let point_data: Vec<PointData> = x
+        let point_data: Vec<FloatData> = x
             .to_vec(py)
             .expect("Cannot convert to vec")
             .iter()
             .copied()
-            .map(|x| PointData {
+            .map(|x| FloatData {
                 position: x as f32,
                 _padding: Default::default(),
             })
@@ -399,18 +408,48 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: PyObject) -> PyExpres
             return expr;
         }
     }
+    if let Ok(x) = obj.extract::<PyReadonlyArray2<f64>>(py) {
+        let array = x.as_array();
+        let major_axis = {
+            if let Some(index) = array.shape().iter().position(|&size| size == 3) {
+                match index {
+                    0 => 1,
+                    1 => 0,
+                    i => panic!("Got index {i} in what was supposed to be a 2D array"),
+                }
+            } else {
+                panic!("Must have a dimensions with three elements");
+            }
+        };
+        let buffer = InstanceBuffer::<PointData>::new(&application.device);
+        let instance = buffer.instance();
+        let point_data: Vec<PointData> = x
+            .as_array()
+            .axis_iter(Axis(major_axis))
+            .map(|v| PointData {
+                position: [v[0] as f32, v[1] as f32, v[2] as f32],
+                _padding: Default::default(),
+            })
+            .collect();
+
+        buffer.update(&application.device, &application.queue, &point_data);
+
+        return PyExpression {
+            inner: instance.position,
+        };
+    }
     if let Ok(x) = obj.extract::<PyBuffer<f64>>(py) {
         // TODO optimize the case where the same PyBuffer has already
         // been written to a wgpu Buffer, for instance by creating
         // a cache
-        let buffer = InstanceBuffer::<PointData>::new(&application.device);
+        let buffer = InstanceBuffer::<FloatData>::new(&application.device);
         let instance = buffer.instance();
-        let point_data: Vec<PointData> = x
+        let point_data: Vec<FloatData> = x
             .to_vec(py)
             .expect("Cannot convert to vec")
             .iter()
             .copied()
-            .map(|x| PointData {
+            .map(|x| FloatData {
                 position: x as f32,
                 _padding: Default::default(),
             })
@@ -425,14 +464,14 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: PyObject) -> PyExpres
         // TODO optimize the case where the same PyBuffer has already
         // been written to a wgpu Buffer, for instance by creating
         // a cache
-        let buffer = InstanceBuffer::<PointData>::new(&application.device);
+        let buffer = InstanceBuffer::<FloatData>::new(&application.device);
         let instance = buffer.instance();
-        let point_data: Vec<PointData> = x
+        let point_data: Vec<FloatData> = x
             .to_vec(py)
             .expect("Cannot convert to vec")
             .iter()
             .copied()
-            .map(|x| PointData {
+            .map(|x| FloatData {
                 position: x,
                 _padding: Default::default(),
             })
