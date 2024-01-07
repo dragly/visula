@@ -238,7 +238,7 @@ impl PyUniformBuffer {
                             kind: naga::ScalarKind::Float,
                             width: 4,
                         },
-                        t => unimplemented!("Field type {:?} is not yet implemented", t),
+                        t => unimplemented!("Float with size {:?} is not yet implemented", t),
                     },
                     t => unimplemented!("Field type {:?} is not yet implemented", t),
                 };
