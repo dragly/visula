@@ -1,7 +1,7 @@
 use crate::camera::uniforms::CameraUniforms;
 use crate::{Matrix4, Point3, Vector2, Vector3};
 
-use cgmath::prelude::*;
+use cgmath::{prelude::*, Quaternion, Rad};
 
 use winit::event::{
     DeviceEvent, ElementState, Event, MouseButton,
@@ -26,6 +26,7 @@ pub struct CameraController {
     pub distance: f32,
     pub center: Vector3,
     pub forward: Vector3,
+    pub true_up: Vector3,
     pub up: Vector3,
     pub rotational_speed: f32,
     pub roll_speed: f32,
@@ -58,6 +59,7 @@ impl CameraController {
             right_pressed: false,
             control_pressed: false,
             forward: new_forward,
+            true_up: up,
             up,
             distance: 100.0,
             center: Vector3::new(0.0, 0.0, 0.0),
@@ -103,6 +105,7 @@ impl CameraController {
                             cgmath::Rad(self.roll_speed * offset),
                         );
                         self.up = (rotation * self.up).normalize();
+                        self.true_up = (rotation * self.true_up).normalize();
                         self.forward = (rotation * self.forward).normalize();
                     } else {
                         if (position_diff.x + position_diff.y).abs() < 0.000001 {
@@ -111,37 +114,16 @@ impl CameraController {
                                 captured_event: false,
                             };
                         }
-                        let offset_up = up * position_diff.y;
-                        let offset_right = -right * position_diff.x;
-                        let offset = offset_up + offset_right;
-                        let axis = Vector3::cross(offset, forward).normalize();
-                        let rotation = cgmath::Quaternion::from_axis_angle(
-                            axis,
-                            cgmath::Rad(self.rotational_speed * position_diff.magnitude()),
+                        let rotation_x = Quaternion::from_axis_angle(
+                            self.true_up,
+                            Rad(-self.rotational_speed * position_diff.x),
                         );
-                        let new_forward = (rotation * self.forward).normalize();
-                        if Vector3::dot(up, new_forward).abs() > 0.99 {
-                            if position_diff.x.abs() < 0.00001 {
-                                return CameraControllerResponse {
-                                    needs_redraw: false,
-                                    captured_event: false,
-                                };
-                            }
-                            let offset = offset_right;
-                            let axis = Vector3::cross(offset, forward).normalize();
-                            let rotation = cgmath::Quaternion::from_axis_angle(
-                                axis,
-                                cgmath::Rad(self.rotational_speed * (position_diff.x).abs()),
-                            );
-                            let new_forward = (rotation * self.forward).normalize();
-                            self.forward = new_forward;
-                            self.state = State::Moving;
-                            return CameraControllerResponse {
-                                needs_redraw: true,
-                                captured_event: true,
-                            };
-                        }
-                        self.forward = new_forward;
+                        let rotation_y = Quaternion::from_axis_angle(
+                            right,
+                            Rad(-self.rotational_speed * position_diff.y),
+                        );
+                        self.forward = (rotation_x * rotation_y * self.forward).normalize();
+                        self.up = (rotation_x * rotation_y * self.up).normalize();
                     }
                     response.needs_redraw = true;
                     response.captured_event = true;
