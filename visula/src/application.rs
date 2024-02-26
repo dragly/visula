@@ -333,7 +333,7 @@ impl Application {
 
         {
             let egui_ctx = self.begin_egui_frame();
-            simulation.gui(&self, &egui_ctx);
+            simulation.gui(self, &egui_ctx);
             self.end_egui_frame(&frame, &mut encoder);
         }
 
