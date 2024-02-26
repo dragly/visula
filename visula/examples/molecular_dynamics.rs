@@ -320,7 +320,7 @@ impl visula::Simulation for Simulation {
         self.lines.render(data);
     }
 
-    fn gui(&mut self, context: &egui::Context) {
+    fn gui(&mut self, _application: &visula::Application, context: &egui::Context) {
         egui::Window::new("Settings").show(context, |ui| {
             ui.label("Simulation speed");
             ui.add(egui::Slider::new(&mut self.settings.speed, 1..=20));

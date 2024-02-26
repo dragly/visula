@@ -1043,7 +1043,7 @@ impl visula::Simulation for Simulation {
         self.boundaries.render(data);
     }
 
-    fn gui(&mut self, context: &egui::Context) {
+    fn gui(&mut self, _application: &visula::Application, context: &egui::Context) {
         egui::Window::new("Settings").show(context, |ui| {
             ui.label("Tool");
             for value in Tool::iter() {

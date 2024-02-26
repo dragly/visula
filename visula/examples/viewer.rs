@@ -207,7 +207,7 @@ impl visula::Simulation for Simulation {
         }
     }
 
-    fn gui(&mut self, context: &egui::Context) {
+    fn gui(&mut self, _application: &visula::Application, context: &egui::Context) {
         egui::Window::new("Settings").show(context, |ui| {
             ui.label("Radius");
             ui.add(egui::Slider::new(&mut self.settings.radius, 0.1..=2.5));

@@ -20,7 +20,7 @@ pub trait Simulation {
     fn handle_event(&mut self, _application: &mut Application, _event: &Event<CustomEvent>) {}
     fn update(&mut self, _application: &Application) {}
     fn render(&mut self, _data: &mut RenderData) {}
-    fn gui(&mut self, _context: &Context) {}
+    fn gui(&mut self, _application: &Application, _context: &Context) {}
     fn clear_color(&self) -> wgpu::Color {
         wgpu::Color {
             r: 0.1,
@@ -45,8 +45,8 @@ where
     fn render(&mut self, data: &mut RenderData) {
         self.as_mut().render(data)
     }
-    fn gui(&mut self, context: &Context) {
-        self.as_mut().gui(context)
+    fn gui(&mut self, application: &Application, context: &Context) {
+        self.as_mut().gui(application, context)
     }
     fn clear_color(&self) -> wgpu::Color {
         self.as_ref().clear_color()
