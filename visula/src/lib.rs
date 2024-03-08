@@ -4,6 +4,7 @@ use wasm_bindgen::{JsCast, JsValue};
 use web_sys::HtmlCanvasElement;
 #[cfg(target_arch = "wasm32")]
 use winit::dpi::LogicalSize;
+use winit::event::WindowEvent;
 use winit::event_loop::EventLoop;
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::EventLoopExtWebSys;
@@ -17,13 +18,12 @@ use js_sys::Uint8Array;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
+use std::borrow::BorrowMut;
 use std::future::Future;
+use std::sync::Arc;
 use winit::window::Window;
 
-use winit::{
-    event::Event,
-    event_loop::{ControlFlow, EventLoopBuilder},
-};
+use winit::{event::Event, event_loop::EventLoopBuilder};
 
 pub mod application;
 pub mod camera;
@@ -86,30 +86,33 @@ where
     F: FnMut(&mut Application) -> S + 'static,
     S: Simulation + 'static,
 {
-    let mut application = Application::new(window).await;
+    let main_window_id = window.id();
+    let mut application = Application::new(Arc::new(window), &event_loop).await;
 
     let mut simulation: S = init_simulation(&mut application);
 
-    event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Poll;
-        match event {
-            Event::RedrawEventsCleared => {
-                application.window.request_redraw();
+    event_loop
+        .run(move |event, target| {
+            if !application.handle_event(&event) {
+                simulation.handle_event(&mut application, &event);
             }
-            Event::RedrawRequested(_) => {
-                application.render(&mut simulation);
-            }
-            Event::MainEventsCleared => {
-                application.update();
-                simulation.update(&application);
-            }
-            event => {
-                if !application.handle_event(&event, control_flow) {
-                    simulation.handle_event(&mut application, &event);
+            if let Event::WindowEvent { window_id, event } = event {
+                if main_window_id != window_id {
+                    return;
+                }
+                match event {
+                    WindowEvent::RedrawRequested => {
+                        application.update();
+                        simulation.update(&application);
+                        application.render(&mut simulation);
+                        application.window.borrow_mut().request_redraw();
+                    }
+                    WindowEvent::CloseRequested => target.exit(),
+                    _ => {}
                 }
             }
-        }
-    });
+        })
+        .expect("Event loop failed to run");
 }
 
 pub fn initialize_panic_hook() {
@@ -137,7 +140,9 @@ pub fn initialize_event_loop_and_window() -> (EventLoop<CustomEvent>, Window) {
 }
 
 pub fn create_event_loop() -> EventLoop<CustomEvent> {
-    EventLoopBuilder::<CustomEvent>::with_user_event().build()
+    EventLoopBuilder::<CustomEvent>::with_user_event()
+        .build()
+        .expect("Failed to create event loop")
 }
 
 pub fn create_window(config: RunConfig, event_loop: &EventLoop<CustomEvent>) -> Window {

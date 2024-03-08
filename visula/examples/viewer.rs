@@ -5,7 +5,7 @@ use bytemuck::{Pod, Zeroable};
 use glam::{Quat, Vec3};
 use oxifive::ReadSeek;
 use structopt::StructOpt;
-use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::event::{Event, KeyEvent, WindowEvent};
 
 use visula::{
     CustomEvent, DropEvent, InstanceBuffer, MeshDelegate, MeshPipeline, RenderData, SphereDelegate,
@@ -170,14 +170,14 @@ impl visula::Simulation for Simulation {
                     }
                 }
                 WindowEvent::KeyboardInput {
-                    input:
-                        KeyboardInput {
-                            virtual_keycode: Some(VirtualKeyCode::M),
+                    event:
+                        KeyEvent {
+                            logical_key,
                             state: winit::event::ElementState::Pressed,
                             ..
                         },
                     ..
-                } => {
+                } if logical_key == "m" => {
                     self.render_mode = match self.render_mode {
                         RenderMode::Mesh => RenderMode::Points,
                         RenderMode::Points => RenderMode::Mesh,
