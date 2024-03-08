@@ -1,40 +1,92 @@
-use std::time::Instant;
-
 use crate::camera::Camera;
 use crate::custom_event::CustomEvent;
 use crate::rendering_descriptor::RenderingDescriptor;
 use crate::{camera::controller::CameraController, simulation::RenderData};
+use crate::{CameraControllerResponse, Simulation};
+use egui::{Context, ViewportId};
+use egui_wgpu::Renderer;
+use egui_wgpu::ScreenDescriptor;
+use egui_winit::State;
 
-use egui::{Context, FontDefinitions};
-use wgpu::{Color, CommandEncoder, InstanceDescriptor, SurfaceTexture, TextureView};
+use std::sync::Arc;
+use std::time::Instant;
+use wgpu::{
+    Color, CommandEncoder, Device, InstanceDescriptor, SurfaceTexture, TextureFormat, TextureView,
+};
+use winit::event_loop::EventLoop;
 use winit::{
     event::{Event, WindowEvent},
-    event_loop::ControlFlow,
     window::Window,
 };
-
-use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
-use egui_winit_platform::{Platform, PlatformDescriptor};
-
-use crate::{CameraControllerResponse, Simulation};
 
 pub struct Application {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub config: wgpu::SurfaceConfiguration,
-    pub surface: wgpu::Surface,
-    pub window: Window,
+    pub surface: wgpu::Surface<'static>,
+    pub window: Arc<Window>,
     pub camera_controller: CameraController,
     pub depth_texture: wgpu::TextureView,
     pub multisampled_framebuffer: wgpu::TextureView,
-    pub platform: Platform,
-    pub egui_rpass: RenderPass,
+    pub egui_renderer: EguiRenderer,
+    pub egui_ctx: egui::Context,
     pub camera: Camera,
     pub start_time: Instant,
 }
 
+fn create_egui_context() -> egui::Context {
+    pub const IS_DESKTOP: bool = cfg!(any(
+        target_os = "freebsd",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "openbsd",
+        target_os = "windows",
+    ));
+
+    let egui_ctx = egui::Context::default();
+    egui_ctx.set_embed_viewports(!IS_DESKTOP);
+    egui_ctx
+}
+
+pub struct EguiRenderer {
+    state: State,
+    renderer: Renderer,
+}
+
+impl EguiRenderer {
+    pub fn new(
+        device: &Device,
+        output_color_format: TextureFormat,
+        output_depth_format: Option<TextureFormat>,
+        msaa_samples: u32,
+        window: &Window,
+        event_loop: &EventLoop<CustomEvent>,
+    ) -> EguiRenderer {
+        let egui_context = Context::default();
+        let egui_state = egui_winit::State::new(
+            egui_context,
+            ViewportId::ROOT,
+            event_loop,
+            Some(window.scale_factor() as f32),
+            None,
+        );
+        //egui_state.set_pixels_per_point(window.scale_factor() as f32);
+        let egui_renderer = egui_wgpu::Renderer::new(
+            device,
+            output_color_format,
+            output_depth_format,
+            msaa_samples,
+        );
+
+        EguiRenderer {
+            state: egui_state,
+            renderer: egui_renderer,
+        }
+    }
+}
+
 impl Application {
-    pub async fn new(window: Window) -> Application {
+    pub async fn new(window: Arc<Window>, event_loop: &EventLoop<CustomEvent>) -> Application {
         let size = window.inner_size();
 
         // TODO remove this when https://github.com/gfx-rs/wgpu/issues/1492 is resolved
@@ -48,7 +100,7 @@ impl Application {
             flags: wgpu::InstanceFlags::from_build_config().with_env(),
             gles_minor_version,
         });
-        let surface = unsafe { instance.create_surface(&window).unwrap() };
+        let surface = instance.create_surface(window.clone()).unwrap();
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
@@ -62,11 +114,11 @@ impl Application {
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
-                    features: wgpu::Features::empty(),
+                    required_features: wgpu::Features::empty(),
                     #[cfg(target_arch = "wasm32")]
-                    limits: wgpu::Limits::downlevel_webgl2_defaults(),
+                    required_limits: wgpu::Limits::downlevel_webgl2_defaults(),
                     #[cfg(not(target_arch = "wasm32"))]
-                    limits: wgpu::Limits::default(),
+                    required_limits: wgpu::Limits::default(),
                 },
                 None,
             )
@@ -100,19 +152,13 @@ impl Application {
 
         let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &config, 4);
 
-        let mut platform = Platform::new(PlatformDescriptor {
-            physical_width: size.width,
-            physical_height: size.height,
-            scale_factor: window.scale_factor(),
-            font_definitions: FontDefinitions::default(),
-            style: Default::default(),
-        });
         let start_time = Instant::now();
-        platform.update_time(start_time.elapsed().as_secs_f64());
-
-        let egui_rpass = RenderPass::new(&device, config.format, 1);
 
         let camera = Camera::new(&device);
+
+        let egui_ctx = create_egui_context();
+        let egui_renderer =
+            EguiRenderer::new(&device, surface_view_format, None, 1, &window, event_loop);
 
         Application {
             device,
@@ -124,8 +170,8 @@ impl Application {
             depth_texture,
             multisampled_framebuffer,
             camera,
-            platform,
-            egui_rpass,
+            egui_renderer,
+            egui_ctx,
             start_time,
         }
     }
@@ -156,26 +202,22 @@ impl Application {
             .create_view(&wgpu::TextureViewDescriptor::default())
     }
 
-    pub fn handle_event(
-        &mut self,
-        event: &Event<CustomEvent>,
-        control_flow: &mut ControlFlow,
-    ) -> bool {
-        self.platform
-            .update_time(self.start_time.elapsed().as_secs_f64());
-
+    pub fn handle_event(&mut self, event: &Event<CustomEvent>) -> bool {
         if let Event::WindowEvent {
             window_id,
-            event: _event,
+            event: window_event,
         } = event
         {
             if *window_id != self.window.id() {
                 return false;
             }
-        }
-        self.platform.handle_event(event);
-        if self.platform.captures_event(event) {
-            return true;
+            let response = self
+                .egui_renderer
+                .state
+                .on_window_event(&self.window, window_event);
+            if response.consumed {
+                return true;
+            }
         }
         let CameraControllerResponse {
             needs_redraw,
@@ -192,7 +234,6 @@ impl Application {
                 event: WindowEvent::CloseRequested,
                 ..
             } => {
-                *control_flow = ControlFlow::Exit;
                 println!("{}", crude_profiler::report());
             }
             Event::WindowEvent {
@@ -251,77 +292,40 @@ impl Application {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None })
     }
 
-    pub fn begin_render_pass(
-        &self,
-        frame: &SurfaceTexture,
-        encoder: &mut CommandEncoder,
-        clear_color: Color,
-    ) -> TextureView {
-        let view = frame
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
-        {
-            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("clear"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.multisampled_framebuffer,
-                    resolve_target: Some(&view),
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(clear_color),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth_texture,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: wgpu::StoreOp::Store,
-                    }),
-                    stencil_ops: None,
+    pub fn clear(&self, view: &TextureView, encoder: &mut CommandEncoder, clear_color: Color) {
+        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("clear"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &self.multisampled_framebuffer,
+                resolve_target: Some(view),
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(clear_color),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &self.depth_texture,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
                 }),
-                occlusion_query_set: None,
-                timestamp_writes: None,
-            });
-        }
-        view
-    }
-
-    pub fn begin_egui_frame(&mut self) -> Context {
-        self.platform.begin_frame();
-        self.platform.context()
-    }
-
-    pub fn end_egui_frame(&mut self, frame: &SurfaceTexture, encoder: &mut CommandEncoder) {
-        let output_view = frame
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
-        let full_output = self.platform.end_frame(Some(&self.window));
-        let paint_jobs = self.platform.context().tessellate(full_output.shapes);
-
-        let screen_descriptor = ScreenDescriptor {
-            physical_width: self.config.width,
-            physical_height: self.config.height,
-            scale_factor: self.window.scale_factor() as f32,
-        };
-        self.egui_rpass
-            .add_textures(&self.device, &self.queue, &full_output.textures_delta)
-            .unwrap();
-        self.egui_rpass
-            .update_buffers(&self.device, &self.queue, &paint_jobs, &screen_descriptor);
-
-        self.egui_rpass
-            .execute(encoder, &output_view, &paint_jobs, &screen_descriptor, None)
-            .unwrap();
+                stencil_ops: None,
+            }),
+            occlusion_query_set: None,
+            timestamp_writes: None,
+        });
     }
 
     pub fn render(&mut self, simulation: &mut impl Simulation) {
         let frame = self.next_frame();
         let mut encoder = self.encoder();
 
+        let view = frame
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
         {
-            let view = self.begin_render_pass(&frame, &mut encoder, simulation.clear_color());
+            self.clear(&view, &mut encoder, simulation.clear_color());
             simulation.render(&mut RenderData {
                 view: &view,
                 multisampled_framebuffer: &self.multisampled_framebuffer,
@@ -329,12 +333,60 @@ impl Application {
                 encoder: &mut encoder,
                 camera: &self.camera,
             });
-        }
+            let screen_descriptor = ScreenDescriptor {
+                size_in_pixels: [self.config.width, self.config.height],
+                pixels_per_point: self.window.scale_factor() as f32,
+            };
+            let raw_input = self.egui_renderer.state.take_egui_input(&self.window);
+            let full_output = self.egui_renderer.state.egui_ctx().run(raw_input, |ui| {
+                simulation.gui(self, ui);
+            });
 
-        {
-            let egui_ctx = self.begin_egui_frame();
-            simulation.gui(self, &egui_ctx);
-            self.end_egui_frame(&frame, &mut encoder);
+            self.egui_renderer
+                .state
+                .handle_platform_output(&self.window, full_output.platform_output);
+
+            let tris = self
+                .egui_renderer
+                .state
+                .egui_ctx()
+                .tessellate(full_output.shapes, self.window.scale_factor() as f32);
+            for (id, image_delta) in &full_output.textures_delta.set {
+                self.egui_renderer.renderer.update_texture(
+                    &self.device,
+                    &self.queue,
+                    *id,
+                    image_delta,
+                );
+            }
+            self.egui_renderer.renderer.update_buffers(
+                &self.device,
+                &self.queue,
+                &mut encoder,
+                &tris,
+                &screen_descriptor,
+            );
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("egui"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                occlusion_query_set: None,
+                timestamp_writes: None,
+            });
+            self.egui_renderer
+                .renderer
+                .render(&mut render_pass, &tris, &screen_descriptor);
+            drop(render_pass);
+            for x in &full_output.textures_delta.free {
+                self.egui_renderer.renderer.free_texture(x)
+            }
         }
 
         self.queue.submit(Some(encoder.finish()));

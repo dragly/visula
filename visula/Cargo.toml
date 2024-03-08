@@ -15,13 +15,13 @@ log = {workspace = true}
 bytemuck = {workspace = true}
 winit = { workspace = true}
 egui = {workspace = true}
-egui_wgpu_backend = {workspace = true}
-egui_winit_platform = {workspace = true}
+egui-wgpu = {workspace = true}
+egui-winit = {workspace = true}
 pollster = { workspace = true }
 itertools = { workspace = true }
 futures = "0.3"
 wasm-bindgen-futures = "0.4"
-wasm-bindgen = "=0.2.87"
+wasm-bindgen = "=0.2.92"
 cgmath = "0.17.0"
 js-sys = "0.3"
 trajan = "0.1.0"

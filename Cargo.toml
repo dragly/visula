@@ -3,7 +3,7 @@ members = ["run-wasm", "visula", "visula_derive", "visula_core", "visula_pyo3"]
 resolver = "2"
 
 [workspace.dependencies]
-wgpu = { version = "0.18", features = ["webgl"] }
+wgpu = { version = "0.19", features = ["webgl"] }
 glam = { version = "0.24", features = ["bytemuck"] }
 naga = { version = "0.13", features = ["wgsl-in", "wgsl-out"] }
 uuid = { version = "1.3.3", features = [
@@ -14,10 +14,10 @@ uuid = { version = "1.3.3", features = [
 ] }
 bytemuck = { version = "1.4", features = ["derive"] }
 log = "0.4"
-winit = { version = "0.28" }
-egui = "0.23"
-egui_wgpu_backend = "0.27.0"
-egui_winit_platform = "0.20"
+winit = { version = "0.29" }
+egui = "0.26"
+egui-wgpu = { version = "0.26", features = ["winit"]  }
+egui-winit = { version = "0.26"  }
 pyo3 = "0.20"
 numpy = { version = "0.20", features = ["nalgebra"] }
 pollster = "0.3.0"

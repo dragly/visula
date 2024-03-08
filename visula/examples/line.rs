@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use bytemuck::{Pod, Zeroable};
 use visula::Renderable;
 use visula::{
@@ -6,7 +8,8 @@ use visula::{
 };
 use visula_derive::Instance;
 use wgpu::Color;
-use winit::{event::Event, event_loop::ControlFlow};
+use winit::event::Event;
+use winit::event::WindowEvent;
 
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
@@ -70,43 +73,48 @@ impl Simulation {
 async fn run() {
     initialize_logger();
     let (event_loop, window) = initialize_event_loop_and_window();
-    let mut application = Application::new(window).await;
+    let mut application = Application::new(Arc::new(window), &event_loop).await;
 
     let mut simulation = Simulation::new(&mut application).expect("Failed to init simulation");
 
-    event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Poll;
-        match event {
-            Event::RedrawEventsCleared => {
-                application.window.request_redraw();
-            }
-            Event::RedrawRequested(_) => {
-                let frame = application.next_frame();
-                let mut encoder = application.encoder();
+    event_loop
+        .run(move |event, target| match event {
+            Event::WindowEvent {
+                window_id: _,
+                event,
+            } => match event {
+                WindowEvent::RedrawRequested => {
+                    application.update();
+                    simulation.update(&application);
+                    let frame = application.next_frame();
+                    let mut encoder = application.encoder();
 
-                {
-                    let view = application.begin_render_pass(&frame, &mut encoder, Color::BLACK);
-                    simulation.render(&mut RenderData {
-                        view: &view,
-                        multisampled_framebuffer: &application.multisampled_framebuffer,
-                        depth_texture: &application.depth_texture,
-                        encoder: &mut encoder,
-                        camera: &application.camera,
-                    });
+                    {
+                        let view = frame
+                            .texture
+                            .create_view(&wgpu::TextureViewDescriptor::default());
+                        application.clear(&view, &mut encoder, Color::BLACK);
+                        simulation.render(&mut RenderData {
+                            view: &view,
+                            multisampled_framebuffer: &application.multisampled_framebuffer,
+                            depth_texture: &application.depth_texture,
+                            encoder: &mut encoder,
+                            camera: &application.camera,
+                        });
+                    }
+
+                    application.queue.submit(Some(encoder.finish()));
+                    frame.present();
+                    application.window.request_redraw();
                 }
-
-                application.queue.submit(Some(encoder.finish()));
-                frame.present();
-            }
-            Event::MainEventsCleared => {
-                application.update();
-                simulation.update(&application);
-            }
+                WindowEvent::CloseRequested => target.exit(),
+                _ => {}
+            },
             event => {
-                application.handle_event(&event, control_flow);
+                application.handle_event(&event);
             }
-        }
-    });
+        })
+        .expect("Failed to run event loop");
 }
 
 fn main() {

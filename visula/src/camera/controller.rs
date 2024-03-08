@@ -72,7 +72,10 @@ impl CameraController {
 
     pub fn update(&mut self) {}
 
-    pub fn handle_event<T>(&mut self, event: &Event<T>) -> CameraControllerResponse {
+    pub fn handle_event<T: std::fmt::Debug>(
+        &mut self,
+        event: &Event<T>,
+    ) -> CameraControllerResponse {
         let mut response = CameraControllerResponse {
             needs_redraw: false,
             captured_event: false,
@@ -144,7 +147,9 @@ impl CameraController {
                 window_id,
             } if *window_id == self.window_id => match window_event {
                 WindowEvent::ModifiersChanged(state) => {
-                    self.control_pressed = state.contains(winit::event::ModifiersState::CTRL);
+                    self.control_pressed = state
+                        .state()
+                        .contains(winit::keyboard::ModifiersState::CONTROL);
                 }
                 WindowEvent::MouseWheel { delta, .. } => {
                     let diff = match delta {

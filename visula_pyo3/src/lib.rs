@@ -4,8 +4,11 @@ use numpy::PyReadonlyArray2;
 
 use itertools::Itertools;
 use std::cell::RefCell;
+use winit::event::WindowEvent;
+use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
 
 use std::rc::Rc;
+use std::sync::Arc;
 
 use pyo3::types::PyFunction;
 use pyo3::{buffer::PyBuffer, prelude::*};
@@ -21,11 +24,7 @@ use visula_core::{UniformBufferInner, UniformField};
 use visula_derive::Instance;
 use wgpu::{BufferUsages, Color};
 
-use winit::platform::run_return::EventLoopExtRunReturn;
-use winit::{
-    event::Event,
-    event_loop::{ControlFlow, EventLoop},
-};
+use winit::{event::Event, event_loop::EventLoop};
 
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
@@ -460,7 +459,8 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: PyObject) -> PyExpres
         return PyExpression {
             inner: instance.position,
         };
-    } else if let Ok(x) = obj.extract::<PyBuffer<f32>>(py) {
+    }
+    if let Ok(x) = obj.extract::<PyBuffer<f32>>(py) {
         // TODO optimize the case where the same PyBuffer has already
         // been written to a wgpu Buffer, for instance by creating
         // a cache
@@ -482,14 +482,17 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: PyObject) -> PyExpres
         return PyExpression {
             inner: instance.position,
         };
-    } else if let Ok(x) = obj.extract::<f32>(py) {
+    }
+    if let Ok(x) = obj.extract::<f32>(py) {
         return PyExpression { inner: x.into() };
-    } else if let Ok(x) = obj.extract::<Vec<f32>>(py) {
+    }
+    if let Ok(x) = obj.extract::<Vec<f32>>(py) {
         if x.len() == 3 {
             return PyExpression {
                 inner: Vec3::new(x[0], x[1], x[2]).into(),
             };
-        } else if x.len() == 4 {
+        }
+        if x.len() == 4 {
             return PyExpression {
                 inner: Vec4::new(x[0], x[1], x[2], x[3]).into(),
             };
@@ -529,7 +532,9 @@ impl PyApplication {
             },
             &event_loop.event_loop,
         );
-        let application = pollster::block_on(async { Application::new(window).await });
+        let application = pollster::block_on(async {
+            Application::new(Arc::new(window), &event_loop.event_loop).await
+        });
         Self { application }
     }
 }
@@ -585,51 +590,54 @@ fn show(
 
     let PyEventLoop { event_loop } = py_event_loop;
 
-    event_loop.run_return(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Poll;
-        match event {
-            Event::RedrawEventsCleared => {
-                py_application.borrow().application.window.request_redraw();
-            }
-            Event::RedrawRequested(_) => {
-                let application = &py_application.borrow().application;
-                let frame = application.next_frame();
-                let mut encoder = application.encoder();
+    event_loop
+        .run_on_demand(move |event, target| {
+            py_application.borrow_mut().application.handle_event(&event);
+            if let Event::WindowEvent {
+                window_id: _,
+                event: window_event,
+            } = event
+            {
+                match window_event {
+                    WindowEvent::RedrawRequested => {
+                        let application = &mut py_application.borrow_mut().application;
+                        let frame = application.next_frame();
+                        let mut encoder = application.encoder();
+                        let view = frame
+                            .texture
+                            .create_view(&wgpu::TextureViewDescriptor::default());
 
-                {
-                    let view = application.begin_render_pass(&frame, &mut encoder, Color::BLACK);
-                    let mut render_data = RenderData {
-                        view: &view,
-                        multisampled_framebuffer: &application.multisampled_framebuffer,
-                        depth_texture: &application.depth_texture,
-                        encoder: &mut encoder,
-                        camera: &application.camera,
-                    };
-                    for spheres in &spheres_list {
-                        spheres.render(&mut render_data);
+                        {
+                            application.clear(&view, &mut encoder, Color::BLACK);
+                            let mut render_data = RenderData {
+                                view: &view,
+                                multisampled_framebuffer: &application.multisampled_framebuffer,
+                                depth_texture: &application.depth_texture,
+                                encoder: &mut encoder,
+                                camera: &application.camera,
+                            };
+                            for spheres in &spheres_list {
+                                spheres.render(&mut render_data);
+                            }
+                        }
+
+                        application.queue.submit(Some(encoder.finish()));
+                        frame.present();
+                        let result = update.call((), None);
+                        if let Err(err) = result {
+                            println!("Could not call update: {:?}", err);
+                            println!("{}", err.traceback(py).unwrap().format().unwrap());
+                        }
+
+                        application.update();
+                        application.window.request_redraw();
                     }
+                    WindowEvent::CloseRequested => target.exit(),
+                    _ => {}
                 }
-
-                application.queue.submit(Some(encoder.finish()));
-                frame.present();
             }
-            Event::MainEventsCleared => {
-                let result = update.call((), None);
-                if let Err(err) = result {
-                    println!("Could not call update: {:?}", err);
-                    println!("{}", err.traceback(py).unwrap().format().unwrap());
-                }
-
-                py_application.borrow_mut().application.update();
-            }
-            event => {
-                py_application
-                    .borrow_mut()
-                    .application
-                    .handle_event(&event, control_flow);
-            }
-        }
-    });
+        })
+        .expect("Failed to run event loop");
     Ok(())
 }
 

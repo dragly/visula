@@ -1,31 +1,28 @@
 import numpy as np
 from itertools import combinations
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from dataclasses import dataclass
-from visula import LineDelegate, SphereDelegate, Figure, InstanceBuffer, Uniform
+from visula import LineDelegate, SphereDelegate, Figure
 import visula as vl
 import numpy as np
 
 
 fig = Figure()
 
-phi = (1 + np.sqrt(5)) / 2  # Golden ratio
+phi: float = (1 + np.sqrt(5)) / 2  # Golden ratio
 
 vertices = np.array(
     [
-        [-1, phi, 0],
-        [1, phi, 0],
-        [-1, -phi, 0],
-        [1, -phi, 0],
-        [0, -1, phi],
-        [0, 1, phi],
-        [0, -1, -phi],
-        [0, 1, -phi],
-        [phi, 0, -1],
-        [phi, 0, 1],
-        [-phi, 0, -1],
-        [-phi, 0, 1],
+        [-1.0, phi, 0.0],
+        [1.0, phi, 0.0],
+        [-1.0, -phi, 0.0],
+        [1.0, -phi, 0.0],
+        [0.0, -1.0, phi],
+        [0.0, 1.0, phi],
+        [0.0, -1.0, -phi],
+        [0.0, 1.0, -phi],
+        [phi, 0.0, -1.0],
+        [phi, 0.0, 1.0],
+        [-phi, 0.0, -1.0],
+        [-phi, 0.0, 1.0],
     ]
 )
 

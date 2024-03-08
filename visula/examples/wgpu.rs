@@ -7,10 +7,11 @@ use visula_derive::Instance;
 
 use bytemuck::{Pod, Zeroable};
 use std::borrow::Cow;
+use std::sync::Arc;
 use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::EventLoop,
     window::Window,
 };
 
@@ -66,12 +67,12 @@ fn create_multisampled_framebuffer(
         .create_view(&wgpu::TextureViewDescriptor::default())
 }
 
-async fn run(event_loop: EventLoop<()>, window: Window) {
+async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     let size = window.inner_size();
 
     let instance = wgpu::Instance::default();
 
-    let surface = unsafe { instance.create_surface(&window) }.unwrap();
+    let surface = instance.create_surface(window.clone()).unwrap();
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::default(),
@@ -86,9 +87,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         .request_device(
             &wgpu::DeviceDescriptor {
                 label: None,
-                features: wgpu::Features::empty(),
+                required_features: wgpu::Features::empty(),
                 // Make sure we use the texture resolution limits from the adapter, so we can support images the size of the swapchain.
-                limits: wgpu::Limits::downlevel_webgl2_defaults()
+                required_limits: wgpu::Limits::downlevel_webgl2_defaults()
                     .using_resolution(adapter.limits()),
             },
             None,
@@ -143,6 +144,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         present_mode: wgpu::PresentMode::Fifo,
         alpha_mode: swapchain_capabilities.alpha_modes[0],
         view_formats: vec![],
+        desired_maximum_frame_latency: 2,
     };
 
     surface.configure(&device, &config);
@@ -158,7 +160,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let line_buffer = InstanceBuffer::<LineData>::new_with_init(&device, &line_data);
     let line = line_buffer.instance();
 
-    let mut camera_controller = CameraController::new(&window);
     let camera = Camera::new(&device);
 
     let lines = Lines::new(
@@ -179,86 +180,67 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     )
     .unwrap();
 
-    event_loop.run(move |event, _, control_flow| {
-        // Have the closure take ownership of the resources.
-        // `event_loop.run` never returns, therefore we must do this to ensure
-        // the resources are properly cleaned up.
-        let _ = (&instance, &adapter, &shader, &pipeline_layout);
+    let mut camera_controller = CameraController::new(&window);
+    event_loop
+        .run(move |event, target| {
+            // Have the closure take ownership of the resources.
+            // `event_loop.run` never returns, therefore we must do this to ensure
+            // the resources are properly cleaned up.
+            let _ = (&instance, &adapter, &shader, &pipeline_layout);
 
-        *control_flow = ControlFlow::Wait;
-        camera_controller.update();
-        let CameraControllerResponse {
-            needs_redraw,
-            captured_event,
-        } = camera_controller.handle_event(&event);
-        if needs_redraw {
-            window.request_redraw();
-        }
-        if captured_event {
-            return;
-        }
-        match event {
-            Event::WindowEvent {
-                event: WindowEvent::Resized(size),
-                ..
-            } => {
-                // Reconfigure the surface with the new size
-                config.width = size.width;
-                config.height = size.height;
-                surface.configure(&device, &config);
-                // On macos the window needs to be redrawn manually after resizing
+            camera_controller.update();
+            let CameraControllerResponse {
+                needs_redraw,
+                captured_event,
+            } = camera_controller.handle_event(&event);
+            if needs_redraw {
                 window.request_redraw();
             }
-            Event::RedrawRequested(_) => {
-                let camera_uniforms =
-                    camera_controller.uniforms(config.width as f32 / config.height as f32);
-                camera.update(&camera_uniforms, &queue);
-                let frame = surface
-                    .get_current_texture()
-                    .expect("Failed to acquire next swap chain texture");
-                let view = frame
-                    .texture
-                    .create_view(&wgpu::TextureViewDescriptor::default());
-                let mut encoder =
-                    device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+            if captured_event {
+                return;
+            }
+            match event {
+                Event::WindowEvent {
+                    event: WindowEvent::Resized(size),
+                    ..
+                } => {
+                    // Reconfigure the surface with the new size
+                    config.width = size.width;
+                    config.height = size.height;
+                    surface.configure(&device, &config);
+                    // On macos the window needs to be redrawn manually after resizing
+                    window.request_redraw();
+                }
+                Event::WindowEvent {
+                    event: WindowEvent::RedrawRequested,
+                    ..
+                } => {
+                    let camera_uniforms =
+                        camera_controller.uniforms(config.width as f32 / config.height as f32);
+                    camera.update(&camera_uniforms, &queue);
+                    let frame = surface
+                        .get_current_texture()
+                        .expect("Failed to acquire next swap chain texture");
+                    let view = frame
+                        .texture
+                        .create_view(&wgpu::TextureViewDescriptor::default());
+                    let mut encoder = device
+                        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-                encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("clear"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &view,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::GREEN),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                        view: &depth_texture,
-                        depth_ops: Some(wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(1.0),
-                            store: wgpu::StoreOp::Store,
-                        }),
-                        stencil_ops: None,
-                    }),
-                    occlusion_query_set: None,
-                    timestamp_writes: None,
-                });
-
-                {
-                    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: None,
+                    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("clear"),
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                             view: &view,
                             resolve_target: None,
                             ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Load,
+                                load: wgpu::LoadOp::Clear(wgpu::Color::GREEN),
                                 store: wgpu::StoreOp::Store,
                             },
                         })],
                         depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                             view: &depth_texture,
                             depth_ops: Some(wgpu::Operations {
-                                load: wgpu::LoadOp::Load,
+                                load: wgpu::LoadOp::Clear(1.0),
                                 store: wgpu::StoreOp::Store,
                             }),
                             stencil_ops: None,
@@ -266,38 +248,64 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         occlusion_query_set: None,
                         timestamp_writes: None,
                     });
-                    rpass.set_pipeline(&render_pipeline);
-                    rpass.draw(0..3, 0..1);
+
+                    {
+                        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            label: None,
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: &view,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Load,
+                                    store: wgpu::StoreOp::Store,
+                                },
+                            })],
+                            depth_stencil_attachment: Some(
+                                wgpu::RenderPassDepthStencilAttachment {
+                                    view: &depth_texture,
+                                    depth_ops: Some(wgpu::Operations {
+                                        load: wgpu::LoadOp::Load,
+                                        store: wgpu::StoreOp::Store,
+                                    }),
+                                    stencil_ops: None,
+                                },
+                            ),
+                            occlusion_query_set: None,
+                            timestamp_writes: None,
+                        });
+                        rpass.set_pipeline(&render_pipeline);
+                        rpass.draw(0..3, 0..1);
+                    }
+
+                    let mut render_data = RenderData {
+                        view: &view,
+                        multisampled_framebuffer: &multisampled_framebuffer,
+                        depth_texture: &depth_texture,
+                        encoder: &mut encoder,
+                        camera: &camera,
+                    };
+                    lines.render(&mut render_data);
+
+                    queue.submit(Some(encoder.finish()));
+                    frame.present();
                 }
-
-                let mut render_data = RenderData {
-                    view: &view,
-                    multisampled_framebuffer: &multisampled_framebuffer,
-                    depth_texture: &depth_texture,
-                    encoder: &mut encoder,
-                    camera: &camera,
-                };
-                lines.render(&mut render_data);
-
-                queue.submit(Some(encoder.finish()));
-                frame.present();
+                Event::WindowEvent {
+                    event: WindowEvent::CloseRequested,
+                    ..
+                } => target.exit(),
+                _ => {}
             }
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                ..
-            } => *control_flow = ControlFlow::Exit,
-            _ => {}
-        }
-    });
+        })
+        .expect("Failed to run event loop");
 }
 
 fn main() {
-    let event_loop = EventLoop::new();
+    let event_loop = EventLoop::new().expect("Failed to create event loop");
     let window = winit::window::Window::new(&event_loop).unwrap();
     #[cfg(not(target_arch = "wasm32"))]
     {
         env_logger::init();
-        pollster::block_on(run(event_loop, window));
+        pollster::block_on(run(event_loop, Arc::new(window)));
     }
     #[cfg(target_arch = "wasm32")]
     {
