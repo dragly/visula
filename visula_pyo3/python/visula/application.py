@@ -1,4 +1,4 @@
-from ._visula_pyo3 import PyApplication, PyEventLoop
+from .lib import PyApplication, PyEventLoop
 from dataclasses import dataclass
 
 _visula_singleton = None

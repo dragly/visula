@@ -1,6 +1,6 @@
 from .application import Visula
 from .expression import Expression
-from ._visula_pyo3 import PyInstanceBuffer
+from .lib import PyInstanceBuffer
 
 
 class InstanceBuffer(Expression):

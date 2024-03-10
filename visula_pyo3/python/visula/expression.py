@@ -1,6 +1,6 @@
 from __future__ import annotations
 from .application import Visula
-from ._visula_pyo3 import convert, vec3 as _vec3, Expression as _Expression
+from .lib import convert, vec3 as _vec3, Expression as _Expression
 
 
 def _ensure_expression(other):
@@ -49,6 +49,7 @@ class Expression:
     def __pow__(self, other) -> Expression:
         o = _ensure_expression(other)
         return Expression(self.inner.pow(o))
+
 
 def vec3(x, y, z):
     x = _ensure_expression(x)

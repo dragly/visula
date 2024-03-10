@@ -15,7 +15,6 @@ use winit::platform::web::WindowExtWebSys;
 
 #[cfg(target_arch = "wasm32")]
 use js_sys::Uint8Array;
-#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
 use std::borrow::BorrowMut;
@@ -309,4 +308,9 @@ where
     let (event_loop, window) = initialize_event_loop_and_window_with_config(_config);
 
     spawn(start(event_loop, window, init));
+}
+
+#[wasm_bindgen]
+struct WasmApplication {
+    application: Application,
 }
