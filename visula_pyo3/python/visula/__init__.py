@@ -4,6 +4,7 @@ from .expression import Expression, vec3
 from .instance_buffer import InstanceBuffer
 from .math import cos, sin, tan
 from .uniform import Uniform
+from .gui import Slider
 
 __all__ = [
     "LineDelegate",
@@ -15,4 +16,5 @@ __all__ = [
     "sin",
     "tan",
     "vec3",
+    "Slider",
 ]
