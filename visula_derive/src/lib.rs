@@ -19,6 +19,7 @@ fn visula_crate_name() -> TokenStream2 {
 
 #[proc_macro_derive(Delegate)]
 pub fn delegate(input: TokenStream) -> TokenStream {
+    let crate_name = visula_crate_name();
     let input = parse_macro_input!(input as syn::Item);
     let result = match input {
         syn::Item::Struct(ItemStruct { ident, fields, .. }) => {
@@ -52,13 +53,13 @@ pub fn delegate(input: TokenStream) -> TokenStream {
             };
             quote! {
                 impl #ident {
-                    fn inject(&self, shader_variable_name: &str, module: &mut ::naga::Module, binding_builder: &mut BindingBuilder) {
+                    fn inject(&self, shader_variable_name: &str, module: &mut ::naga::Module, binding_builder: &mut #crate_name::BindingBuilder) {
                         let entry_point_index = binding_builder.entry_point_index;
                         let variable = module.entry_points[entry_point_index]
                             .function
                             .local_variables
                             .fetch_if(|variable| variable.name == Some(shader_variable_name.into()))
-                            .unwrap();
+                            .expect(format!("Could not find variable name {shader_variable_name}", shader_variable_name=shader_variable_name).as_ref());
                         let variable_expression = module.entry_points[entry_point_index]
                             .function
                             .expressions
@@ -67,7 +68,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                                 _ => false,
                             })
                             .unwrap();
-                        let mut new_body = Block::from_vec(vec![
+                        let mut new_body = ::naga::Block::from_vec(vec![
                             #(#field_modifications)*
                         ]);
                         for (statement, span) in module.entry_points[entry_point_index]
