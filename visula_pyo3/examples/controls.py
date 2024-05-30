@@ -27,7 +27,7 @@ parameters.update()
 def create_particles(t, a, b, c):
     a = 10.0 * vl.cos(a)
     b = 100.0 * vl.sin(b)
-    c = 50.0 * vl.cos(b)
+    c = 50.0 * vl.cos(c)
     x = vl.cos(a * t) + vl.cos(b * t) / 2.0 + vl.sin(c * t) / 3.0
     y = vl.sin(a * t) + vl.sin(b * t) / 2.0 + vl.cos(c * t) / 3.0
     z = t
@@ -51,22 +51,38 @@ a_slider = Slider(
     name="a",
     value=0.0,
     minimum=0.0,
-    maximum=10.0,
+    maximum=1.0,
     step=0.1,
 )
-
-controls = [
-    a_slider,
-]
+b_slider = Slider(
+    name="b",
+    value=0.0,
+    minimum=0.0,
+    maximum=1.0,
+    step=0.1,
+)
+c_slider = Slider(
+    name="c",
+    value=0.0,
+    minimum=0.0,
+    maximum=1.0,
+    step=0.1,
+)
 
 
 def update():
     parameters.a = a_slider.value
+    parameters.b = b_slider.value
+    parameters.c = c_slider.value
     parameters.update()
 
 
 fig.show(
     [spheres],
     update=update,
-    controls=controls,
+    controls=[
+        a_slider,
+        b_slider,
+        c_slider,
+    ],
 )
