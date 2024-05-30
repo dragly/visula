@@ -47,13 +47,26 @@ spheres = SphereDelegate(
 fig = Figure()
 
 
-def update():
-    pass
-
+a_slider = Slider(
+    name="a",
+    value=0.0,
+    minimum=0.0,
+    maximum=10.0,
+    step=0.1,
+)
 
 controls = [
-    Slider(minimum=0.0, maximum=10.0, step=0.1),
+    a_slider,
 ]
 
 
-fig.show([spheres], update=update, controls=controls)
+def update():
+    parameters.a = a_slider.value
+    parameters.update()
+
+
+fig.show(
+    [spheres],
+    update=update,
+    controls=controls,
+)
