@@ -574,10 +574,10 @@ impl PyApplication {
 fn show(
     py: Python,
     py_event_loop: &mut PyEventLoop,
-    py_application: &PyCell<PyApplication>,
+    py_application: &Bound<PyApplication>,
     renderables: Vec<PyObject>,
-    update: &PyFunction,
-    mut controls: Vec<&PyCell<PySlider>>,
+    update: &Bound<PyFunction>,
+    mut controls: Vec<Bound<PySlider>>,
 ) -> PyResult<()> {
     // TODO consider making the application retained so that not all the wgpu initialization needs
     // to be re-done
@@ -741,7 +741,7 @@ fn show(
                         let result = update.call((), None);
                         if let Err(err) = result {
                             println!("Could not call update: {:?}", err);
-                            println!("{}", err.traceback(py).unwrap().format().unwrap());
+                            println!("{}", err.traceback_bound(py).unwrap().format().unwrap());
                         }
                     }
                     WindowEvent::CloseRequested => target.exit(),
@@ -753,26 +753,10 @@ fn show(
     Ok(())
 }
 
-#[pyfunction]
-fn testme(update: &PyFunction) {
-    println!("Called testme");
-    let result = update.call((), None);
-    if let Err(err) = result {
-        println!("Could not call update: {:?}", err);
-    }
-}
-
-#[pyfunction]
-fn testyou() {
-    println!("Called testyou");
-}
-
 #[pymodule]
 #[pyo3(name = "_visula_pyo3")]
-fn visula_pyo3(_py: Python, m: &PyModule) -> PyResult<()> {
+fn visula_pyo3(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(show, m)?)?;
-    m.add_function(wrap_pyfunction!(testme, m)?)?;
-    m.add_function(wrap_pyfunction!(testyou, m)?)?;
     m.add_function(wrap_pyfunction!(convert, m)?)?;
     m.add_function(wrap_pyfunction!(vec3, m)?)?;
     m.add_class::<PyLineDelegate>()?;
