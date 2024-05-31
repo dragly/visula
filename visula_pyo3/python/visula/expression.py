@@ -27,6 +27,10 @@ class Expression:
         o = _ensure_expression(other)
         return Expression(self.inner.sub(o))
 
+    def __rsub__(self, other) -> Expression:
+        o = _ensure_expression(other)
+        return o - self.inner
+
     def __mul__(self, other) -> Expression:
         o = _ensure_expression(other)
         return Expression(self.inner.mul(o))
@@ -49,6 +53,7 @@ class Expression:
     def __pow__(self, other) -> Expression:
         o = _ensure_expression(other)
         return Expression(self.inner.pow(o))
+
 
 def vec3(x, y, z):
     x = _ensure_expression(x)
