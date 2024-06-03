@@ -33,9 +33,6 @@ struct SphereData {
     _padding: f32,
 }
 
-#[derive(Debug)]
-struct Error {}
-
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct PointData {
@@ -600,37 +597,38 @@ fn show(
             {
                 match window_event {
                     WindowEvent::RedrawRequested => {
-                        let application = &mut py_application.borrow_mut().application;
-                        let frame = application.next_frame();
-                        let mut encoder = application.encoder();
-                        let view = frame
-                            .texture
-                            .create_view(&wgpu::TextureViewDescriptor::default());
-
                         {
-                            application.clear(&view, &mut encoder, Color::BLACK);
-                            let mut render_data = RenderData {
-                                view: &view,
-                                multisampled_framebuffer: &application.multisampled_framebuffer,
-                                depth_texture: &application.depth_texture,
-                                encoder: &mut encoder,
-                                camera: &application.camera,
-                            };
-                            for spheres in &spheres_list {
-                                spheres.render(&mut render_data);
-                            }
-                        }
+                            let application = &mut py_application.borrow_mut().application;
+                            let frame = application.next_frame();
+                            let mut encoder = application.encoder();
+                            let view = frame
+                                .texture
+                                .create_view(&wgpu::TextureViewDescriptor::default());
 
-                        application.queue.submit(Some(encoder.finish()));
-                        frame.present();
+                            {
+                                application.clear(&view, &mut encoder, Color::BLACK);
+                                let mut render_data = RenderData {
+                                    view: &view,
+                                    multisampled_framebuffer: &application.multisampled_framebuffer,
+                                    depth_texture: &application.depth_texture,
+                                    encoder: &mut encoder,
+                                    camera: &application.camera,
+                                };
+                                for spheres in &spheres_list {
+                                    spheres.render(&mut render_data);
+                                }
+                            }
+
+                            application.queue.submit(Some(encoder.finish()));
+                            frame.present();
+                            application.update();
+                            application.window.request_redraw();
+                        }
                         let result = update.call((), None);
                         if let Err(err) = result {
                             println!("Could not call update: {:?}", err);
                             println!("{}", err.traceback(py).unwrap().format().unwrap());
                         }
-
-                        application.update();
-                        application.window.request_redraw();
                     }
                     WindowEvent::CloseRequested => target.exit(),
                     _ => {}
