@@ -33,9 +33,6 @@ struct SphereData {
     _padding: f32,
 }
 
-#[derive(Debug)]
-struct Error {}
-
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct PointData {
