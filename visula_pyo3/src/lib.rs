@@ -1,7 +1,9 @@
 use bytemuck::{Pod, Zeroable};
+use egui::Slider;
 use numpy::ndarray::Axis;
 use numpy::PyReadonlyArray2;
 
+use egui_wgpu::ScreenDescriptor;
 use itertools::Itertools;
 use std::cell::RefCell;
 use winit::event::WindowEvent;
@@ -110,6 +112,35 @@ impl PyExpression {
     fn tan(&self) -> PyExpression {
         Self {
             inner: self.inner.tan(),
+        }
+    }
+}
+
+#[pyclass]
+#[derive(Clone, Debug)]
+struct PySlider {
+    #[pyo3(get, set)]
+    name: String,
+    #[pyo3(get, set)]
+    value: f32,
+    #[pyo3(get, set)]
+    minimum: f32,
+    #[pyo3(get, set)]
+    maximum: f32,
+    #[pyo3(get, set)]
+    step: f32,
+}
+
+#[pymethods]
+impl PySlider {
+    #[new]
+    fn new(name: &str, value: f32, minimum: f32, maximum: f32, step: f32) -> Self {
+        Self {
+            name: name.to_owned(),
+            value,
+            minimum,
+            maximum,
+            step,
         }
     }
 }
@@ -540,9 +571,10 @@ impl PyApplication {
 fn show(
     py: Python,
     py_event_loop: &mut PyEventLoop,
-    py_application: &PyCell<PyApplication>,
+    py_application: &Bound<PyApplication>,
     renderables: Vec<PyObject>,
-    update: &PyFunction,
+    update: &Bound<PyFunction>,
+    mut controls: Vec<Bound<PySlider>>,
 ) -> PyResult<()> {
     // TODO consider making the application retained so that not all the wgpu initialization needs
     // to be re-done
@@ -618,6 +650,85 @@ fn show(
                                     spheres.render(&mut render_data);
                                 }
                             }
+                            let raw_input = application
+                                .egui_renderer
+                                .state
+                                .take_egui_input(&application.window);
+                            let full_output =
+                                application
+                                    .egui_renderer
+                                    .state
+                                    .egui_ctx()
+                                    .run(raw_input, |ctx| {
+                                        egui::Window::new("Settings").show(ctx, |ui| {
+                                            for slider in &mut controls {
+                                                let mut slider_mut = slider.borrow_mut();
+                                                let minimum = slider_mut.minimum;
+                                                let maximum = slider_mut.maximum;
+                                                ui.label(&slider_mut.name);
+                                                ui.add(Slider::new(
+                                                    &mut slider_mut.value,
+                                                    minimum..=maximum,
+                                                ));
+                                            }
+                                        });
+                                    });
+
+                            application.egui_renderer.state.handle_platform_output(
+                                &application.window,
+                                full_output.platform_output,
+                            );
+
+                            let tris = application.egui_renderer.state.egui_ctx().tessellate(
+                                full_output.shapes,
+                                application.window.scale_factor() as f32,
+                            );
+                            for (id, image_delta) in &full_output.textures_delta.set {
+                                application.egui_renderer.renderer.update_texture(
+                                    &application.device,
+                                    &application.queue,
+                                    *id,
+                                    image_delta,
+                                );
+                            }
+                            let screen_descriptor = ScreenDescriptor {
+                                size_in_pixels: [
+                                    application.config.width,
+                                    application.config.height,
+                                ],
+                                pixels_per_point: application.window.scale_factor() as f32,
+                            };
+                            application.egui_renderer.renderer.update_buffers(
+                                &application.device,
+                                &application.queue,
+                                &mut encoder,
+                                &tris,
+                                &screen_descriptor,
+                            );
+                            let mut render_pass =
+                                encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                                    label: Some("egui"),
+                                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                        view: &view,
+                                        resolve_target: None,
+                                        ops: wgpu::Operations {
+                                            load: wgpu::LoadOp::Load,
+                                            store: wgpu::StoreOp::Store,
+                                        },
+                                    })],
+                                    depth_stencil_attachment: None,
+                                    occlusion_query_set: None,
+                                    timestamp_writes: None,
+                                });
+                            application.egui_renderer.renderer.render(
+                                &mut render_pass,
+                                &tris,
+                                &screen_descriptor,
+                            );
+                            drop(render_pass);
+                            for x in &full_output.textures_delta.free {
+                                application.egui_renderer.renderer.free_texture(x)
+                            }
 
                             application.queue.submit(Some(encoder.finish()));
                             frame.present();
@@ -627,7 +738,7 @@ fn show(
                         let result = update.call((), None);
                         if let Err(err) = result {
                             println!("Could not call update: {:?}", err);
-                            println!("{}", err.traceback(py).unwrap().format().unwrap());
+                            println!("{}", err.traceback_bound(py).unwrap().format().unwrap());
                         }
                     }
                     WindowEvent::CloseRequested => target.exit(),
@@ -639,26 +750,10 @@ fn show(
     Ok(())
 }
 
-#[pyfunction]
-fn testme(update: &PyFunction) {
-    println!("Called testme");
-    let result = update.call((), None);
-    if let Err(err) = result {
-        println!("Could not call update: {:?}", err);
-    }
-}
-
-#[pyfunction]
-fn testyou() {
-    println!("Called testyou");
-}
-
 #[pymodule]
 #[pyo3(name = "_visula_pyo3")]
-fn visula_pyo3(_py: Python, m: &PyModule) -> PyResult<()> {
+fn visula_pyo3(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(show, m)?)?;
-    m.add_function(wrap_pyfunction!(testme, m)?)?;
-    m.add_function(wrap_pyfunction!(testyou, m)?)?;
     m.add_function(wrap_pyfunction!(convert, m)?)?;
     m.add_function(wrap_pyfunction!(vec3, m)?)?;
     m.add_class::<PyLineDelegate>()?;
@@ -669,5 +764,6 @@ fn visula_pyo3(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyInstanceBuffer>()?;
     m.add_class::<PyUniformBuffer>()?;
     m.add_class::<PyUniformField>()?;
+    m.add_class::<PySlider>()?;
     Ok(())
 }

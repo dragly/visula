@@ -18,8 +18,8 @@ winit = { version = "0.29" }
 egui = "0.26"
 egui-wgpu = { version = "0.26", features = ["winit"]  }
 egui-winit = { version = "0.26"  }
-pyo3 = "0.20"
-numpy = { version = "0.20", features = ["nalgebra"] }
+pyo3 = { version = "0.21" }
+numpy = { version = "0.21", features = ["nalgebra"] }
 pollster = "0.3.0"
 itertools = "0.10.5"
 

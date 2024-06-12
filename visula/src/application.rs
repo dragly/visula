@@ -49,8 +49,8 @@ fn create_egui_context() -> egui::Context {
 }
 
 pub struct EguiRenderer {
-    state: State,
-    renderer: Renderer,
+    pub state: State,
+    pub renderer: Renderer,
 }
 
 impl EguiRenderer {
