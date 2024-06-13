@@ -60,7 +60,7 @@ impl Simulation {
         })
     }
 
-    fn update(&mut self, application: &visula::Application) {
+    fn update(&mut self, application: &mut visula::Application) {
         self.line_buffer
             .update(&application.device, &application.queue, &self.line_data);
     }
@@ -85,7 +85,7 @@ async fn run() {
             } => match event {
                 WindowEvent::RedrawRequested => {
                     application.update();
-                    simulation.update(&application);
+                    simulation.update(&mut application);
                     let frame = application.next_frame();
                     let mut encoder = application.encoder();
 

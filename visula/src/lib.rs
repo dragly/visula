@@ -103,7 +103,7 @@ where
                 match event {
                     WindowEvent::RedrawRequested => {
                         application.update();
-                        simulation.update(&application);
+                        simulation.update(&mut application);
                         application.render(&mut simulation);
                         application.window.borrow_mut().request_redraw();
                     }
@@ -179,13 +179,17 @@ pub fn create_window(config: RunConfig, event_loop: &EventLoop<CustomEvent>) -> 
         }
         let window = builder.build(event_loop).unwrap();
         if !canvas_existed {
+            let window_canvas = window.canvas().expect("should have made canvas");
+            window_canvas
+                .set_attribute("style", "width: 100%; height: 100%")
+                .unwrap();
             web_sys::window()
                 .expect("no global `window` exists")
                 .document()
                 .expect("should have a document on window")
                 .body()
                 .expect("should have a body on document")
-                .append_child(&web_sys::Element::from(window.canvas()))
+                .append_child(&web_sys::Element::from(window_canvas))
                 .ok()
                 .expect("couldn't append canvas to document body");
         }
@@ -306,6 +310,7 @@ where
     S: Simulation + 'static,
 {
     initialize_logger();
+    initialize_panic_hook();
     let (event_loop, window) = initialize_event_loop_and_window_with_config(_config);
 
     spawn(start(event_loop, window, init));

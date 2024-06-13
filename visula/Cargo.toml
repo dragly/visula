@@ -38,6 +38,7 @@ oxifive = { git = "https://github.com/dragly/oxifive", rev = "9f4314b587ef510290
 hecs = "0.10.3"
 strum = { version = "0.25.0", features = ["derive"] }
 rand = "0.8.5"
+chrono = "0.4.37"
 
 [dev-dependencies]
 slotmap = "1.0.2"

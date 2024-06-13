@@ -178,7 +178,7 @@ impl Simulation {
 
 impl visula::Simulation for Simulation {
     type Error = Error;
-    fn update(&mut self, application: &visula::Application) {
+    fn update(&mut self, application: &mut visula::Application) {
         let compartments = &mut self.compartments;
         let injecting_current = false;
         let mouse = Vec3::new(0.0, 0.0, 0.0);

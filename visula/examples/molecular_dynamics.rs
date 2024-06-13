@@ -1,8 +1,8 @@
 use bytemuck::{Pod, Zeroable};
+use chrono::{DateTime, TimeDelta, Utc};
 use glam::Vec3;
 use itertools::Itertools;
 use itertools_num::linspace;
-use std::time::{Duration, Instant};
 use structopt::StructOpt;
 use visula::Renderable;
 use visula::{
@@ -206,7 +206,7 @@ struct Simulation {
     bounding_box: BoundingBox,
     count: usize,
     target_temperature: f32,
-    last_update: Instant,
+    last_update: DateTime<Utc>,
 }
 
 impl Simulation {
@@ -214,6 +214,7 @@ impl Simulation {
         let cli = Cli::from_args();
         let count = cli.count.unwrap_or(8);
         let particles = generate(count);
+        log::info!("Particles: {}", particles.len());
 
         let particle_buffer = application.device.create_instance_buffer::<Particle>();
         let particle = particle_buffer.instance();
@@ -274,7 +275,7 @@ impl Simulation {
             },
             count,
             target_temperature: 10.0,
-            last_update: Instant::now(),
+            last_update: Utc::now(),
         })
     }
 
@@ -285,15 +286,16 @@ impl Simulation {
 
 impl visula::Simulation for Simulation {
     type Error = Error;
-    fn update(&mut self, application: &visula::Application) {
+    fn update(&mut self, application: &mut visula::Application) {
         let mut bond_data = Vec::new();
-        let current_time = Instant::now();
+        let current_time = Utc::now();
         let time_diff = current_time - self.last_update;
         let target_fps = self.settings.speed as f32 * 60.0;
-        if time_diff < Duration::from_secs_f32(1.0 / target_fps) {
+        if time_diff < TimeDelta::milliseconds((1000.0 / target_fps) as i64) {
             return;
         }
-        let steps = ((target_fps * time_diff.as_secs_f32()) as i32).min(self.settings.speed);
+        let steps = ((target_fps * time_diff.num_milliseconds() as f32 / 1000.0) as i32)
+            .min(self.settings.speed);
         for _ in 0..steps {
             let previous_particles = self.particles.clone();
             bond_data = integrate(

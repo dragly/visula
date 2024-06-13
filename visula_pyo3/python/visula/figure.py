@@ -1,11 +1,13 @@
-from typing import Any, Sequence
+from typing import Any, Optional, Sequence
 
+from .gui import Slider
 from ._visula_pyo3 import show
 from .application import Visula
 
 
 class Figure:
-    def show(self, renderables: Sequence[Any], update, controls):
+    def show(self, renderables: Sequence[Any], update, controls: Optional[Sequence[Slider]] = None):
+        controls = controls or []
         app = Visula.application()
         event_loop = Visula.event_loop()
         show(

@@ -18,7 +18,7 @@ pub struct RenderData<'a> {
 pub trait Simulation {
     type Error: Debug;
     fn handle_event(&mut self, _application: &mut Application, _event: &Event<CustomEvent>) {}
-    fn update(&mut self, _application: &Application) {}
+    fn update(&mut self, _application: &mut Application) {}
     fn render(&mut self, _data: &mut RenderData) {}
     fn gui(&mut self, _application: &Application, _context: &Context) {}
     fn clear_color(&self) -> wgpu::Color {
@@ -39,7 +39,7 @@ where
     fn handle_event(&mut self, application: &mut Application, event: &Event<CustomEvent>) {
         self.as_mut().handle_event(application, event)
     }
-    fn update(&mut self, application: &Application) {
+    fn update(&mut self, application: &mut Application) {
         self.as_mut().update(application)
     }
     fn render(&mut self, data: &mut RenderData) {
