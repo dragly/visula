@@ -132,24 +132,38 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
         }),
-        multisample: wgpu::MultisampleState::default(),
+        multisample: wgpu::MultisampleState {
+            count: 4,
+            mask: !0,
+            alpha_to_coverage_enabled: false,
+        },
         multiview: None,
     });
 
-    let mut config = wgpu::SurfaceConfiguration {
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        format: swapchain_format,
-        width: size.width,
-        height: size.height,
-        present_mode: wgpu::PresentMode::Fifo,
-        alpha_mode: swapchain_capabilities.alpha_modes[0],
-        view_formats: vec![],
-        desired_maximum_frame_latency: 2,
-    };
+    let mut config = surface
+        .get_default_config(&adapter, size.width.max(640), size.height.max(480))
+        .expect("Surface isn't supported by the adapter.");
+
+    let surface_view_format = config.format.add_srgb_suffix();
+    config.view_formats.push(surface_view_format);
 
     surface.configure(&device, &config);
 
-    let depth_texture = create_depth_texture(&device, &size);
+    let depth_texture_in = device.create_texture(&wgpu::TextureDescriptor {
+        size: wgpu::Extent3d {
+            width: config.width,
+            height: config.height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 4,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Depth32Float,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        label: None,
+        view_formats: &[],
+    });
+    let depth_texture = depth_texture_in.create_view(&wgpu::TextureViewDescriptor::default());
     let multisampled_framebuffer = create_multisampled_framebuffer(&device, &config, 4);
 
     let line_data = vec![LineData {
@@ -230,7 +244,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                     encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: Some("clear"),
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: &view,
+                            view: &multisampled_framebuffer,
                             resolve_target: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color::GREEN),
@@ -253,7 +267,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                             label: None,
                             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                                view: &view,
+                                view: &multisampled_framebuffer,
                                 resolve_target: None,
                                 ops: wgpu::Operations {
                                     load: wgpu::LoadOp::Load,
