@@ -650,7 +650,7 @@ fn show(
                                     spheres.render(&mut render_data);
                                 }
                             }
-                            if controls.len() > 0 {
+                            if !controls.is_empty() {
                                 let raw_input = application
                                     .egui_renderer
                                     .state
