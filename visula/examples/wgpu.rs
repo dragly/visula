@@ -1,4 +1,11 @@
+use std::borrow::BorrowMut;
+use visula::initialize_event_loop_and_window_with_config;
+use visula::initialize_logger;
+use visula::initialize_panic_hook;
+use visula::spawn;
+use visula::CustomEvent;
 use visula::Renderable;
+use visula::RunConfig;
 use visula::{
     Camera, CameraController, CameraControllerResponse, Expression, InstanceBuffer, LineDelegate,
     Lines, RenderData, RenderingDescriptor,
@@ -9,7 +16,6 @@ use bytemuck::{Pod, Zeroable};
 use std::borrow::Cow;
 use std::sync::Arc;
 use winit::{
-    dpi::PhysicalSize,
     event::{Event, WindowEvent},
     event_loop::EventLoop,
     window::Window,
@@ -21,24 +27,6 @@ struct LineData {
     position_a: [f32; 3],
     position_b: [f32; 3],
     _padding: [f32; 2],
-}
-
-fn create_depth_texture(device: &wgpu::Device, size: &PhysicalSize<u32>) -> wgpu::TextureView {
-    let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
-        size: wgpu::Extent3d {
-            width: size.width,
-            height: size.height,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Depth32Float,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        label: None,
-        view_formats: &[],
-    });
-    depth_texture.create_view(&wgpu::TextureViewDescriptor::default())
 }
 
 fn create_multisampled_framebuffer(
@@ -67,12 +55,13 @@ fn create_multisampled_framebuffer(
         .create_view(&wgpu::TextureViewDescriptor::default())
 }
 
-async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
+async fn run(event_loop: EventLoop<CustomEvent>, window: Window) {
     let size = window.inner_size();
+    let mut window_arc = Arc::new(window);
 
     let instance = wgpu::Instance::default();
 
-    let surface = instance.create_surface(window.clone()).unwrap();
+    let surface = instance.create_surface(window_arc.clone()).unwrap();
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::default(),
@@ -194,7 +183,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     )
     .unwrap();
 
-    let mut camera_controller = CameraController::new(&window);
+    let mut camera_controller = CameraController::new(window_arc.borrow_mut());
     event_loop
         .run(move |event, target| {
             // Have the closure take ownership of the resources.
@@ -208,7 +197,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                 captured_event,
             } = camera_controller.handle_event(&event);
             if needs_redraw {
-                window.request_redraw();
+                window_arc.borrow_mut().request_redraw();
             }
             if captured_event {
                 return;
@@ -223,7 +212,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                     config.height = size.height;
                     surface.configure(&device, &config);
                     // On macos the window needs to be redrawn manually after resizing
-                    window.request_redraw();
+                    window_arc.borrow_mut().request_redraw();
                 }
                 Event::WindowEvent {
                     event: WindowEvent::RedrawRequested,
@@ -314,27 +303,11 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 }
 
 fn main() {
-    let event_loop = EventLoop::new().expect("Failed to create event loop");
-    let window = winit::window::Window::new(&event_loop).unwrap();
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        env_logger::init();
-        pollster::block_on(run(event_loop, Arc::new(window)));
-    }
-    #[cfg(target_arch = "wasm32")]
-    {
-        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-        console_log::init().expect("could not initialize logger");
-        use winit::platform::web::WindowExtWebSys;
-        // On wasm, append the canvas to the document body
-        web_sys::window()
-            .and_then(|win| win.document())
-            .and_then(|doc| doc.body())
-            .and_then(|body| {
-                body.append_child(&web_sys::Element::from(window.canvas()))
-                    .ok()
-            })
-            .expect("couldn't append canvas to document body");
-        wasm_bindgen_futures::spawn_local(run(event_loop, window));
-    }
+    let config = RunConfig {
+        canvas_name: "canvas".to_owned(),
+    };
+    initialize_logger();
+    initialize_panic_hook();
+    let (event_loop, window) = initialize_event_loop_and_window_with_config(config);
+    spawn(run(event_loop, window));
 }

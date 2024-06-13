@@ -3,13 +3,13 @@ use crate::custom_event::CustomEvent;
 use crate::rendering_descriptor::RenderingDescriptor;
 use crate::{camera::controller::CameraController, simulation::RenderData};
 use crate::{CameraControllerResponse, Simulation};
+use chrono::{DateTime, Utc};
 use egui::{Context, ViewportId};
 use egui_wgpu::Renderer;
 use egui_wgpu::ScreenDescriptor;
 use egui_winit::State;
 
 use std::sync::Arc;
-use std::time::Instant;
 use wgpu::{
     Color, CommandEncoder, Device, InstanceDescriptor, SurfaceTexture, TextureFormat, TextureView,
 };
@@ -31,7 +31,7 @@ pub struct Application {
     pub egui_renderer: EguiRenderer,
     pub egui_ctx: egui::Context,
     pub camera: Camera,
-    pub start_time: Instant,
+    pub start_time: DateTime<Utc>,
 }
 
 fn create_egui_context() -> egui::Context {
@@ -91,6 +91,7 @@ impl Application {
 
         // TODO remove this when https://github.com/gfx-rs/wgpu/issues/1492 is resolved
         let backends = wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all);
+
         let dx12_shader_compiler = wgpu::util::dx12_shader_compiler_from_env().unwrap_or_default();
         let gles_minor_version = wgpu::util::gles_minor_version_from_env().unwrap_or_default();
 
@@ -126,7 +127,7 @@ impl Application {
             .unwrap();
 
         let mut config = surface
-            .get_default_config(&adapter, size.width, size.height)
+            .get_default_config(&adapter, size.width.max(640), size.height.max(480))
             .expect("Surface isn't supported by the adapter.");
         let surface_view_format = config.format.add_srgb_suffix();
         config.view_formats.push(surface_view_format);
@@ -152,7 +153,7 @@ impl Application {
 
         let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &config, 4);
 
-        let start_time = Instant::now();
+        let start_time = Utc::now();
 
         let camera = Camera::new(&device);
 

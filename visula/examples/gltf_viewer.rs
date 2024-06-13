@@ -76,7 +76,7 @@ impl Simulation {
 impl visula::Simulation for Simulation {
     type Error = Error;
 
-    fn update(&mut self, _application: &visula::Application) {}
+    fn update(&mut self, _application: &mut visula::Application) {}
 
     fn render(&mut self, data: &mut RenderData) {
         for pipeline in &self.mesh_pipelines {

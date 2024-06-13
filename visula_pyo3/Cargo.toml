@@ -8,7 +8,7 @@ edition = "2021"
 name = "visula_pyo3"
 crate-type = ["cdylib"]
 
-[dependencies]
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 visula = { path = "../visula" }
 visula_core = { path = "../visula_core" }
 visula_derive = { path = "../visula_derive" }

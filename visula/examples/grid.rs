@@ -100,7 +100,7 @@ impl Simulation {
 
 impl visula::Simulation for Simulation {
     type Error = Error;
-    fn update(&mut self, application: &visula::Application) {
+    fn update(&mut self, application: &mut visula::Application) {
         self.line_buffer
             .update(&application.device, &application.queue, &self.line_data);
     }
