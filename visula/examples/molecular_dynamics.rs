@@ -255,7 +255,11 @@ impl Simulation {
                 start: bond.position_a,
                 end: bond.position_b,
                 width: settings.width,
-                alpha: bond.strength,
+                color: visula::Expression::Vector3 {
+                    x: bond.strength.into(),
+                    y: 1.0.into(),
+                    z: 0.8.into(),
+                },
             },
         )
         .unwrap();

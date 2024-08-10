@@ -13,14 +13,14 @@ var<uniform> u_globals: Globals;
 
 struct VertexOutput {
     @builtin(position) projected_position: vec4<f32>,
-    @location(0) alpha: f32,
+    @location(0) color: vec3<f32>,
 };
 
 struct Line {
     start: vec3<f32>,
     end: vec3<f32>,
     width: f32,
-    alpha: f32,
+    color: vec3<f32>,
 };
 
 fn offset(pos: vec3<f32>, direction: vec3<f32>, unit_offset: vec3<f32>) -> vec3<f32> {
@@ -39,7 +39,7 @@ fn linef(
     line1: Line,
 ) -> VertexOutput {
     var output: VertexOutput;
-    output.alpha = line1.alpha;
+    output.color = line1.color;
 
     let width_half = line1.width / 2.0;
     let left = vec3<f32>(-width_half, 0.0, 0.0);
@@ -78,5 +78,5 @@ fn vs_main(
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4<f32>(0.8, 0.7, 0.6, input.alpha);
+    return vec4<f32>(input.color, 1.0);
 }
