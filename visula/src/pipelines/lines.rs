@@ -55,7 +55,8 @@ pub struct LineDelegate {
     pub start: Expression,
     pub end: Expression,
     pub width: Expression,
-    pub color: Expression,
+    pub start_color: Expression,
+    pub end_color: Expression,
 }
 
 impl Default for LineDelegate {
@@ -64,7 +65,8 @@ impl Default for LineDelegate {
             start: Vec3::new(0.0, 0.0, 0.0).into(),
             end: Vec3::new(1.0, 0.0, 0.0).into(),
             width: 1.0.into(),
-            color: Vec3::new(1.0, 1.0, 1.0).into(),
+            start_color: Vec3::new(1.0, 1.0, 1.0).into(),
+            end_color: Vec3::new(1.0, 1.0, 1.0).into(),
         }
     }
 }

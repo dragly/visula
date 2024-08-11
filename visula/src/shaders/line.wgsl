@@ -20,7 +20,8 @@ struct Line {
     start: vec3<f32>,
     end: vec3<f32>,
     width: f32,
-    color: vec3<f32>,
+    start_color: vec3<f32>,
+    end_color: vec3<f32>,
 };
 
 fn offset(pos: vec3<f32>, direction: vec3<f32>, unit_offset: vec3<f32>) -> vec3<f32> {
@@ -39,7 +40,7 @@ fn linef(
     line1: Line,
 ) -> VertexOutput {
     var output: VertexOutput;
-    output.color = line1.color;
+    output.color = (1.0 - length_weight) * line1.start_color + length_weight * line1.end_color;
 
     let width_half = line1.width / 2.0;
     let left = vec3<f32>(-width_half, 0.0, 0.0);
@@ -78,5 +79,5 @@ fn vs_main(
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4<f32>(input.color, 1.0);
+    return vec4<f32>(pow(input.color, vec3<f32>(2.4)), 1.0);
 }

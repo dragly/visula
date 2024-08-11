@@ -255,7 +255,12 @@ impl Simulation {
                 start: bond.position_a,
                 end: bond.position_b,
                 width: settings.width,
-                color: visula::Expression::Vector3 {
+                start_color: visula::Expression::Vector3 {
+                    x: bond.strength.clone().into(),
+                    y: 1.0.into(),
+                    z: 0.8.into(),
+                },
+                end_color: visula::Expression::Vector3 {
                     x: bond.strength.into(),
                     y: 1.0.into(),
                     z: 0.8.into(),
