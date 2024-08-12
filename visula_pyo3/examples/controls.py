@@ -12,12 +12,14 @@ class Parameters(Uniform):
     a: float
     b: float
     c: float
+    radius: float
 
 
 parameters = Parameters(
     a=0.0,
     b=0.0,
     c=0.0,
+    radius=0.2,
 )
 
 parameters_uniform = parameters.instance()
@@ -40,7 +42,7 @@ position = create_particles(t, parameters_uniform.a, parameters_uniform.b, param
 
 spheres = SphereDelegate(
     position=position,
-    radius=0.2,
+    radius=parameters_uniform.radius,
     color=1.0 * position / 4.0 + 8.0 / 3.0,
 )
 
@@ -68,12 +70,20 @@ c_slider = Slider(
     maximum=1.0,
     step=0.1,
 )
+radius_slider = Slider(
+    name="radius",
+    value=0.0,
+    minimum=0.0,
+    maximum=1.0,
+    step=0.01,
+)
 
 
 def update():
     parameters.a = a_slider.value
     parameters.b = b_slider.value
     parameters.c = c_slider.value
+    parameters.radius = radius_slider.value
     parameters.update()
 
 
@@ -84,5 +94,6 @@ fig.show(
         a_slider,
         b_slider,
         c_slider,
+        radius_slider,
     ],
 )

@@ -606,7 +606,8 @@ fn show(
                                 start: convert(py, &application, pylines.start).inner,
                                 end: convert(py, &application, pylines.end).inner,
                                 width: convert(py, &application, pylines.width).inner,
-                                alpha: convert(py, &application, pylines.alpha).inner,
+                                start_color: convert(py, &application, pylines.start_color).inner,
+                                end_color: convert(py, &application, pylines.end_color).inner,
                             },
                         )
                         .expect("Failed to create spheres"),

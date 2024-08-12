@@ -67,7 +67,8 @@ lines = LineDelegate(
     start=vertices[edges[:, 0]],
     end=vertices[edges[:, 1]],
     width=0.1,
-    alpha=1.0,
+    start_color=vl.vec3(1.0, 1.0, 1.0),
+    end_color=vl.vec3(1.0, 1.0, 1.0),
 )
 
 
