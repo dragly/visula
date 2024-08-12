@@ -12,6 +12,7 @@ use egui_winit::State;
 use std::sync::Arc;
 use wgpu::{
     Color, CommandEncoder, Device, InstanceDescriptor, SurfaceTexture, TextureFormat, TextureView,
+    TextureViewDescriptor,
 };
 use winit::event_loop::EventLoop;
 use winit::{
@@ -195,7 +196,7 @@ impl Application {
             format: config.view_formats[0],
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             label: None,
-            view_formats: &[],
+            view_formats: &config.view_formats,
         };
 
         device
@@ -321,9 +322,10 @@ impl Application {
         let frame = self.next_frame();
         let mut encoder = self.encoder();
 
-        let view = frame
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+        let view = frame.texture.create_view(&TextureViewDescriptor {
+            format: Some(self.config.view_formats[0]),
+            ..wgpu::TextureViewDescriptor::default()
+        });
 
         {
             self.clear(&view, &mut encoder, simulation.clear_color());

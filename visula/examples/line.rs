@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use wgpu::TextureViewDescriptor;
 
 use bytemuck::{Pod, Zeroable};
 use visula::Renderable;
@@ -99,9 +100,10 @@ async fn run() {
                     let mut encoder = application.encoder();
 
                     {
-                        let view = frame
-                            .texture
-                            .create_view(&wgpu::TextureViewDescriptor::default());
+                        let view = frame.texture.create_view(&TextureViewDescriptor {
+                            format: Some(application.config.view_formats[0]),
+                            ..wgpu::TextureViewDescriptor::default()
+                        });
                         application.clear(&view, &mut encoder, Color::BLACK);
                         simulation.render(&mut RenderData {
                             view: &view,
