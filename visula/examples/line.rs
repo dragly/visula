@@ -83,7 +83,7 @@ impl Simulation {
 async fn run() {
     initialize_logger();
     let (event_loop, window) = initialize_event_loop_and_window();
-    let mut application = Application::new(Arc::new(window), &event_loop).await;
+    let mut application = Application::new(Arc::new(window)).await;
 
     let mut simulation = Simulation::new(&mut application).expect("Failed to init simulation");
 

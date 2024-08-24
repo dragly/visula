@@ -560,9 +560,7 @@ impl PyApplication {
             },
             &event_loop.event_loop,
         );
-        let application = pollster::block_on(async {
-            Application::new(Arc::new(window), &event_loop.event_loop).await
-        });
+        let application = pollster::block_on(async { Application::new(Arc::new(window)).await });
         Self { application }
     }
 }

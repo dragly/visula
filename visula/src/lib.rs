@@ -87,7 +87,7 @@ where
     S: Simulation + 'static,
 {
     let main_window_id = window.id();
-    let mut application = Application::new(Arc::new(window), &event_loop).await;
+    let mut application = Application::new(Arc::new(window)).await;
 
     let mut simulation: S = init_simulation(&mut application);
 
