@@ -14,7 +14,6 @@ use wgpu::{
     Color, CommandEncoder, Device, InstanceDescriptor, SurfaceTexture, TextureFormat, TextureView,
     TextureViewDescriptor,
 };
-use winit::event_loop::EventLoop;
 use winit::{
     event::{Event, WindowEvent},
     window::Window,
@@ -61,13 +60,12 @@ impl EguiRenderer {
         output_depth_format: Option<TextureFormat>,
         msaa_samples: u32,
         window: &Window,
-        event_loop: &EventLoop<CustomEvent>,
     ) -> EguiRenderer {
         let egui_context = Context::default();
         let egui_state = egui_winit::State::new(
             egui_context,
             ViewportId::ROOT,
-            event_loop,
+            window,
             Some(window.scale_factor() as f32),
             None,
         );
@@ -87,7 +85,7 @@ impl EguiRenderer {
 }
 
 impl Application {
-    pub async fn new(window: Arc<Window>, event_loop: &EventLoop<CustomEvent>) -> Application {
+    pub async fn new(window: Arc<Window>) -> Application {
         let size = window.inner_size();
 
         // TODO remove this when https://github.com/gfx-rs/wgpu/issues/1492 is resolved
@@ -159,8 +157,7 @@ impl Application {
         let camera = Camera::new(&device);
 
         let egui_ctx = create_egui_context();
-        let egui_renderer =
-            EguiRenderer::new(&device, surface_view_format, None, 1, &window, event_loop);
+        let egui_renderer = EguiRenderer::new(&device, surface_view_format, None, 1, &window);
 
         Application {
             device,
