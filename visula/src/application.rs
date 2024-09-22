@@ -88,7 +88,9 @@ impl Application {
     pub async fn new(window: Arc<Window>) -> Application {
         let size = window.inner_size();
 
-        // TODO remove this when https://github.com/gfx-rs/wgpu/issues/1492 is resolved
+        #[cfg(target_arch = "wasm32")]
+        let backends = wgpu::Backends::GL;
+        #[cfg(not(target_arch = "wasm32"))]
         let backends = wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all);
 
         let dx12_shader_compiler = wgpu::util::dx12_shader_compiler_from_env().unwrap_or_default();
