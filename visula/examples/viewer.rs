@@ -66,14 +66,6 @@ impl Simulation {
         self.mesh.vertex_buffer = mesh_vertex_buf;
         self.mesh.vertex_count = mesh_vertex_count;
     }
-
-    pub fn handle_xyz(&mut self, application: &mut visula::Application, text: &[u8]) {
-        let visula::io::xyz::XyzFile { point_cloud } =
-            visula::io::xyz::read_xyz(text, &mut application.device);
-
-        self.sphere_buffer
-            .update(&application.device, &application.queue, &point_cloud[..]);
-    }
 }
 
 #[derive(Debug)]
@@ -157,7 +149,6 @@ impl visula::Simulation for Simulation {
                     if let Some(extension) = path.extension() {
                         if let Some(extension) = extension.to_str() {
                             match extension {
-                                "xyz" => self.handle_xyz(app, &drop_event.bytes),
                                 "zdf" => {
                                     let input = Cursor::new(drop_event.bytes.clone());
                                     self.handle_zdf(app, input);
@@ -191,7 +182,6 @@ impl visula::Simulation for Simulation {
                 if let Some(extension) = path.extension() {
                     if let Some(extension) = extension.to_str() {
                         match extension {
-                            "xyz" => self.handle_xyz(app, &drop_event.bytes),
                             "zdf" => {
                                 let input = Box::new(Cursor::new(drop_event.bytes.clone()));
                                 self.handle_zdf(app, input);
