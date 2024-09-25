@@ -5,17 +5,17 @@ use std::rc::Rc;
 use bytemuck::{Pod, Zeroable};
 
 use cgmath::InnerSpace;
+use clap::Parser;
 use itertools_num::linspace;
-use structopt::StructOpt;
 
 use visula::{
     InstanceBuffer, RenderData, Renderable, SphereDelegate, Spheres, UniformBuffer, Vector3,
 };
 use visula_derive::{Instance, Uniform};
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct Cli {
-    #[structopt(long)]
+    #[arg(long)]
     count: Option<usize>,
 }
 
@@ -324,7 +324,7 @@ struct Simulation {
 
 impl Simulation {
     fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
-        let cli = Cli::from_args();
+        let cli = Cli::parse();
         let count = cli.count.unwrap_or(6);
         let particles = generate(count);
 

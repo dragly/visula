@@ -2,16 +2,16 @@ use std::fs::File;
 
 use glam::{Quat, Vec3};
 use std::io::BufReader;
-use structopt::StructOpt;
 
+use clap::Parser;
 use visula::{
     io::gltf::{parse_gltf, GltfMesh},
     MeshDelegate, MeshPipeline, RenderData,
 };
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct Cli {
-    #[structopt(long)]
+    #[arg(long)]
     filename: String,
 }
 
@@ -36,7 +36,7 @@ impl From<visula::error::Error> for Error {
 
 impl Simulation {
     fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
-        let cli = Cli::from_args();
+        let cli = Cli::parse();
         let filename = cli.filename;
         let file = File::open(filename)?;
         let mut reader = BufReader::new(file);

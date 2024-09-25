@@ -1,9 +1,9 @@
 use bytemuck::{Pod, Zeroable};
 use chrono::{DateTime, TimeDelta, Utc};
+use clap::Parser;
 use glam::Vec3;
 use itertools::Itertools;
 use itertools_num::linspace;
-use structopt::StructOpt;
 use visula::Renderable;
 use visula::{
     InstanceBuffer, InstanceDeviceExt, LineDelegate, Lines, RenderData, SphereDelegate, Spheres,
@@ -11,9 +11,9 @@ use visula::{
 };
 use visula_derive::{Instance, Uniform};
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct Cli {
-    #[structopt(long)]
+    #[arg(long)]
     count: Option<usize>,
 }
 
@@ -211,7 +211,7 @@ struct Simulation {
 
 impl Simulation {
     fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
-        let cli = Cli::from_args();
+        let cli = Cli::parse();
         let count = cli.count.unwrap_or(8);
         let particles = generate(count);
         log::info!("Particles: {}", particles.len());
