@@ -2,9 +2,9 @@ use std::{fs::File, io::Cursor, path::Path};
 use visula::Renderable;
 
 use bytemuck::{Pod, Zeroable};
+use clap::Parser;
 use glam::{Quat, Vec3};
 use oxifive::ReadSeek;
-use structopt::StructOpt;
 use winit::event::{Event, KeyEvent, WindowEvent};
 
 use visula::{
@@ -13,9 +13,9 @@ use visula::{
 };
 use visula_derive::Uniform;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct Cli {
-    #[structopt(long)]
+    #[arg(long)]
     load_zdf: Option<std::path::PathBuf>,
 }
 
@@ -73,7 +73,7 @@ struct Error {}
 
 impl Simulation {
     fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
-        let args = Cli::from_args();
+        let args = Cli::parse();
         let sphere_buffer = InstanceBuffer::<SpherePrimitive>::new(&application.device);
         let sphere = sphere_buffer.instance();
         let settings_data = Settings {
