@@ -36,11 +36,11 @@ hecs = "0.10.3"
 strum = { version = "0.25.0", features = ["derive"] }
 rand = "0.8.5"
 chrono = "0.4.37"
+oxifive = { git = "https://github.com/dragly/oxifive", rev = "552366bd4d65c0fb09582517a9bfe5300ce84e22" }
 
 [dev-dependencies]
 slotmap = "1.0.2"
 clap = { version = "4.5.18", features = ["derive"] }
-oxifive = { git = "https://github.com/dragly/oxifive", rev = "552366bd4d65c0fb09582517a9bfe5300ce84e22" }
 
 [dependencies.web-sys]
 version = "0.3"
