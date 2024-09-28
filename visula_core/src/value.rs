@@ -49,6 +49,7 @@ pub enum Expression {
     Cos(ExpressionInner),
     Sin(ExpressionInner),
     Tan(ExpressionInner),
+    // Normal,
 }
 
 impl Expression {

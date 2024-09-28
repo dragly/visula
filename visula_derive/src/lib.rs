@@ -106,6 +106,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                             .body
                             .span_iter_mut()
                         {
+                            dbg!(&statement);
                             new_body.push(
                                 statement.clone(),
                                 match span {
@@ -114,6 +115,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                                 },
                             );
                         }
+                        let last = new_body.pop_last();
                         module.entry_points[entry_point_index].function.body = new_body;
                     }
                 }
@@ -136,6 +138,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
     let mut field_index: usize = 0;
     let mut instance_struct_fields = Vec::new();
     let mut module_fields = Vec::new();
+    let mut vertex_output_fields = Vec::new();
     let mut instance_field_values = Vec::new();
     let mut binding_fields = Vec::new();
 
@@ -181,6 +184,25 @@ pub fn instance(input: TokenStream) -> TokenStream {
                                         });
                                 }
                             });
+                            vertex_output_fields.push(quote! {
+                                {
+                                    let field_type = module.types.insert(#naga_type, ::visula_core::naga::Span::default());
+                                    ::log::debug!("Generating struct member");
+                                    members.push(
+                                        ::visula_core::naga::StructMember {
+                                            name: Some(stringify!(#field_name).into()),
+                                            ty: field_type,
+                                            binding: Some(::visula_core::naga::Binding::Location {
+                                                location: #shader_location + 10,
+                                                interpolation: None,
+                                                sampling: None
+                                            }),
+                                            offset: (#offset) as u32,
+                                        }
+                                    );
+
+                                }
+                            });
                             instance_field_values.push(quote! {
                                 #field_name: visula_core::Expression::InstanceField(visula_core::InstanceField {
                                     buffer_handle: inner.borrow().handle,
@@ -215,6 +237,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
     }
 
     let expanded = quote! {
+        use ::std::borrow::BorrowMut;
         pub struct #instance_struct_name {
             #(#instance_struct_fields,)*
             pub handle: ::visula_core::uuid::Uuid,
@@ -228,6 +251,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
                 binding_builder: &mut visula_core::BindingBuilder,
             )
             {
+                ::log::debug!("HELLO");
                 let entry_point_index = binding_builder.entry_point_index;
                 let previous_shader_location_offset = binding_builder.shader_location_offset;
                 let slot = binding_builder.current_slot;
@@ -251,6 +275,44 @@ pub fn instance(input: TokenStream) -> TokenStream {
 
                 binding_builder.shader_location_offset += #shader_location;
                 binding_builder.current_slot += 1;
+
+                let vot = module.types.iter().find(|(_, ty)| {
+                    if let Some(name) = ty.name.clone() {
+                        name == "VertexOutput"
+                    } else {
+                        false
+                    }
+                });
+                let handle = match vot {
+                    Some((vot, _)) => {
+                        vot
+                    }
+                    None => panic!("did not find VertexOutput")
+                };
+                let (mut members, span) = match module.types.get_handle(handle) {
+                    Ok(mut ty) => match &ty.inner {
+                        ::visula_core::naga::TypeInner::Struct {
+                            members,
+                            span
+                        } => {
+                            (members.clone(), *span)
+                        }
+                        _ => {
+                            unimplemented!("VertexOutput is wrong type");
+                        }
+                    },
+                    Err(_) => panic!("Unexpected"),
+                };
+
+                #(#vertex_output_fields)*
+
+                module.types.replace(handle, ::visula_core::naga::Type {
+                    name: Some("VertexOutput".into()),
+                    inner: ::visula_core::naga::TypeInner::Struct {
+                        members,
+                        span,
+                    }
+                });
             }
 
         }

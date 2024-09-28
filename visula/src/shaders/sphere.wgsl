@@ -18,11 +18,15 @@ struct VertexOutput {
     @location(2) vertex_position: vec3<f32>,
     @location(3) instance_position: vec3<f32>,
     @location(4) instance_color: vec3<f32>,
+    @location(5) sphere: Sphere,
 };
 
 struct Sphere {
     position: vec3<f32>,
     radius: f32,
+};
+
+struct SphereFragment {
     color: vec3<f32>,
 };
 
@@ -67,7 +71,9 @@ fn vs_main(
 ) -> VertexOutput {
     var sphere: Sphere;
     // modification happens here
-    return spheres(vertex_offset_pre_transform, sphere);
+    var output = spheres(vertex_offset_pre_transform, sphere);
+    // modification happens here
+    return output;
 }
 
 @fragment
@@ -124,8 +130,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let bounds_max = vec3<f32>(bound, bound, bound);
     let projectedPoint: vec4<f32> = u_globals.transform * vec4<f32>(intersection_position, 1.0);
 
-    // TODO fix frag depth
-    // gl_FragDepth = projectedPoint.z / projectedPoint.w;
+    var fragment: SphereFragment;
 
+    // return vec4<f32>(fragment.color * clamp(normalDotCamera + normalDotSun1 + normalDotSun2, 0.05, 1.0), 1.0);
     return vec4<f32>(in.instance_color * clamp(normalDotCamera + normalDotSun1 + normalDotSun2, 0.05, 1.0), 1.0);
 }

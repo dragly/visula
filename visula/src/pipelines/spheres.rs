@@ -53,6 +53,10 @@ pub struct Spheres {
 pub struct SphereDelegate {
     pub position: Expression,
     pub radius: Expression,
+}
+
+#[derive(Delegate)]
+pub struct SphereFragment {
     pub color: Expression,
 }
 
@@ -60,6 +64,7 @@ impl Spheres {
     pub fn new(
         rendering_descriptor: &RenderingDescriptor,
         delegate: &SphereDelegate,
+        fragment: &SphereFragment,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let &RenderingDescriptor {
             device,
