@@ -5,6 +5,7 @@ use glam::Vec3;
 use itertools::Itertools;
 use naga::back::wgsl::WriterFlags;
 use naga::valid::ValidationFlags;
+use naga::ShaderStage;
 use std::cell::Ref;
 use std::mem::size_of;
 use visula_core::{BindingBuilder, BufferBinding, Expression};
@@ -83,10 +84,15 @@ impl Lines {
         } = rendering_descriptor;
         let mut module =
             naga::front::wgsl::parse_str(include_str!("../shaders/line.wgsl")).unwrap();
-        let mut binding_builder = BindingBuilder::new(&module, "vs_main", 1);
+        let mut binding_builder = BindingBuilder::new(&module, "vs_main", "fs_main", 1);
 
         log::info!("Injecting line shader delegate");
-        delegate.inject("line_input", &mut module, &mut binding_builder);
+        delegate.inject(
+            "line_input",
+            &mut module,
+            &mut binding_builder,
+            ShaderStage::Vertex,
+        );
 
         let vertex_size = size_of::<Vertex>();
         let (vertex_data, index_data) = create_vertices();

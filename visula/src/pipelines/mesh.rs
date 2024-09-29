@@ -3,6 +3,7 @@ use std::mem::size_of;
 
 use naga::back::wgsl::WriterFlags;
 use naga::valid::ValidationFlags;
+use naga::ShaderStage;
 use wgpu::util::DeviceExt;
 
 use crate::primitives::mesh_primitive::MeshVertexAttributes;
@@ -37,9 +38,14 @@ impl MeshPipeline {
         } = rendering_descriptor;
         let vertex_size = size_of::<MeshVertexAttributes>();
         let mut module = naga::front::wgsl::parse_str(include_str!("../mesh.wgsl")).unwrap();
-        let mut binding_builder = BindingBuilder::new(&module, "vs_main", 1);
+        let mut binding_builder = BindingBuilder::new(&module, "vs_main", "fs_main", 1);
 
-        delegate.inject("instance", &mut module, &mut binding_builder);
+        delegate.inject(
+            "instance",
+            &mut module,
+            &mut binding_builder,
+            ShaderStage::Vertex,
+        );
         log::debug!("Validating generated mesh shader\n{module:#?}");
         let info =
             naga::valid::Validator::new(ValidationFlags::empty(), naga::valid::Capabilities::all())

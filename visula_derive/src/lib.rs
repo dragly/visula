@@ -23,7 +23,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                         let Field { ident, .. } = field;
                         field_modifications.push(quote! {
                             {
-                                let result_expression = self.#ident.setup(module, binding_builder);
+                                let result_expression = self.#ident.setup(module, binding_builder, shader_stage);
                                 let access_index = module.entry_points[entry_point_index]
                                     .function
                                     .expressions
@@ -83,7 +83,13 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                 }
 
                 impl #struct_ident {
-                    fn inject(&self, shader_variable_name: &str, module: &mut ::naga::Module, binding_builder: &mut BindingBuilder) {
+                    fn inject(
+                        &self,
+                        shader_variable_name: &str,
+                        module: &mut ::naga::Module,
+                        binding_builder: &mut BindingBuilder,
+                        shader_stage: ::visula_core::naga::ShaderStage
+                    ) {
                         let entry_point_index = binding_builder.entry_point_index;
                         let variable = module.entry_points[entry_point_index]
                             .function

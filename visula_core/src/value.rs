@@ -127,6 +127,7 @@ impl Expression {
         &self,
         module: &mut naga::Module,
         binding_builder: &mut BindingBuilder,
+        shader_stage: naga::ShaderStage,
     ) -> naga::Handle<naga::Expression> {
         let val = self.clone();
 
@@ -147,7 +148,7 @@ impl Expression {
                 let field_type = module.types.insert(naga_type, ::naga::Span::default());
                 let components_setup = [x, y]
                     .iter()
-                    .map(|component| component.setup(module, binding_builder))
+                    .map(|component| component.setup(module, binding_builder, shader_stage))
                     .collect();
                 module.entry_points[binding_builder.entry_point_index]
                     .function
@@ -172,7 +173,7 @@ impl Expression {
                 let field_type = module.types.insert(naga_type, ::naga::Span::default());
                 let components_setup = [x, y, z]
                     .iter()
-                    .map(|component| component.setup(module, binding_builder))
+                    .map(|component| component.setup(module, binding_builder, shader_stage))
                     .collect();
                 module.entry_points[binding_builder.entry_point_index]
                     .function
@@ -197,7 +198,7 @@ impl Expression {
                 let field_type = module.types.insert(naga_type, ::naga::Span::default());
                 let components_setup = [x, y, z, w]
                     .iter()
-                    .map(|component| component.setup(module, binding_builder))
+                    .map(|component| component.setup(module, binding_builder, shader_stage))
                     .collect();
                 module.entry_points[binding_builder.entry_point_index]
                     .function
@@ -215,8 +216,8 @@ impl Expression {
                 right,
                 operator,
             } => {
-                let left_setup = left.setup(module, binding_builder);
-                let right_setup = right.setup(module, binding_builder);
+                let left_setup = left.setup(module, binding_builder, shader_stage);
+                let right_setup = right.setup(module, binding_builder, shader_stage);
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -230,7 +231,7 @@ impl Expression {
                     )
             }
             Expression::UnaryOperator { value, operator } => {
-                let value_setup = value.setup(module, binding_builder);
+                let value_setup = value.setup(module, binding_builder, shader_stage);
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -243,7 +244,7 @@ impl Expression {
                     )
             }
             Expression::Length(value) => {
-                let arg = value.setup(module, binding_builder);
+                let arg = value.setup(module, binding_builder, shader_stage);
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -259,7 +260,7 @@ impl Expression {
                     )
             }
             Expression::Floor(value) => {
-                let arg = value.setup(module, binding_builder);
+                let arg = value.setup(module, binding_builder, shader_stage);
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -275,7 +276,7 @@ impl Expression {
                     )
             }
             Expression::Exp(value) => {
-                let arg = value.setup(module, binding_builder);
+                let arg = value.setup(module, binding_builder, shader_stage);
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -291,7 +292,7 @@ impl Expression {
                     )
             }
             Expression::Cos(value) => {
-                let arg = value.setup(module, binding_builder);
+                let arg = value.setup(module, binding_builder, shader_stage);
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -307,7 +308,7 @@ impl Expression {
                     )
             }
             Expression::Sin(value) => {
-                let arg = value.setup(module, binding_builder);
+                let arg = value.setup(module, binding_builder, shader_stage);
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -323,7 +324,7 @@ impl Expression {
                     )
             }
             Expression::Tan(value) => {
-                let arg = value.setup(module, binding_builder);
+                let arg = value.setup(module, binding_builder, shader_stage);
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -339,8 +340,8 @@ impl Expression {
                     )
             }
             Expression::Pow { base, exponent } => {
-                let arg = base.setup(module, binding_builder);
-                let arg1 = Some(exponent.setup(module, binding_builder));
+                let arg = base.setup(module, binding_builder, shader_stage);
+                let arg1 = Some(exponent.setup(module, binding_builder, shader_stage));
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions

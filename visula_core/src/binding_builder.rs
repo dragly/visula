@@ -55,12 +55,18 @@ pub struct BindingBuilder {
     pub bind_groups: BindGroupMap,
     pub shader_location_offset: u32,
     pub entry_point_index: usize,
+    pub fragment_entry_point_index: usize,
     pub current_slot: u32,
     pub current_bind_group: u32,
 }
 
 impl BindingBuilder {
-    pub fn new(module: &Module, entry_point_name: &str, current_slot: u32) -> BindingBuilder {
+    pub fn new(
+        module: &Module,
+        entry_point_name: &str,
+        fragment_entry_point_name: &str,
+        current_slot: u32,
+    ) -> BindingBuilder {
         log::debug!(
             "Making binding builder for entry point {entry_point_name} and slot {current_slot}"
         );
@@ -69,6 +75,13 @@ impl BindingBuilder {
             .iter()
             .enumerate()
             .find(|(_index, entry_point)| entry_point.name == entry_point_name)
+            .unwrap();
+
+        let (fragment_entry_point_index, fragment_entry_point) = module
+            .entry_points
+            .iter()
+            .enumerate()
+            .find(|(_index, entry_point)| entry_point.name == fragment_entry_point_name)
             .unwrap();
 
         let shader_location_offset = entry_point.function.arguments.len() as u32;
@@ -96,6 +109,7 @@ impl BindingBuilder {
             uniforms: HashMap::new(),
             bind_groups: HashMap::new(),
             entry_point_index,
+            fragment_entry_point_index,
             shader_location_offset,
             current_slot,
             current_bind_group,

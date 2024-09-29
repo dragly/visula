@@ -3,6 +3,7 @@ use crate::simulation::RenderData;
 use crate::{DefaultRenderPassDescriptor, Renderable};
 use bytemuck::{Pod, Zeroable};
 use itertools::Itertools;
+use naga::ShaderStage;
 use naga::{back::wgsl::WriterFlags, valid::ValidationFlags};
 use std::cell::Ref;
 use std::mem::size_of;
@@ -78,10 +79,21 @@ impl Spheres {
             naga::front::wgsl::parse_str(include_str!("../shaders/sphere.wgsl")).unwrap();
 
         log::debug!("Creating binding builder");
-        let mut binding_builder = BindingBuilder::new(&module, "vs_main", 1);
+        let mut binding_builder = BindingBuilder::new(&module, "vs_main", "fs_main", 1);
 
         log::debug!("Injecting delegate");
-        delegate.inject("sphere", &mut module, &mut binding_builder);
+        delegate.inject(
+            "sphere",
+            &mut module,
+            &mut binding_builder,
+            ShaderStage::Vertex,
+        );
+        delegate.inject(
+            "sphere",
+            &mut module,
+            &mut binding_builder,
+            ShaderStage::Fragment,
+        );
 
         log::debug!("Injection complete");
         let vertex_size = size_of::<Vertex>();
