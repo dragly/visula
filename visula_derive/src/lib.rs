@@ -90,7 +90,11 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                         binding_builder: &mut BindingBuilder,
                         shader_stage: ::visula_core::naga::ShaderStage
                     ) {
-                        let entry_point_index = binding_builder.entry_point_index;
+                        let entry_point_index = match shader_stage {
+                            ShaderStage::Vertex => binding_builder.entry_point_index,
+                            ShaderStage::Fragment => binding_builder.fragment_entry_point_index,
+                            _ => unimplemented!(),
+                        };
                         let variable = module.entry_points[entry_point_index]
                             .function
                             .local_variables
@@ -327,7 +331,6 @@ pub fn instance(input: TokenStream) -> TokenStream {
                 };
                 let (mut members, span) = match module.types.get_handle(handle) {
                     Ok(mut ty) => {
-                        dbg!(&ty);
                         match &ty.inner {
                             ::visula_core::naga::TypeInner::Struct {
                                 members,
@@ -352,8 +355,6 @@ pub fn instance(input: TokenStream) -> TokenStream {
                         span: (span as u64 #(+ #sizes)*) as u32,
                     }
                 };
-
-                dbg!(&new_type);
 
                 module.types.replace(handle, new_type);
 

@@ -3,6 +3,8 @@ use std::{
     ops::{Add, Deref, Div, Mul, Neg, Rem, Sub},
 };
 
+use naga::ShaderStage;
+
 use crate::{BindingBuilder, InstanceField, UniformField};
 
 #[derive(Clone)]
@@ -131,8 +133,13 @@ impl Expression {
     ) -> naga::Handle<naga::Expression> {
         let val = self.clone();
 
+        let entry_point_index = match shader_stage {
+            ShaderStage::Vertex => binding_builder.entry_point_index,
+            ShaderStage::Fragment => binding_builder.fragment_entry_point_index,
+            _ => unimplemented!("Unsupported shader stage"),
+        };
         match val {
-            Expression::Literal(inner) => module.entry_points[binding_builder.entry_point_index]
+            Expression::Literal(inner) => module.entry_points[entry_point_index]
                 .function
                 .expressions
                 .append(naga::Expression::Literal(inner), ::naga::Span::default()),
@@ -150,7 +157,7 @@ impl Expression {
                     .iter()
                     .map(|component| component.setup(module, binding_builder, shader_stage))
                     .collect();
-                module.entry_points[binding_builder.entry_point_index]
+                module.entry_points[entry_point_index]
                     .function
                     .expressions
                     .append(
@@ -175,7 +182,7 @@ impl Expression {
                     .iter()
                     .map(|component| component.setup(module, binding_builder, shader_stage))
                     .collect();
-                module.entry_points[binding_builder.entry_point_index]
+                module.entry_points[entry_point_index]
                     .function
                     .expressions
                     .append(
@@ -200,7 +207,7 @@ impl Expression {
                     .iter()
                     .map(|component| component.setup(module, binding_builder, shader_stage))
                     .collect();
-                module.entry_points[binding_builder.entry_point_index]
+                module.entry_points[entry_point_index]
                     .function
                     .expressions
                     .append(
@@ -218,7 +225,7 @@ impl Expression {
             } => {
                 let left_setup = left.setup(module, binding_builder, shader_stage);
                 let right_setup = right.setup(module, binding_builder, shader_stage);
-                module.entry_points[binding_builder.entry_point_index]
+                module.entry_points[entry_point_index]
                     .function
                     .expressions
                     .append(
@@ -232,7 +239,7 @@ impl Expression {
             }
             Expression::UnaryOperator { value, operator } => {
                 let value_setup = value.setup(module, binding_builder, shader_stage);
-                module.entry_points[binding_builder.entry_point_index]
+                module.entry_points[entry_point_index]
                     .function
                     .expressions
                     .append(
@@ -245,7 +252,7 @@ impl Expression {
             }
             Expression::Length(value) => {
                 let arg = value.setup(module, binding_builder, shader_stage);
-                module.entry_points[binding_builder.entry_point_index]
+                module.entry_points[entry_point_index]
                     .function
                     .expressions
                     .append(
@@ -261,7 +268,7 @@ impl Expression {
             }
             Expression::Floor(value) => {
                 let arg = value.setup(module, binding_builder, shader_stage);
-                module.entry_points[binding_builder.entry_point_index]
+                module.entry_points[entry_point_index]
                     .function
                     .expressions
                     .append(
@@ -277,7 +284,7 @@ impl Expression {
             }
             Expression::Exp(value) => {
                 let arg = value.setup(module, binding_builder, shader_stage);
-                module.entry_points[binding_builder.entry_point_index]
+                module.entry_points[entry_point_index]
                     .function
                     .expressions
                     .append(
@@ -293,7 +300,7 @@ impl Expression {
             }
             Expression::Cos(value) => {
                 let arg = value.setup(module, binding_builder, shader_stage);
-                module.entry_points[binding_builder.entry_point_index]
+                module.entry_points[entry_point_index]
                     .function
                     .expressions
                     .append(
@@ -309,7 +316,7 @@ impl Expression {
             }
             Expression::Sin(value) => {
                 let arg = value.setup(module, binding_builder, shader_stage);
-                module.entry_points[binding_builder.entry_point_index]
+                module.entry_points[entry_point_index]
                     .function
                     .expressions
                     .append(
@@ -325,7 +332,7 @@ impl Expression {
             }
             Expression::Tan(value) => {
                 let arg = value.setup(module, binding_builder, shader_stage);
-                module.entry_points[binding_builder.entry_point_index]
+                module.entry_points[entry_point_index]
                     .function
                     .expressions
                     .append(
@@ -342,7 +349,7 @@ impl Expression {
             Expression::Pow { base, exponent } => {
                 let arg = base.setup(module, binding_builder, shader_stage);
                 let arg1 = Some(exponent.setup(module, binding_builder, shader_stage));
-                module.entry_points[binding_builder.entry_point_index]
+                module.entry_points[entry_point_index]
                     .function
                     .expressions
                     .append(
@@ -365,17 +372,43 @@ impl Expression {
                         binding_builder,
                     );
                 }
-                module.entry_points[binding_builder.entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::FunctionArgument(
-                            binding_builder.bindings[&field.buffer_handle].fields
-                                [field.field_index]
-                                .function_argument,
+                match shader_stage {
+                    ShaderStage::Vertex => module.entry_points[entry_point_index]
+                        .function
+                        .expressions
+                        .append(
+                            naga::Expression::FunctionArgument(
+                                binding_builder.bindings[&field.buffer_handle].fields
+                                    [field.field_index]
+                                    .function_argument,
+                            ),
+                            naga::Span::default(),
                         ),
-                        naga::Span::default(),
-                    )
+                    ShaderStage::Fragment => {
+                        let input = module.entry_points[entry_point_index]
+                            .function
+                            .expressions
+                            .append(naga::Expression::FunctionArgument(0), naga::Span::default());
+
+                        dbg!(5 + field.field_index as u32);
+
+                        module.entry_points[entry_point_index]
+                            .function
+                            .expressions
+                            .append(
+                                naga::Expression::AccessIndex {
+                                    index: 5 + field.field_index as u32, // TODO this is not the right
+                                    // value if there are multiple
+                                    // fields...
+                                    base: input,
+                                },
+                                naga::Span::default(),
+                            )
+                    }
+                    _ => {
+                        unimplemented!("ShaderStage is not implemented")
+                    }
+                }
             }
             Expression::UniformField(field) => {
                 let inner = field.inner.borrow();
@@ -388,7 +421,7 @@ impl Expression {
                         &inner.bind_group_layout,
                     );
                 }
-                let access_index = module.entry_points[binding_builder.entry_point_index]
+                let access_index = module.entry_points[entry_point_index]
                     .function
                     .expressions
                     .append(
@@ -398,7 +431,7 @@ impl Expression {
                         },
                         naga::Span::default(),
                     );
-                module.entry_points[binding_builder.entry_point_index]
+                module.entry_points[entry_point_index]
                     .function
                     .expressions
                     .append(

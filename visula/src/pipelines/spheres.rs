@@ -88,7 +88,7 @@ impl Spheres {
             &mut binding_builder,
             ShaderStage::Vertex,
         );
-        delegate.inject(
+        fragment.inject(
             "sphere",
             &mut module,
             &mut binding_builder,
@@ -113,6 +113,7 @@ impl Spheres {
         });
 
         log::debug!("Validating generated spheres shader");
+        dbg!(&module);
         let info =
             naga::valid::Validator::new(ValidationFlags::empty(), naga::valid::Capabilities::all())
                 .validate(&module)
