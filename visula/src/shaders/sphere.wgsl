@@ -16,7 +16,8 @@ struct VertexOutput {
     @location(0) plane_coord: vec2<f32>,
     @location(1) radius: f32,
     @location(2) vertex_position: vec3<f32>,
-    @location(3) sphere: SphereVertex,
+    @location(3) instance_position: vec3<f32>,
+    @location(4) instance_radius: f32,
 };
 
 struct SphereVertex {
@@ -57,7 +58,8 @@ fn spheres(
     output.plane_coord = vertex_offset_pre_transform.xy;
     output.radius = sphere.radius;
     output.vertex_position = vertexPosition;
-    output.sphere = sphere;
+    output.instance_position = sphere.position;
+    output.instance_radius = sphere.radius;
 
     return output;
 }
@@ -77,7 +79,7 @@ fn vs_main(
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     let rayDirection: vec3<f32> = normalize(in.vertex_position - u_globals.camera_position.xyz);
-    let rayOrigin: vec3<f32> = in.vertex_position - in.sphere.position;
+    let rayOrigin: vec3<f32> = in.vertex_position - in.instance_position;
 
     let radius: f32 = in.radius;
 
@@ -121,7 +123,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let normalDotSun1: f32 = dot(normal, normalize(sun1));
     let normalDotSun2: f32 = dot(normal, normalize(sun2));
 
-    let intersection_position: vec3<f32> = in.sphere.position + sphereIntersection;
+    let intersection_position: vec3<f32> = in.instance_position + sphereIntersection;
 
     let bound = 8.0;
     let bounds_min = vec3<f32>(-bound, -bound, -bound);

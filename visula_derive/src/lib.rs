@@ -193,11 +193,12 @@ pub fn instance(input: TokenStream) -> TokenStream {
                                             name: Some(stringify!(#name).to_owned() + "_" + stringify!(#field_name).into()),
                                             ty: field_type,
                                             binding: Some(::visula_core::naga::Binding::Location {
-                                                location: #shader_location + 10,
-                                                interpolation: None,
-                                                sampling: None
+                                                location: 6 + #shader_location, // TODO do not hard
+                                                                                // code 5
+                                                interpolation: Some(::visula_core::naga::Interpolation::Perspective),
+                                                sampling: Some(::visula_core::naga::Sampling::Center),
                                             }),
-                                            offset: (#offset) as u32,
+                                            offset: (span as u64 + #offset) as u32,
                                         }
                                     );
 
@@ -219,7 +220,8 @@ pub fn instance(input: TokenStream) -> TokenStream {
                                         .expressions
                                         .append(
                                             ::visula_core::naga::Expression::AccessIndex {
-                                                index: #index as u32,
+                                                index: 6 + #index as u32, // TODO do not hard code
+                                                                          // 5
                                                 base: variable_expression,
                                             },
                                             ::visula_core::naga::Span::default(),
@@ -318,15 +320,18 @@ pub fn instance(input: TokenStream) -> TokenStream {
                     None => panic!("did not find VertexOutput")
                 };
                 let (mut members, span) = match module.types.get_handle(handle) {
-                    Ok(mut ty) => match &ty.inner {
-                        ::visula_core::naga::TypeInner::Struct {
-                            members,
-                            span
-                        } => {
-                            (members.clone(), *span)
-                        }
-                        _ => {
-                            unimplemented!("VertexOutput is wrong type");
+                    Ok(mut ty) => {
+                        dbg!(&ty);
+                        match &ty.inner {
+                            ::visula_core::naga::TypeInner::Struct {
+                                members,
+                                span
+                            } => {
+                                (members.clone(), *span)
+                            }
+                            _ => {
+                                unimplemented!("VertexOutput is wrong type");
+                            }
                         }
                     },
                     Err(_) => panic!("Unexpected"),
@@ -334,13 +339,17 @@ pub fn instance(input: TokenStream) -> TokenStream {
 
                 #(#vertex_output_fields)*
 
-                module.types.replace(handle, ::visula_core::naga::Type {
+                let new_type = ::visula_core::naga::Type {
                     name: Some("VertexOutput".into()),
                     inner: ::visula_core::naga::TypeInner::Struct {
                         members,
-                        span,
+                        span: (span as u64 #(+ #sizes)*) as u32,
                     }
-                });
+                };
+
+                dbg!(&new_type);
+
+                module.types.replace(handle, new_type);
 
                 let entry_point_index = binding_builder.entry_point_index;
                 let variable = module.entry_points[entry_point_index]
@@ -366,6 +375,9 @@ pub fn instance(input: TokenStream) -> TokenStream {
 
                 #(#vertex_output_assignments)*
 
+                module.entry_points[entry_point_index]
+                    .function
+                    .body = ::visula_core::naga::Block::from_vec(statements);
             }
 
         }
