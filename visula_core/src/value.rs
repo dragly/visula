@@ -51,7 +51,7 @@ pub enum Expression {
     Cos(ExpressionInner),
     Sin(ExpressionInner),
     Tan(ExpressionInner),
-    // Normal,
+    Normal,
 }
 
 impl Expression {
@@ -441,6 +441,24 @@ impl Expression {
                         naga::Span::default(),
                     )
             }
+            Expression::Normal => {
+                if shader_stage != ShaderStage::Fragment {
+                    unimplemented!("Normals are only implemented for fragment stage");
+                }
+                module.entry_points[entry_point_index]
+                    .function
+                    .named_expressions
+                    .iter()
+                    .find_map(|(expression, name)| {
+                        if name == "normal" {
+                            Some(expression)
+                        } else {
+                            None
+                        }
+                    })
+                    .expect("Could not find normal expression in shader")
+                    .clone()
+            }
         }
     }
 }
@@ -499,6 +517,9 @@ impl std::fmt::Debug for Expression {
             }
             Expression::Tan(_) => {
                 write!(fmt, "Tan")?;
+            }
+            Expression::Normal => {
+                write!(fmt, "Normal")?;
             }
         }
         Ok(())

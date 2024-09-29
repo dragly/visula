@@ -40,11 +40,7 @@ impl Simulation {
                 radius: ring.radius_x,
             },
             &SphereFragment {
-                color: Expression::Vector3 {
-                    x: 1.0.into(),
-                    y: 1.0.into(),
-                    z: 1.0.into(),
-                },
+                color: Expression::Normal,
             },
         )
         .unwrap();
