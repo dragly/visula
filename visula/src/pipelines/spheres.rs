@@ -73,12 +73,17 @@ impl Spheres {
             ..
         } = rendering_descriptor;
 
+        log::debug!("Loading sphere shader");
         let mut module =
             naga::front::wgsl::parse_str(include_str!("../shaders/sphere.wgsl")).unwrap();
+
+        log::debug!("Creating binding builder");
         let mut binding_builder = BindingBuilder::new(&module, "vs_main", 1);
 
+        log::debug!("Injecting delegate");
         delegate.inject("sphere", &mut module, &mut binding_builder);
 
+        log::debug!("Injection complete");
         let vertex_size = size_of::<Vertex>();
         let (vertex_data, index_data) = create_vertices();
         let index_count = index_data.len();

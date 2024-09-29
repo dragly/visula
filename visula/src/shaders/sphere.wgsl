@@ -16,12 +16,10 @@ struct VertexOutput {
     @location(0) plane_coord: vec2<f32>,
     @location(1) radius: f32,
     @location(2) vertex_position: vec3<f32>,
-    @location(3) instance_position: vec3<f32>,
-    @location(4) instance_color: vec3<f32>,
-    @location(5) sphere: Sphere,
+    @location(3) sphere: SphereVertex,
 };
 
-struct Sphere {
+struct SphereVertex {
     position: vec3<f32>,
     radius: f32,
 };
@@ -32,7 +30,7 @@ struct SphereFragment {
 
 fn spheres(
     vertex_offset_pre_transform: vec4<f32>,
-    sphere: Sphere,
+    sphere: SphereVertex,
 ) -> VertexOutput {
     var output: VertexOutput;
     let viewMatrix: mat3x3<f32> = mat3x3<f32>(
@@ -59,8 +57,7 @@ fn spheres(
     output.plane_coord = vertex_offset_pre_transform.xy;
     output.radius = sphere.radius;
     output.vertex_position = vertexPosition;
-    output.instance_position = sphere.position;
-    output.instance_color = sphere.color;
+    output.sphere = sphere;
 
     return output;
 }
@@ -69,7 +66,7 @@ fn spheres(
 fn vs_main(
     @location(0) vertex_offset_pre_transform: vec4<f32>,
 ) -> VertexOutput {
-    var sphere: Sphere;
+    var sphere: SphereVertex;
     // modification happens here
     var output = spheres(vertex_offset_pre_transform, sphere);
     // modification happens here
@@ -78,8 +75,9 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+
     let rayDirection: vec3<f32> = normalize(in.vertex_position - u_globals.camera_position.xyz);
-    let rayOrigin: vec3<f32> = in.vertex_position - in.instance_position;
+    let rayOrigin: vec3<f32> = in.vertex_position - in.sphere.position;
 
     let radius: f32 = in.radius;
 
@@ -123,15 +121,15 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let normalDotSun1: f32 = dot(normal, normalize(sun1));
     let normalDotSun2: f32 = dot(normal, normalize(sun2));
 
-    let intersection_position: vec3<f32> = in.instance_position + sphereIntersection;
+    let intersection_position: vec3<f32> = in.sphere.position + sphereIntersection;
 
     let bound = 8.0;
     let bounds_min = vec3<f32>(-bound, -bound, -bound);
     let bounds_max = vec3<f32>(bound, bound, bound);
     let projectedPoint: vec4<f32> = u_globals.transform * vec4<f32>(intersection_position, 1.0);
 
-    var fragment: SphereFragment;
+    var sphere: SphereFragment;
+    // modification happens here
 
-    // return vec4<f32>(fragment.color * clamp(normalDotCamera + normalDotSun1 + normalDotSun2, 0.05, 1.0), 1.0);
-    return vec4<f32>(in.instance_color * clamp(normalDotCamera + normalDotSun1 + normalDotSun2, 0.05, 1.0), 1.0);
+    return vec4<f32>(sphere.color * clamp(normalDotCamera + normalDotSun1 + normalDotSun2, 0.05, 1.0), 1.0);
 }

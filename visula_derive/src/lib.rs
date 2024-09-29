@@ -106,7 +106,6 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                             .body
                             .span_iter_mut()
                         {
-                            dbg!(&statement);
                             new_body.push(
                                 statement.clone(),
                                 match span {
@@ -115,7 +114,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                                 },
                             );
                         }
-                        let last = new_body.pop_last();
+                        // let last = new_body.pop_last();
                         module.entry_points[entry_point_index].function.body = new_body;
                     }
                 }
@@ -139,6 +138,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
     let mut instance_struct_fields = Vec::new();
     let mut module_fields = Vec::new();
     let mut vertex_output_fields = Vec::new();
+    let mut vertex_output_assignments = Vec::new();
     let mut instance_field_values = Vec::new();
     let mut binding_fields = Vec::new();
 
@@ -147,7 +147,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
     match input.data {
         Data::Struct(ref data) => match data.fields {
             Fields::Named(ref fields) => {
-                for field in &fields.named {
+                for (index, field) in fields.named.iter().enumerate() {
                     let field_name = &field.ident;
                     match field_name {
                         Some(field_name) => {
@@ -190,7 +190,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
                                     ::log::debug!("Generating struct member");
                                     members.push(
                                         ::visula_core::naga::StructMember {
-                                            name: Some(stringify!(#field_name).into()),
+                                            name: Some(stringify!(#name).to_owned() + "_" + stringify!(#field_name).into()),
                                             ty: field_type,
                                             binding: Some(::visula_core::naga::Binding::Location {
                                                 location: #shader_location + 10,
@@ -201,6 +201,34 @@ pub fn instance(input: TokenStream) -> TokenStream {
                                         }
                                     );
 
+                                }
+                            });
+                            vertex_output_assignments.push(quote! {
+                                {
+                                    let result_expression = module.entry_points[binding_builder.entry_point_index]
+                                        .function
+                                        .expressions
+                                        .append(
+                                            naga::Expression::FunctionArgument(
+                                                previous_shader_location_offset + #shader_location,
+                                            ),
+                                            naga::Span::default(),
+                                        );
+                                    let access_index = module.entry_points[entry_point_index]
+                                        .function
+                                        .expressions
+                                        .append(
+                                            ::visula_core::naga::Expression::AccessIndex {
+                                                index: #index as u32,
+                                                base: variable_expression,
+                                            },
+                                            ::visula_core::naga::Span::default(),
+                                        );
+                                    let element = ::naga::Statement::Store {
+                                        pointer: access_index,
+                                        value: result_expression,
+                                    };
+                                    statements.insert(statements.len() - 1, element);
                                 }
                             });
                             instance_field_values.push(quote! {
@@ -313,6 +341,31 @@ pub fn instance(input: TokenStream) -> TokenStream {
                         span,
                     }
                 });
+
+                let entry_point_index = binding_builder.entry_point_index;
+                let variable = module.entry_points[entry_point_index]
+                    .function
+                    .local_variables
+                    .fetch_if(|variable| variable.name == Some("output".to_owned()))
+                    .unwrap();
+                let variable_expression = module.entry_points[entry_point_index]
+                    .function
+                    .expressions
+                    .fetch_if(|expression| match expression {
+                        ::visula_core::naga::Expression::LocalVariable(v) => v == &variable,
+                        _ => false,
+                    })
+                    .unwrap();
+
+                let mut statements: Vec<::visula_core::naga::Statement> = module.entry_points[entry_point_index]
+                    .function
+                    .body
+                    .iter()
+                    .cloned()
+                    .collect();
+
+                #(#vertex_output_assignments)*
+
             }
 
         }
