@@ -68,7 +68,10 @@ fn spheres(
 fn vs_main(
     @location(0) vertex_offset_pre_transform: vec4<f32>,
 ) -> VertexOutput {
-    var sphere: SphereVertex;
+    let sphere = SphereVertex(
+        vec3<f32>(0.0, 0.0, 0.0),
+        1.0,
+    );
     // modification happens here
     var output = spheres(vertex_offset_pre_transform, sphere);
     // modification happens here

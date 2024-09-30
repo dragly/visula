@@ -77,6 +77,7 @@ impl Spheres {
         log::debug!("Loading sphere shader");
         let mut module =
             naga::front::wgsl::parse_str(include_str!("../shaders/sphere.wgsl")).unwrap();
+        dbg!(&module);
 
         log::debug!("Creating binding builder");
         let mut binding_builder = BindingBuilder::new(&module, "vs_main", "fs_main", 1);

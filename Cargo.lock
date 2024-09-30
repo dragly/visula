@@ -2849,6 +2849,7 @@ dependencies = [
  "egui-wgpu",
  "egui-winit",
  "itertools",
+ "log",
  "naga 0.13.0",
  "numpy",
  "pollster",

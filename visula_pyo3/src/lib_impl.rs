@@ -18,7 +18,7 @@ use pyo3::{buffer::PyBuffer, prelude::*};
 use visula::{
     create_event_loop, create_window, initialize_logger, Application, CustomEvent, Expression,
     InstanceBuffer, LineDelegate, Lines, PyLineDelegate, PySphereDelegate, RenderData, Renderable,
-    RunConfig, SphereDelegate, Spheres,
+    RunConfig, SphereDelegate, SphereFragment, Spheres,
 };
 use visula_core::glam::{Vec3, Vec4};
 use visula_core::uuid::Uuid;
@@ -583,34 +583,36 @@ fn show(
             .iter()
             .map(|renderable| -> Box<dyn Renderable> {
                 // TODO automate the conversion
-                if let Ok(pysphere) = renderable.extract::<PySphereDelegate>(py) {
-                    return Box::new(
-                        Spheres::new(
-                            &application.application.rendering_descriptor(),
-                            &SphereDelegate {
-                                position: convert(py, &application, pysphere.position).inner,
-                                radius: convert(py, &application, pysphere.radius).inner,
-                                color: convert(py, &application, pysphere.color).inner,
-                            },
-                        )
-                        .expect("Failed to create spheres"),
-                    );
-                }
-                if let Ok(pylines) = renderable.extract::<PyLineDelegate>(py) {
-                    return Box::new(
-                        Lines::new(
-                            &application.application.rendering_descriptor(),
-                            &LineDelegate {
-                                start: convert(py, &application, pylines.start).inner,
-                                end: convert(py, &application, pylines.end).inner,
-                                width: convert(py, &application, pylines.width).inner,
-                                start_color: convert(py, &application, pylines.start_color).inner,
-                                end_color: convert(py, &application, pylines.end_color).inner,
-                            },
-                        )
-                        .expect("Failed to create spheres"),
-                    );
-                }
+                // if let Ok(pysphere) = renderable.extract::<PySphereDelegate>(py) {
+                //     return Box::new(
+                //         Spheres::new(
+                //             &application.application.rendering_descriptor(),
+                //             &SphereDelegate {
+                //                 position: convert(py, &application, pysphere.position).inner,
+                //                 radius: convert(py, &application, pysphere.radius).inner,
+                //             },
+                //             &SphereFragment {
+                //                 color: convert(py, &application, pysphere.color).inner,
+                //             },
+                //         )
+                //         .expect("Failed to create spheres"),
+                //     );
+                // }
+                // if let Ok(pylines) = renderable.extract::<PyLineDelegate>(py) {
+                //     return Box::new(
+                //         Lines::new(
+                //             &application.application.rendering_descriptor(),
+                //             &LineDelegate {
+                //                 start: convert(py, &application, pylines.start).inner,
+                //                 end: convert(py, &application, pylines.end).inner,
+                //                 width: convert(py, &application, pylines.width).inner,
+                //                 start_color: convert(py, &application, pylines.start_color).inner,
+                //                 end_color: convert(py, &application, pylines.end_color).inner,
+                //             },
+                //         )
+                //         .expect("Failed to create spheres"),
+                //     );
+                // }
                 unimplemented!("TODO")
             })
             .collect_vec()

@@ -23,21 +23,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                         let Field { ident, .. } = field;
                         field_modifications.push(quote! {
                             {
-                                let result_expression = self.#ident.setup(module, binding_builder, shader_stage);
-                                let access_index = module.entry_points[entry_point_index]
-                                    .function
-                                    .expressions
-                                    .append(
-                                        ::visula_core::naga::Expression::AccessIndex {
-                                            index: #index as u32,
-                                            base: variable_expression,
-                                        },
-                                        ::visula_core::naga::Span::default(),
-                                    );
-                                ::naga::Statement::Store {
-                                    pointer: access_index,
-                                    value: result_expression,
-                                }
+                                self.#ident.setup(module, binding_builder, shader_stage)
                             },
                         });
 
@@ -95,37 +81,51 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                             ShaderStage::Fragment => binding_builder.fragment_entry_point_index,
                             _ => unimplemented!(),
                         };
-                        let variable = module.entry_points[entry_point_index]
+                        let mut variable_expression = module.entry_points[entry_point_index]
                             .function
-                            .local_variables
-                            .fetch_if(|variable| variable.name == Some(shader_variable_name.into()))
-                            .unwrap();
-                        let variable_expression = module.entry_points[entry_point_index]
-                            .function
-                            .expressions
-                            .fetch_if(|expression| match expression {
-                                ::visula_core::naga::Expression::LocalVariable(v) => v == &variable,
-                                _ => false,
+                            .named_expressions
+                            .iter()
+                            .find_map(|(expression, name)| {
+                                if name == shader_variable_name
+                                {
+                                    Some(expression)
+                                } else {
+                                    None
+                                }
                             })
-                            .unwrap();
-                        let mut new_body = ::naga::Block::from_vec(vec![
-                            #(#field_modifications)*
-                        ]);
-                        for (statement, span) in module.entry_points[entry_point_index]
-                            .function
-                            .body
-                            .span_iter_mut()
-                        {
-                            new_body.push(
-                                statement.clone(),
-                                match span {
-                                    Some(s) => s.clone(),
-                                    None => ::visula_core::naga::Span::default(),
-                                },
-                            );
-                        }
+                            .expect(format!("Could not find variable `{shader_variable_name}`").as_str());
+                        dbg!(variable_expression);
+                        // let mut new_expressions = ::visula_core::naga::Arena::new();
+                        // let mut expression_map = ::visula_core::naga::FastIndexMap::new();
+                        // for (old_handle, old_expression) in module.entry_points[entry_point_index]
+                        //     .function
+                        //     .expressions
+                        //     .iter()
+                        // {
+                        //     let new_handle = new_expressions.append(old_expression.clone(), ::visula_core::naga::Span::default());
+                        //     expression_map.insert(old_handle, new_handle);
+                        //     if variable_expression == old_handle {
+                        //         panic!("Found variable expression");
+                        //     }
+                        // }
+                        // let mut components = vec![
+                        //     #(#field_modifications)*
+                        // ];
+                        // for (statement, span) in module.entry_points[entry_point_index]
+                        //     .function
+                        //     .body
+                        //     .span_iter_mut()
+                        // {
+                        //     new_body.push(
+                        //         statement.clone(),
+                        //         match span {
+                        //             Some(s) => s.clone(),
+                        //             None => ::visula_core::naga::Span::default(),
+                        //         },
+                        //     );
+                        // }
                         // let last = new_body.pop_last();
-                        module.entry_points[entry_point_index].function.body = new_body;
+                        // module.entry_points[entry_point_index].function.body = new_body;
                     }
                 }
             }
@@ -277,7 +277,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
     }
 
     let expanded = quote! {
-        use ::std::borrow::BorrowMut;
+        // use ::std::borrow::BorrowMut;
         pub struct #instance_struct_name {
             #(#instance_struct_fields,)*
             pub handle: ::visula_core::uuid::Uuid,

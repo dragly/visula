@@ -25,3 +25,4 @@ pollster = { workspace = true }
 itertools = { workspace = true }
 naga = { workspace = true }
 uuid = { workspace = true }
+log = { workspace = true }

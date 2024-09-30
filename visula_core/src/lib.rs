@@ -2,6 +2,7 @@ pub mod binding_builder;
 pub mod instance_binding;
 pub mod instance_buffer;
 pub mod naga_type;
+pub mod transform;
 pub mod uniform_binding;
 pub mod uniform_buffer;
 pub mod value;
