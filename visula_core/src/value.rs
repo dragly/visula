@@ -128,6 +128,7 @@ impl Expression {
     pub fn setup(
         &self,
         module: &mut naga::Module,
+        expressions: &mut naga::Arena<naga::Expression>,
         binding_builder: &mut BindingBuilder,
         shader_stage: naga::ShaderStage,
     ) -> naga::Handle<naga::Expression> {
@@ -139,10 +140,9 @@ impl Expression {
             _ => unimplemented!("Unsupported shader stage"),
         };
         match val {
-            Expression::Literal(inner) => module.entry_points[entry_point_index]
-                .function
-                .expressions
-                .append(naga::Expression::Literal(inner), ::naga::Span::default()),
+            Expression::Literal(inner) => {
+                expressions.append(naga::Expression::Literal(inner), ::naga::Span::default())
+            }
             Expression::Vector2 { x, y } => {
                 let naga_type = ::naga::Type {
                     name: None,
@@ -155,18 +155,17 @@ impl Expression {
                 let field_type = module.types.insert(naga_type, ::naga::Span::default());
                 let components_setup = [x, y]
                     .iter()
-                    .map(|component| component.setup(module, binding_builder, shader_stage))
+                    .map(|component| {
+                        component.setup(module, expressions, binding_builder, shader_stage)
+                    })
                     .collect();
-                module.entry_points[entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        ::naga::Expression::Compose {
-                            ty: field_type,
-                            components: components_setup,
-                        },
-                        ::naga::Span::default(),
-                    )
+                expressions.append(
+                    ::naga::Expression::Compose {
+                        ty: field_type,
+                        components: components_setup,
+                    },
+                    ::naga::Span::default(),
+                )
             }
             Expression::Vector3 { x, y, z } => {
                 let naga_type = ::naga::Type {
@@ -180,18 +179,17 @@ impl Expression {
                 let field_type = module.types.insert(naga_type, ::naga::Span::default());
                 let components_setup = [x, y, z]
                     .iter()
-                    .map(|component| component.setup(module, binding_builder, shader_stage))
+                    .map(|component| {
+                        component.setup(module, expressions, binding_builder, shader_stage)
+                    })
                     .collect();
-                module.entry_points[entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        ::naga::Expression::Compose {
-                            ty: field_type,
-                            components: components_setup,
-                        },
-                        ::naga::Span::default(),
-                    )
+                expressions.append(
+                    ::naga::Expression::Compose {
+                        ty: field_type,
+                        components: components_setup,
+                    },
+                    ::naga::Span::default(),
+                )
             }
             Expression::Vector4 { x, y, z, w } => {
                 let naga_type = ::naga::Type {
@@ -205,163 +203,135 @@ impl Expression {
                 let field_type = module.types.insert(naga_type, ::naga::Span::default());
                 let components_setup = [x, y, z, w]
                     .iter()
-                    .map(|component| component.setup(module, binding_builder, shader_stage))
+                    .map(|component| {
+                        component.setup(module, expressions, binding_builder, shader_stage)
+                    })
                     .collect();
-                module.entry_points[entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        ::naga::Expression::Compose {
-                            ty: field_type,
-                            components: components_setup,
-                        },
-                        ::naga::Span::default(),
-                    )
+                expressions.append(
+                    ::naga::Expression::Compose {
+                        ty: field_type,
+                        components: components_setup,
+                    },
+                    ::naga::Span::default(),
+                )
             }
             Expression::BinaryOperator {
                 left,
                 right,
                 operator,
             } => {
-                let left_setup = left.setup(module, binding_builder, shader_stage);
-                let right_setup = right.setup(module, binding_builder, shader_stage);
-                module.entry_points[entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::Binary {
-                            op: operator,
-                            left: left_setup,
-                            right: right_setup,
-                        },
-                        naga::Span::default(),
-                    )
+                let left_setup = left.setup(module, expressions, binding_builder, shader_stage);
+                let right_setup = right.setup(module, expressions, binding_builder, shader_stage);
+                expressions.append(
+                    naga::Expression::Binary {
+                        op: operator,
+                        left: left_setup,
+                        right: right_setup,
+                    },
+                    naga::Span::default(),
+                )
             }
             Expression::UnaryOperator { value, operator } => {
-                let value_setup = value.setup(module, binding_builder, shader_stage);
-                module.entry_points[entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::Unary {
-                            expr: value_setup,
-                            op: operator,
-                        },
-                        naga::Span::default(),
-                    )
+                let value_setup = value.setup(module, expressions, binding_builder, shader_stage);
+                expressions.append(
+                    naga::Expression::Unary {
+                        expr: value_setup,
+                        op: operator,
+                    },
+                    naga::Span::default(),
+                )
             }
             Expression::Length(value) => {
-                let arg = value.setup(module, binding_builder, shader_stage);
-                module.entry_points[entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::Math {
-                            fun: naga::MathFunction::Length,
-                            arg,
-                            arg1: None,
-                            arg2: None,
-                            arg3: None,
-                        },
-                        naga::Span::default(),
-                    )
+                let arg = value.setup(module, expressions, binding_builder, shader_stage);
+                expressions.append(
+                    naga::Expression::Math {
+                        fun: naga::MathFunction::Length,
+                        arg,
+                        arg1: None,
+                        arg2: None,
+                        arg3: None,
+                    },
+                    naga::Span::default(),
+                )
             }
             Expression::Floor(value) => {
-                let arg = value.setup(module, binding_builder, shader_stage);
-                module.entry_points[entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::Math {
-                            fun: naga::MathFunction::Floor,
-                            arg,
-                            arg1: None,
-                            arg2: None,
-                            arg3: None,
-                        },
-                        naga::Span::default(),
-                    )
+                let arg = value.setup(module, expressions, binding_builder, shader_stage);
+                expressions.append(
+                    naga::Expression::Math {
+                        fun: naga::MathFunction::Floor,
+                        arg,
+                        arg1: None,
+                        arg2: None,
+                        arg3: None,
+                    },
+                    naga::Span::default(),
+                )
             }
             Expression::Exp(value) => {
-                let arg = value.setup(module, binding_builder, shader_stage);
-                module.entry_points[entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::Math {
-                            fun: naga::MathFunction::Exp,
-                            arg,
-                            arg1: None,
-                            arg2: None,
-                            arg3: None,
-                        },
-                        naga::Span::default(),
-                    )
+                let arg = value.setup(module, expressions, binding_builder, shader_stage);
+                expressions.append(
+                    naga::Expression::Math {
+                        fun: naga::MathFunction::Exp,
+                        arg,
+                        arg1: None,
+                        arg2: None,
+                        arg3: None,
+                    },
+                    naga::Span::default(),
+                )
             }
             Expression::Cos(value) => {
-                let arg = value.setup(module, binding_builder, shader_stage);
-                module.entry_points[entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::Math {
-                            fun: naga::MathFunction::Cos,
-                            arg,
-                            arg1: None,
-                            arg2: None,
-                            arg3: None,
-                        },
-                        naga::Span::default(),
-                    )
+                let arg = value.setup(module, expressions, binding_builder, shader_stage);
+                expressions.append(
+                    naga::Expression::Math {
+                        fun: naga::MathFunction::Cos,
+                        arg,
+                        arg1: None,
+                        arg2: None,
+                        arg3: None,
+                    },
+                    naga::Span::default(),
+                )
             }
             Expression::Sin(value) => {
-                let arg = value.setup(module, binding_builder, shader_stage);
-                module.entry_points[entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::Math {
-                            fun: naga::MathFunction::Sin,
-                            arg,
-                            arg1: None,
-                            arg2: None,
-                            arg3: None,
-                        },
-                        naga::Span::default(),
-                    )
+                let arg = value.setup(module, expressions, binding_builder, shader_stage);
+                expressions.append(
+                    naga::Expression::Math {
+                        fun: naga::MathFunction::Sin,
+                        arg,
+                        arg1: None,
+                        arg2: None,
+                        arg3: None,
+                    },
+                    naga::Span::default(),
+                )
             }
             Expression::Tan(value) => {
-                let arg = value.setup(module, binding_builder, shader_stage);
-                module.entry_points[entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::Math {
-                            fun: naga::MathFunction::Tan,
-                            arg,
-                            arg1: None,
-                            arg2: None,
-                            arg3: None,
-                        },
-                        naga::Span::default(),
-                    )
+                let arg = value.setup(module, expressions, binding_builder, shader_stage);
+                expressions.append(
+                    naga::Expression::Math {
+                        fun: naga::MathFunction::Tan,
+                        arg,
+                        arg1: None,
+                        arg2: None,
+                        arg3: None,
+                    },
+                    naga::Span::default(),
+                )
             }
             Expression::Pow { base, exponent } => {
-                let arg = base.setup(module, binding_builder, shader_stage);
-                let arg1 = Some(exponent.setup(module, binding_builder, shader_stage));
-                module.entry_points[entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::Math {
-                            fun: naga::MathFunction::Pow,
-                            arg,
-                            arg1,
-                            arg2: None,
-                            arg3: None,
-                        },
-                        naga::Span::default(),
-                    )
+                let arg = base.setup(module, expressions, binding_builder, shader_stage);
+                let arg1 = Some(exponent.setup(module, expressions, binding_builder, shader_stage));
+                expressions.append(
+                    naga::Expression::Math {
+                        fun: naga::MathFunction::Pow,
+                        arg,
+                        arg1,
+                        arg2: None,
+                        arg3: None,
+                    },
+                    naga::Span::default(),
+                )
             }
             Expression::InstanceField(field) => {
                 if !binding_builder.bindings.contains_key(&field.buffer_handle) {
@@ -373,37 +343,29 @@ impl Expression {
                     );
                 }
                 match shader_stage {
-                    ShaderStage::Vertex => module.entry_points[entry_point_index]
-                        .function
-                        .expressions
-                        .append(
-                            naga::Expression::FunctionArgument(
-                                binding_builder.bindings[&field.buffer_handle].fields
-                                    [field.field_index]
-                                    .function_argument,
-                            ),
-                            naga::Span::default(),
+                    ShaderStage::Vertex => expressions.append(
+                        naga::Expression::FunctionArgument(
+                            binding_builder.bindings[&field.buffer_handle].fields
+                                [field.field_index]
+                                .function_argument,
                         ),
+                        naga::Span::default(),
+                    ),
                     ShaderStage::Fragment => {
-                        let input = module.entry_points[entry_point_index]
-                            .function
-                            .expressions
+                        let input = expressions
                             .append(naga::Expression::FunctionArgument(0), naga::Span::default());
 
                         dbg!(5 + field.field_index as u32);
 
-                        module.entry_points[entry_point_index]
-                            .function
-                            .expressions
-                            .append(
-                                naga::Expression::AccessIndex {
-                                    index: 5 + field.field_index as u32, // TODO this is not the right
-                                    // value if there are multiple
-                                    // fields...
-                                    base: input,
-                                },
-                                naga::Span::default(),
-                            )
+                        expressions.append(
+                            naga::Expression::AccessIndex {
+                                index: 5 + field.field_index as u32, // TODO this is not the right
+                                // value if there are multiple
+                                // fields...
+                                base: input,
+                            },
+                            naga::Span::default(),
+                        )
                     }
                     _ => {
                         unimplemented!("ShaderStage is not implemented")
@@ -421,25 +383,19 @@ impl Expression {
                         &inner.bind_group_layout,
                     );
                 }
-                let access_index = module.entry_points[entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::AccessIndex {
-                            index: field.field_index as u32,
-                            base: binding_builder.uniforms[&field.buffer_handle].expression,
-                        },
-                        naga::Span::default(),
-                    );
-                module.entry_points[entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::Load {
-                            pointer: access_index,
-                        },
-                        naga::Span::default(),
-                    )
+                let access_index = expressions.append(
+                    naga::Expression::AccessIndex {
+                        index: field.field_index as u32,
+                        base: binding_builder.uniforms[&field.buffer_handle].expression,
+                    },
+                    naga::Span::default(),
+                );
+                expressions.append(
+                    naga::Expression::Load {
+                        pointer: access_index,
+                    },
+                    naga::Span::default(),
+                )
             }
             Expression::Normal => {
                 if shader_stage != ShaderStage::Fragment {

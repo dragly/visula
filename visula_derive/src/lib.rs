@@ -23,7 +23,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                         let Field { ident, .. } = field;
                         field_modifications.push(quote! {
                             {
-                                self.#ident.setup(module, binding_builder, shader_stage)
+                                self.#ident.setup(module, &mut target_arena, binding_builder, shader_stage)
                             },
                         });
 
@@ -93,8 +93,49 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                                     None
                                 }
                             })
-                            .expect(format!("Could not find variable `{shader_variable_name}`").as_str());
+                            .expect(format!("Could not find variable `{shader_variable_name}`").as_str()).clone();
                         dbg!(variable_expression);
+                        let source_arena = ::std::mem::take(&mut module.entry_points[entry_point_index].function.expressions);
+                        for (source_handle, source_expression) in source_arena.iter() {
+                            module.entry_points[entry_point_index].function.expressions.append(
+                                source_expression.clone(),
+                                ::visula_core::naga::Span::default(),
+                            );
+                        }
+                        let mut target_arena = ::visula_core::naga::Arena::new();
+                        let mut handle_map = ::std::collections::HashMap::new();
+                        for (source_handle, source_expression) in source_arena.iter() {
+                            if variable_expression == source_handle {
+                                let ty = match source_expression {
+                                    ::visula_core::naga::Expression::Compose {
+                                        ty,
+                                        ..
+                                    } => ty,
+                                    _ => panic!("Variable `{shader_variable_name}` must be Compose expression"),
+                                };
+                                let components = vec![
+                                    #(#field_modifications)*
+                                ];
+                                let target_handle = target_arena.append(
+                                    ::visula_core::naga::Expression::Compose {
+                                        ty: ty.clone(),
+                                        components,
+                                    },
+                                    ::visula_core::naga::Span::default(),
+                                );
+                                handle_map.insert(target_handle, source_handle);
+                            } else {
+                                ::visula_core::transform::transform(
+                                    &source_arena,
+                                    source_handle,
+                                    &mut target_arena,
+                                    &mut handle_map,
+                                );
+                            }
+                        }
+                        dbg!(&source_arena);
+                        dbg!(&target_arena);
+                        module.entry_points[entry_point_index].function.expressions = target_arena;
                         // let mut new_expressions = ::visula_core::naga::Arena::new();
                         // let mut expression_map = ::visula_core::naga::FastIndexMap::new();
                         // for (old_handle, old_expression) in module.entry_points[entry_point_index]
@@ -363,7 +404,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
                     .function
                     .local_variables
                     .fetch_if(|variable| variable.name == Some("output".to_owned()))
-                    .unwrap();
+                    .expect("Failed to find variable `output`");
                 let variable_expression = module.entry_points[entry_point_index]
                     .function
                     .expressions
@@ -371,7 +412,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
                         ::visula_core::naga::Expression::LocalVariable(v) => v == &variable,
                         _ => false,
                     })
-                    .unwrap();
+                    .expect("Failed to get local variable expression");
 
                 let mut statements: Vec<::visula_core::naga::Statement> = module.entry_points[entry_point_index]
                     .function

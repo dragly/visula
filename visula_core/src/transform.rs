@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use naga::{Arena, Expression, Handle, Span};
 
-fn transform(
+pub fn transform(
     source_arena: &Arena<Expression>,
     source_handle: Handle<Expression>,
     target_arena: &mut Arena<Expression>,
@@ -90,6 +90,7 @@ fn transform(
             }
         }
         &Expression::LocalVariable(v) => Expression::LocalVariable(v),
+        &Expression::CallResult(f) => Expression::CallResult(f),
         x => {
             unimplemented!("expression type not supported: {:?}", x)
         }

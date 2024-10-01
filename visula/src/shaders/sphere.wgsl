@@ -133,7 +133,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let bounds_max = vec3<f32>(bound, bound, bound);
     let projectedPoint: vec4<f32> = u_globals.transform * vec4<f32>(intersection_position, 1.0);
 
-    var sphere: SphereFragment;
+    let sphere = SphereFragment(
+        vec3<f32>(1.0, 1.0, 0.0)
+    );
     // modification happens here
 
     return vec4<f32>(sphere.color * clamp(normalDotCamera + normalDotSun1 + normalDotSun2, 0.05, 1.0), 1.0);
