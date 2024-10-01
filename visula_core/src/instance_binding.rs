@@ -9,8 +9,13 @@ pub trait Instance {
     fn instance(inner: Rc<RefCell<InstanceBufferInner>>) -> Self::Type;
 }
 
-type IntegrateBuffer =
-    fn(&Rc<RefCell<InstanceBufferInner>>, &uuid::Uuid, &mut naga::Module, &mut BindingBuilder);
+type IntegrateBuffer = fn(
+    &Rc<RefCell<InstanceBufferInner>>,
+    &uuid::Uuid,
+    &mut naga::Module,
+    &mut naga::Arena<naga::Expression>,
+    &mut BindingBuilder,
+);
 
 #[derive(Clone)]
 pub struct InstanceField {

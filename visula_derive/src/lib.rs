@@ -257,18 +257,14 @@ pub fn instance(input: TokenStream) -> TokenStream {
                             });
                             vertex_output_assignments.push(quote! {
                                 {
-                                    let result_expression = module.entry_points[binding_builder.entry_point_index]
-                                        .function
-                                        .expressions
+                                    let result_expression = target_arena
                                         .append(
                                             naga::Expression::FunctionArgument(
                                                 previous_shader_location_offset + #shader_location,
                                             ),
                                             naga::Span::default(),
                                         );
-                                    let access_index = module.entry_points[entry_point_index]
-                                        .function
-                                        .expressions
+                                    let access_index = target_arena
                                         .append(
                                             ::visula_core::naga::Expression::AccessIndex {
                                                 index: 6 + #index as u32, // TODO do not hard code
@@ -329,6 +325,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
                 inner: &std::rc::Rc<std::cell::RefCell<visula_core::InstanceBufferInner>>,
                 handle: &::visula_core::uuid::Uuid,
                 module: &mut ::visula_core::naga::Module,
+                target_arena: &mut ::visula_core::naga::Arena<visula_core::naga::Expression>,
                 binding_builder: &mut visula_core::BindingBuilder,
             )
             {
@@ -405,9 +402,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
                     .local_variables
                     .fetch_if(|variable| variable.name == Some("output".to_owned()))
                     .expect("Failed to find variable `output`");
-                let variable_expression = module.entry_points[entry_point_index]
-                    .function
-                    .expressions
+                let variable_expression = target_arena
                     .fetch_if(|expression| match expression {
                         ::visula_core::naga::Expression::LocalVariable(v) => v == &variable,
                         _ => false,
@@ -533,6 +528,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                 inner: &std::rc::Rc<std::cell::RefCell<visula_core::UniformBufferInner>>,
                 handle: &::visula_core::uuid::Uuid,
                 module: &mut ::visula_core::naga::Module,
+                target_arena: &mut ::visula_core::naga::Arena<::visula_core::naga::Expression>,
                 binding_builder: &mut visula_core::BindingBuilder,
                 bind_group_layout: &std::rc::Rc<::visula_core::wgpu::BindGroupLayout>,
             )
@@ -573,9 +569,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                     },
                     ::visula_core::naga::Span::default(),
                 );
-                let settings_expression = module.entry_points[entry_point_index]
-                    .function
-                    .expressions
+                let settings_expression = target_arena
                     .append(::visula_core::naga::Expression::GlobalVariable(uniform_variable), ::visula_core::naga::Span::default());
 
                 binding_builder.uniforms.insert(handle.clone(), visula_core::UniformBinding {

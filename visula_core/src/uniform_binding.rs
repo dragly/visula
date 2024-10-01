@@ -13,6 +13,7 @@ type IntegrateUniform = Rc<
             &Rc<RefCell<UniformBufferInner>>,
             &uuid::Uuid,
             &mut naga::Module,
+            &mut naga::Arena<naga::Expression>,
             &mut BindingBuilder,
             &Rc<BindGroupLayout>,
         ),
