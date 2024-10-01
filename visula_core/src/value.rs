@@ -339,7 +339,6 @@ impl Expression {
                         &field.inner,
                         &field.buffer_handle,
                         module,
-                        expressions,
                         binding_builder,
                     );
                 }
@@ -380,7 +379,6 @@ impl Expression {
                         &field.inner,
                         &field.buffer_handle,
                         module,
-                        expressions,
                         binding_builder,
                         &inner.bind_group_layout,
                     );
