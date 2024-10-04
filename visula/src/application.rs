@@ -335,10 +335,6 @@ impl Application {
                 encoder: &mut encoder,
                 camera: &self.camera,
             });
-            let screen_descriptor = ScreenDescriptor {
-                size_in_pixels: [self.config.width, self.config.height],
-                pixels_per_point: self.window.scale_factor() as f32,
-            };
             let raw_input = self.egui_renderer.state.take_egui_input(&self.window);
             let full_output = self.egui_renderer.state.egui_ctx().run(raw_input, |ui| {
                 simulation.gui(self, ui);
@@ -352,7 +348,7 @@ impl Application {
                 .egui_renderer
                 .state
                 .egui_ctx()
-                .tessellate(full_output.shapes, self.window.scale_factor() as f32);
+                .tessellate(full_output.shapes, full_output.pixels_per_point);
             for (id, image_delta) in &full_output.textures_delta.set {
                 self.egui_renderer.renderer.update_texture(
                     &self.device,
@@ -361,6 +357,10 @@ impl Application {
                     image_delta,
                 );
             }
+            let screen_descriptor = ScreenDescriptor {
+                size_in_pixels: [self.config.width, self.config.height],
+                pixels_per_point: full_output.pixels_per_point,
+            };
             self.egui_renderer.renderer.update_buffers(
                 &self.device,
                 &self.queue,
