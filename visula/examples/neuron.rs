@@ -1,9 +1,8 @@
 use bytemuck::{Pod, Zeroable};
-use cgmath::{InnerSpace, SquareMatrix};
 use slotmap::{DefaultKey, SlotMap};
 use visula::Renderable;
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 use visula::{
     CustomEvent, Expression, InstanceBuffer, LineDelegate, Lines, RenderData, SphereDelegate,
     Spheres, UniformBuffer,
@@ -381,45 +380,25 @@ impl visula::Simulation for Simulation {
                         return;
                     }
                 };
-                let screen_position = cgmath::Vector4 {
-                    x: 2.0 * position.x as f32 / application.config.width as f32 - 1.0,
-                    y: 1.0 - 2.0 * position.y as f32 / application.config.height as f32,
-                    z: 1.0,
-                    w: 1.0,
-                };
-                let ray_clip = cgmath::Vector4 {
-                    x: screen_position.x,
-                    y: screen_position.y,
-                    z: -1.0,
-                    w: 1.0,
-                };
+                let screen_position = Vec4::new(
+                    2.0 * position.x as f32 / application.config.width as f32 - 1.0,
+                    1.0 - 2.0 * position.y as f32 / application.config.height as f32,
+                    1.0,
+                    1.0,
+                );
+                let ray_clip = Vec4::new(screen_position.x, screen_position.y, -1.0, 1.0);
                 let aspect_ratio =
                     application.config.width as f32 / application.config.height as f32;
                 let inv_projection = application
                     .camera_controller
                     .projection_matrix(aspect_ratio)
-                    .invert()
-                    .unwrap();
+                    .inverse();
 
                 let ray_eye = inv_projection * ray_clip;
-                let ray_eye = cgmath::Vector4 {
-                    x: ray_eye.x,
-                    y: ray_eye.y,
-                    z: -1.0,
-                    w: 0.0,
-                };
-                let inv_view_matrix = application
-                    .camera_controller
-                    .view_matrix()
-                    .invert()
-                    .unwrap();
+                let ray_eye = Vec4::new(ray_eye.x, ray_eye.y, -1.0, 0.0);
+                let inv_view_matrix = application.camera_controller.view_matrix().inverse();
                 let ray_world = inv_view_matrix * ray_eye;
-                let ray_world = cgmath::Vector3 {
-                    x: ray_world.x,
-                    y: ray_world.y,
-                    z: ray_world.z,
-                }
-                .normalize();
+                let ray_world = Vec3::new(ray_world.x, ray_world.y, ray_world.z).normalize();
                 let ray_origin = application.camera_controller.position();
                 let t = -ray_origin.y / ray_world.y;
                 let intersection = ray_origin + t * ray_world;

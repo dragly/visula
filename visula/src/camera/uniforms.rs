@@ -1,20 +1,19 @@
-use crate::{Matrix4, Vector3};
-
 use bytemuck::{Pod, Zeroable};
+use glam::{Mat4, Vec3};
 use std::mem::size_of;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct CameraUniforms {
-    pub view_matrix: Matrix4,
-    pub model_view_projection_matrix: Matrix4,
-    pub center: Vector3,
+    pub view_matrix: Mat4,
+    pub model_view_projection_matrix: Mat4,
+    pub center: Vec3,
     pub dummy0: f32,
-    pub view_vector: Vector3,
+    pub view_vector: Vec3,
     pub dummy1: f32,
-    pub position: Vector3,
+    pub position: Vec3,
     pub dummy2: f32,
-    pub up: Vector3,
+    pub up: Vec3,
     pub dummy3: f32,
 }
 

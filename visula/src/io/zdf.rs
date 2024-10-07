@@ -1,15 +1,13 @@
-use cgmath::EuclideanSpace;
 use ndarray::{s, Ix3};
 use oxifive::ReadSeek;
 use wgpu::util::DeviceExt;
 
 use crate::primitives::mesh_primitive::MeshVertexAttributes;
 use crate::primitives::sphere_primitive::SpherePrimitive;
-use crate::Point3;
-use crate::Vector3;
+use glam::Vec3;
 
 pub struct ZdfFile {
-    pub camera_center: Vector3,
+    pub camera_center: Vec3,
     pub point_cloud: Vec<SpherePrimitive>,
     pub mesh_vertex_buf: wgpu::Buffer,
     pub mesh_index_buf: wgpu::Buffer,
@@ -87,7 +85,7 @@ pub fn read_zdf<R: ReadSeek>(input: R, device: &mut wgpu::Device) -> ZdfFile {
         }
     }
 
-    let mut mean_position = Point3::new(0.0, 0.0, 0.0);
+    let mut mean_position = Vec3::ZERO;
     assert!(points.shape()[2] == 3);
     let points_shape = (points.shape()[0] * points.shape()[1], points.shape()[2]);
     let colors_shape = (colors.shape()[0] * colors.shape()[1], colors.shape()[2]);
@@ -103,15 +101,15 @@ pub fn read_zdf<R: ReadSeek>(input: R, device: &mut wgpu::Device) -> ZdfFile {
             if x.is_nan() || y.is_nan() || z.is_nan() {
                 return None;
             }
-            let position = Point3::new(x, y, z);
-            let color = Point3::new(
+            let position = Vec3::new(x, y, z);
+            let color = Vec3::new(
                 color[0] as f32 / 255.0,
                 color[1] as f32 / 255.0,
                 color[2] as f32 / 255.0,
             );
             let radius = 1.0;
 
-            mean_position += position.to_vec();
+            mean_position += position;
 
             Some(SpherePrimitive {
                 position: position.into(),
@@ -122,7 +120,7 @@ pub fn read_zdf<R: ReadSeek>(input: R, device: &mut wgpu::Device) -> ZdfFile {
         })
         .collect();
 
-    let camera_center = (mean_position / point_cloud.len() as f32).to_vec();
+    let camera_center = mean_position / point_cloud.len() as f32;
 
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Mesh buffer"),

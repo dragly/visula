@@ -98,6 +98,7 @@ impl Simulation {
             &MeshDelegate {
                 position: Vec3::new(0.0, 0.0, 0.0).into(),
                 rotation: Quat::IDENTITY.into(),
+                scale: Vec3::ONE.into(),
             },
         )
         .unwrap();
