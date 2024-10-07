@@ -32,6 +32,7 @@ pub struct Application {
     pub egui_ctx: egui::Context,
     pub camera: Camera,
     pub start_time: DateTime<Utc>,
+    pub sample_count: u32,
 }
 
 fn create_egui_context() -> egui::Context {
@@ -136,6 +137,7 @@ impl Application {
 
         let camera_controller = CameraController::new(&window);
 
+        let sample_count = 4;
         let depth_texture_in = device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
                 width: config.width,
@@ -143,7 +145,7 @@ impl Application {
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
-            sample_count: 4,
+            sample_count,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Depth32Float,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -152,7 +154,8 @@ impl Application {
         });
         let depth_texture = depth_texture_in.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &config, 4);
+        let multisampled_framebuffer =
+            Self::create_multisampled_framebuffer(&device, &config, sample_count);
 
         let start_time = Utc::now();
 
@@ -174,6 +177,7 @@ impl Application {
             egui_renderer,
             egui_ctx,
             start_time,
+            sample_count,
         }
     }
 
@@ -248,7 +252,7 @@ impl Application {
                         depth_or_array_layers: 1,
                     },
                     mip_level_count: 1,
-                    sample_count: 4,
+                    sample_count: self.sample_count,
                     dimension: wgpu::TextureDimension::D2,
                     format: wgpu::TextureFormat::Depth32Float,
                     usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -259,8 +263,11 @@ impl Application {
                     depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
                 self.config.width = size.width;
                 self.config.height = size.height;
-                self.multisampled_framebuffer =
-                    Self::create_multisampled_framebuffer(&self.device, &self.config, 4);
+                self.multisampled_framebuffer = Self::create_multisampled_framebuffer(
+                    &self.device,
+                    &self.config,
+                    self.sample_count,
+                );
                 self.surface.configure(&self.device, &self.config);
             }
             _ => {}
@@ -400,6 +407,7 @@ impl Application {
             device: &self.device,
             format: &self.config.format,
             camera: &self.camera,
+            sample_count: self.sample_count,
         }
     }
 }

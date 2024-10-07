@@ -138,6 +138,7 @@ async fn run(event_loop: EventLoop<CustomEvent>, window: Window) {
 
     surface.configure(&device, &config);
 
+    let sample_count = 4;
     let depth_texture_in = device.create_texture(&wgpu::TextureDescriptor {
         size: wgpu::Extent3d {
             width: config.width,
@@ -145,7 +146,7 @@ async fn run(event_loop: EventLoop<CustomEvent>, window: Window) {
             depth_or_array_layers: 1,
         },
         mip_level_count: 1,
-        sample_count: 4,
+        sample_count,
         dimension: wgpu::TextureDimension::D2,
         format: wgpu::TextureFormat::Depth32Float,
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -153,7 +154,7 @@ async fn run(event_loop: EventLoop<CustomEvent>, window: Window) {
         view_formats: &[],
     });
     let depth_texture = depth_texture_in.create_view(&wgpu::TextureViewDescriptor::default());
-    let multisampled_framebuffer = create_multisampled_framebuffer(&device, &config, 4);
+    let multisampled_framebuffer = create_multisampled_framebuffer(&device, &config, sample_count);
 
     let line_data = vec![LineData {
         position_a: [-10.0, 0.0, 0.0],
@@ -170,6 +171,7 @@ async fn run(event_loop: EventLoop<CustomEvent>, window: Window) {
             device: &device,
             format: &config.format,
             camera: &camera,
+            sample_count,
         },
         &LineDelegate {
             start: line.position_a,
