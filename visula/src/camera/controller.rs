@@ -206,6 +206,10 @@ impl CameraController {
         Mat4::perspective_rh(40f32 / 180.0 * PI, aspect_ratio, 10.0, 10000.0)
     }
 
+    pub fn active(&self) -> bool {
+        self.state != State::Released
+    }
+
     pub fn uniforms(&self, aspect_ratio: f32) -> CameraUniforms {
         let view_matrix = self.view_matrix();
 
