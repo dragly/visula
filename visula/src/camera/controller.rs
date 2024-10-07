@@ -1,7 +1,7 @@
-use crate::camera::uniforms::CameraUniforms;
-use crate::{Matrix4, Point3, Vector2, Vector3};
+use std::f32::consts::PI;
 
-use cgmath::{prelude::*, Quaternion, Rad};
+use crate::camera::uniforms::CameraUniforms;
+use glam::{Mat4, Quat, Vec2, Vec3};
 
 use winit::event::{
     DeviceEvent, ElementState, Event, MouseButton,
@@ -24,10 +24,10 @@ pub struct CameraController {
     control_pressed: bool,
     pub enabled: bool,
     pub distance: f32,
-    pub center: Vector3,
-    pub forward: Vector3,
-    pub true_up: Vector3,
-    pub up: Vector3,
+    pub center: Vec3,
+    pub forward: Vec3,
+    pub true_up: Vec3,
+    pub up: Vec3,
     pub rotational_speed: f32,
     pub roll_speed: f32,
     state: State,
@@ -42,14 +42,14 @@ pub struct CameraControllerResponse {
 
 impl CameraController {
     pub fn new(window: &Window) -> CameraController {
-        let up = Vector3::unit_y();
-        let forward = Vector3::unit_z();
-        let right = Vector3::cross(forward, up).normalize();
+        let up = Vec3::Y;
+        let forward = Vec3::Z;
+        let right = Vec3::cross(forward, up).normalize();
         let offset_up = up;
         let _offset_right = right;
         let offset = offset_up;
-        let axis = Vector3::cross(offset, forward).normalize();
-        let rotation = cgmath::Quaternion::from_axis_angle(axis, cgmath::Rad(1.0));
+        let axis = Vec3::cross(offset, forward).normalize();
+        let rotation = Quat::from_axis_angle(axis, 1.0);
         let new_forward = (rotation * forward).normalize();
         let scale_factor = window.scale_factor() as f32;
         let window_id = window.id();
@@ -62,7 +62,7 @@ impl CameraController {
             true_up: up,
             up,
             distance: 100.0,
-            center: Vector3::new(0.0, 0.0, 0.0),
+            center: Vec3::new(0.0, 0.0, 0.0),
             rotational_speed: 0.005 / scale_factor,
             roll_speed: 0.005 / scale_factor,
             state: State::Released,
@@ -86,15 +86,15 @@ impl CameraController {
 
         let up = self.up.normalize();
         let forward = self.forward.normalize();
-        let right = Vector3::cross(forward, up).normalize();
-        let flat_forward = Vector3::cross(up, right).normalize();
+        let right = Vec3::cross(forward, up).normalize();
+        let flat_forward = Vec3::cross(up, right).normalize();
 
         match event {
             Event::DeviceEvent {
                 event: DeviceEvent::MouseMotion { delta, .. },
                 ..
             } => {
-                let position_diff = Vector2 {
+                let position_diff = Vec2 {
                     x: delta.0 as f32,
                     y: delta.1 as f32,
                 };
@@ -103,10 +103,7 @@ impl CameraController {
                         let offset_up = -position_diff.y;
                         let offset_right = position_diff.x;
                         let offset = offset_up + offset_right;
-                        let rotation = cgmath::Quaternion::from_axis_angle(
-                            forward,
-                            cgmath::Rad(self.roll_speed * offset),
-                        );
+                        let rotation = Quat::from_axis_angle(forward, self.roll_speed * offset);
                         self.up = (rotation * self.up).normalize();
                         self.true_up = (rotation * self.true_up).normalize();
                         self.forward = (rotation * self.forward).normalize();
@@ -117,14 +114,12 @@ impl CameraController {
                                 captured_event: false,
                             };
                         }
-                        let rotation_x = Quaternion::from_axis_angle(
+                        let rotation_x = Quat::from_axis_angle(
                             self.true_up,
-                            Rad(-self.rotational_speed * position_diff.x),
+                            -self.rotational_speed * position_diff.x,
                         );
-                        let rotation_y = Quaternion::from_axis_angle(
-                            right,
-                            Rad(-self.rotational_speed * position_diff.y),
-                        );
+                        let rotation_y =
+                            Quat::from_axis_angle(right, -self.rotational_speed * position_diff.y);
                         self.forward = (rotation_x * rotation_y * self.forward).normalize();
                         self.up = (rotation_x * rotation_y * self.up).normalize();
                     }
@@ -198,25 +193,17 @@ impl CameraController {
         response
     }
 
-    pub fn view_matrix(&self) -> Matrix4 {
-        cgmath::Matrix4::look_at(
-            self.position(),
-            Point3::new(self.center.x, self.center.y, self.center.z),
-            self.up,
-        )
+    pub fn view_matrix(&self) -> Mat4 {
+        Mat4::look_at_rh(self.position(), self.center, self.up)
     }
 
-    pub fn position(&self) -> Point3 {
+    pub fn position(&self) -> Vec3 {
         let view_vector = self.forward * self.distance;
-        Point3::new(
-            self.center.x - view_vector.x,
-            self.center.y - view_vector.y,
-            self.center.z - view_vector.z,
-        )
+        self.center - view_vector
     }
 
-    pub fn projection_matrix(&self, aspect_ratio: f32) -> Matrix4 {
-        OPENGL_TO_WGPU_MATRIX * cgmath::perspective(cgmath::Deg(40f32), aspect_ratio, 10.0, 10000.0)
+    pub fn projection_matrix(&self, aspect_ratio: f32) -> Mat4 {
+        Mat4::perspective_rh(40f32 / 180.0 * PI, aspect_ratio, 10.0, 10000.0)
     }
 
     pub fn uniforms(&self, aspect_ratio: f32) -> CameraUniforms {
@@ -231,18 +218,10 @@ impl CameraController {
             dummy0: 0.0,
             view_vector: self.forward * self.distance,
             dummy1: 0.0,
-            position: self.position() - Point3::new(0.0, 0.0, 0.0),
+            position: self.position() - Vec3::ZERO,
             dummy2: 0.0,
             up: self.up,
             dummy3: 0.0,
         }
     }
 }
-
-#[rustfmt::skip]
-pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
-    1.0, 0.0, 0.0, 0.0,
-    0.0, 1.0, 0.0, 0.0,
-    0.0, 0.0, 0.5, 0.0,
-    0.0, 0.0, 0.5, 1.0,
-);
