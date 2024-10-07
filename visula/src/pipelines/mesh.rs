@@ -22,6 +22,7 @@ pub struct MeshPipeline {
 pub struct MeshDelegate {
     pub rotation: Expression,
     pub position: Expression,
+    pub scale: Expression,
 }
 
 impl MeshPipeline {

@@ -20,9 +20,14 @@ struct VertexOutput {
 struct MeshInstance {
     rotation: vec4<f32>,
     position: vec3<f32>,
+    scale: vec3<f32>,
 };
 
-fn calculate_transform_matrix(rotation: vec4<f32>, translation: vec3<f32>) -> mat4x4<f32> {
+fn calculate_transform_matrix(
+    rotation: vec4<f32>,
+    translation: vec3<f32>,
+    scale: vec3<f32>,
+) -> mat4x4<f32> {
     let x = rotation.x;
     let y = rotation.y;
     let z = rotation.z;
@@ -43,7 +48,7 @@ fn calculate_transform_matrix(rotation: vec4<f32>, translation: vec3<f32>) -> ma
     let x_axis = vec4<f32>(1.0 - (yy + zz), xy + wz, xz - wy, 0.0);
     let y_axis = vec4<f32>(xy - wz, 1.0 - (xx + zz), yz + wx, 0.0);
     let z_axis = vec4<f32>(xz + wy, yz - wx, 1.0 - (xx + yy), 0.0);
-    return mat4x4(x_axis, y_axis, z_axis, vec4(translation, 1.0));
+    return mat4x4(scale.x * x_axis, scale.y * y_axis, scale.z * z_axis, vec4(translation, 1.0));
 }
 
 @vertex
@@ -55,7 +60,7 @@ fn vs_main(
     var instance: MeshInstance;
     // modification happens here
     var out: VertexOutput;
-    let transform_matrix = calculate_transform_matrix(instance.rotation, instance.position);
+    let transform_matrix = calculate_transform_matrix(instance.rotation, instance.position, instance.scale);
     out.position = u_globals.model_view_projection_matrix * transform_matrix * vec4<f32>(position, 1.0);
     let normal_matrix = mat3x3(transform_matrix.x.xyz, transform_matrix.y.xyz, transform_matrix.z.xyz); // TODO figure out how to get hold of inverse
     out.normal = normal_matrix * normal;
