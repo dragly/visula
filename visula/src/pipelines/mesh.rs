@@ -104,7 +104,7 @@ impl MeshPipeline {
                 bias: wgpu::DepthBiasState::default(),
             }),
             multisample: wgpu::MultisampleState {
-                count: 4,
+                count: rendering_descriptor.sample_count,
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },

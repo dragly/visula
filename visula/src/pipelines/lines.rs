@@ -80,6 +80,7 @@ impl Lines {
             device,
             format,
             camera,
+            ..
         } = rendering_descriptor;
         let mut module =
             naga::front::wgsl::parse_str(include_str!("../shaders/line.wgsl")).unwrap();
@@ -194,7 +195,7 @@ impl Lines {
                 bias: wgpu::DepthBiasState::default(),
             }),
             multisample: wgpu::MultisampleState {
-                count: 4,
+                count: rendering_descriptor.sample_count,
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
