@@ -6,7 +6,7 @@ pub struct DefaultRenderPassDescriptor<'a> {
     depth_texture: &'a wgpu::TextureView,
 }
 
-impl<'b> DefaultRenderPassDescriptor<'b> {
+impl DefaultRenderPassDescriptor<'_> {
     pub fn new<'a>(
         label: &'a str,
         view: &'a wgpu::TextureView,

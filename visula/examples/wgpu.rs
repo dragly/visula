@@ -180,8 +180,7 @@ async fn run(event_loop: EventLoop<CustomEvent>, window: Window) {
                 let a: Expression = 1.0.into();
                 a + 1.0 + 2.0
             },
-            start_color: glam::Vec3::new(1.0, 0.8, 1.0).into(),
-            end_color: glam::Vec3::new(1.0, 0.8, 1.0).into(),
+            color: glam::Vec3::new(1.0, 0.8, 1.0).into(),
         },
     )
     .unwrap();

@@ -1,4 +1,5 @@
 pub mod binding_builder;
+pub mod inject;
 pub mod instance_binding;
 pub mod instance_buffer;
 pub mod naga_type;

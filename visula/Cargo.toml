@@ -57,7 +57,7 @@ features = [
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 pyo3 = {workspace = true}
 numpy = {workspace = true}
-env_logger = "0.11"
+env_logger = {workspace = true}
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"
