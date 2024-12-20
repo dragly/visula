@@ -1,5 +1,5 @@
 [workspace]
-members = ["run-wasm", "visula", "visula_derive", "visula_core", "visula_pyo3"]
+members = ["run-wasm", "visula", "visula_derive", "visula_core", "visula_py"]
 resolver = "2"
 
 
