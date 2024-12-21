@@ -2840,7 +2840,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "visula-pyo3"
+name = "visula-py"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
@@ -2882,6 +2882,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "visula_web"
+version = "0.1.0"
+dependencies = [
+ "visula",
+ "wasm-bindgen",
 ]
 
 [[package]]
