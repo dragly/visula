@@ -43,15 +43,10 @@ impl Simulation {
                     let a: Expression = 1.0.into();
                     a + 1.0 + 2.0
                 },
-                start_color: Expression::Vector3 {
+                color: Expression::Vector3 {
                     x: 1.0.into(),
                     y: 1.0.into(),
                     z: 1.0.into(),
-                },
-                end_color: Expression::Vector3 {
-                    x: 0.0.into(),
-                    y: 0.0.into(),
-                    z: 0.0.into(),
                 },
             },
         )

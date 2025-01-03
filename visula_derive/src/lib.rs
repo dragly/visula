@@ -13,32 +13,16 @@ pub fn delegate(input: TokenStream) -> TokenStream {
             fields,
             ..
         }) => {
-            let mut field_modifications: Vec<TokenStream2> = Vec::new();
+            let mut field_insertions: Vec<TokenStream2> = Vec::new();
             let mut pyo3_fields: Vec<TokenStream2> = Vec::new();
             let mut pyo3_attributes: Vec<TokenStream2> = Vec::new();
             let mut pyo3_field_names: Vec<TokenStream2> = Vec::new();
             match fields {
                 Fields::Named(FieldsNamed { named, .. }) => {
-                    for (index, field) in named.iter().enumerate() {
+                    for field in named.iter() {
                         let Field { ident, .. } = field;
-                        field_modifications.push(quote! {
-                            {
-                                let result_expression = self.#ident.setup(module, binding_builder);
-                                let access_index = module.entry_points[entry_point_index]
-                                    .function
-                                    .expressions
-                                    .append(
-                                        ::visula_core::naga::Expression::AccessIndex {
-                                            index: #index as u32,
-                                            base: variable_expression,
-                                        },
-                                        ::visula_core::naga::Span::default(),
-                                    );
-                                ::naga::Statement::Store {
-                                    pointer: access_index,
-                                    value: result_expression,
-                                }
-                            },
+                        field_insertions.push(quote! {
+                            self.#ident.clone(),
                         });
 
                         pyo3_fields.push(quote! {
@@ -84,37 +68,10 @@ pub fn delegate(input: TokenStream) -> TokenStream {
 
                 impl #struct_ident {
                     fn inject(&self, shader_variable_name: &str, module: &mut ::naga::Module, binding_builder: &mut BindingBuilder) {
-                        let entry_point_index = binding_builder.entry_point_index;
-                        let variable = module.entry_points[entry_point_index]
-                            .function
-                            .local_variables
-                            .fetch_if(|variable| variable.name == Some(shader_variable_name.into()))
-                            .unwrap();
-                        let variable_expression = module.entry_points[entry_point_index]
-                            .function
-                            .expressions
-                            .fetch_if(|expression| match expression {
-                                ::visula_core::naga::Expression::LocalVariable(v) => v == &variable,
-                                _ => false,
-                            })
-                            .unwrap();
-                        let mut new_body = ::naga::Block::from_vec(vec![
-                            #(#field_modifications)*
-                        ]);
-                        for (statement, span) in module.entry_points[entry_point_index]
-                            .function
-                            .body
-                            .span_iter_mut()
-                        {
-                            new_body.push(
-                                statement.clone(),
-                                match span {
-                                    Some(s) => s.clone(),
-                                    None => ::visula_core::naga::Span::default(),
-                                },
-                            );
-                        }
-                        module.entry_points[entry_point_index].function.body = new_body;
+                        let fields = vec![
+                            #(#field_insertions)*
+                        ];
+                        ::visula_core::inject::inject(module, binding_builder, ::visula_core::naga::ShaderStage::Vertex, shader_variable_name, &fields);
                     }
                 }
             }

@@ -118,13 +118,8 @@ impl Simulation {
                 start: bond.position_a,
                 end: bond.position_b,
                 width: settings.width,
-                start_color: Expression::Vector3 {
+                color: Expression::Vector3 {
                     x: bond.strength.clone().into(),
-                    y: 0.8.into(),
-                    z: 1.0.into(),
-                },
-                end_color: Expression::Vector3 {
-                    x: bond.strength.into(),
                     y: 0.8.into(),
                     z: 1.0.into(),
                 },

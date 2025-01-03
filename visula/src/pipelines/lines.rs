@@ -1,7 +1,7 @@
 use crate::rendering_descriptor::RenderingDescriptor;
 use crate::{DefaultRenderPassDescriptor, RenderData, Renderable};
 use bytemuck::{Pod, Zeroable};
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 use itertools::Itertools;
 use naga::back::wgsl::WriterFlags;
 use naga::valid::ValidationFlags;
@@ -15,8 +15,7 @@ use wgpu::{util::DeviceExt, BindGroupLayout};
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct Vertex {
-    length_weight: f32,
-    width_weight: f32,
+    texture_coordinate: Vec2,
 }
 
 unsafe impl Pod for Vertex {}
@@ -24,8 +23,7 @@ unsafe impl Zeroable for Vertex {}
 
 fn vertex(length_weight: f32, width_weight: f32) -> Vertex {
     Vertex {
-        length_weight,
-        width_weight,
+        texture_coordinate: Vec2::new(length_weight, width_weight),
     }
 }
 
@@ -55,8 +53,7 @@ pub struct LineDelegate {
     pub start: Expression,
     pub end: Expression,
     pub width: Expression,
-    pub start_color: Expression,
-    pub end_color: Expression,
+    pub color: Expression,
 }
 
 impl Default for LineDelegate {
@@ -65,8 +62,7 @@ impl Default for LineDelegate {
             start: Vec3::new(0.0, 0.0, 0.0).into(),
             end: Vec3::new(1.0, 0.0, 0.0).into(),
             width: 1.0.into(),
-            start_color: Vec3::new(1.0, 1.0, 1.0).into(),
-            end_color: Vec3::new(1.0, 1.0, 1.0).into(),
+            color: Vec3::new(1.0, 1.0, 1.0).into(),
         }
     }
 }
@@ -141,18 +137,11 @@ impl Lines {
         let vertex_buffer_layout = wgpu::VertexBufferLayout {
             array_stride: vertex_size as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32,
-                    offset: 0,
-                    shader_location: 0,
-                },
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32,
-                    offset: 4,
-                    shader_location: 1,
-                },
-            ],
+            attributes: &[wgpu::VertexAttribute {
+                format: wgpu::VertexFormat::Float32x2,
+                offset: 0,
+                shader_location: 0,
+            }],
         };
         let sorted_bindings = binding_builder.sorted_bindings();
         let mut layouts = sorted_bindings

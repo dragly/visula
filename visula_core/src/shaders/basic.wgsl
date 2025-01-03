@@ -16,11 +16,14 @@ struct VertexOutput {
     @location(0) color: vec3<f32>,
 };
 
-struct Line {
+struct LineVertex {
     start: vec3<f32>,
     end: vec3<f32>,
     width: f32,
-    color: vec3<f32>,
+};
+
+struct LineFragment {
+    color: vec4<f32>,
 };
 
 fn offset(pos: vec3<f32>, direction: vec3<f32>, unit_offset: vec3<f32>) -> vec3<f32> {
@@ -34,14 +37,11 @@ fn offset(pos: vec3<f32>, direction: vec3<f32>, unit_offset: vec3<f32>) -> vec3<
 }
 
 fn linef(
-    texture_coordinate: vec2<f32>,
-    line1: Line,
+    length_weight: f32,
+    width_weight: f32,
+    line1: LineVertex,
 ) -> VertexOutput {
-    let length_weight = texture_coordinate.x;
-    let width_weight = texture_coordinate.y;
-
     var output: VertexOutput;
-    output.color = (1.0 - length_weight) * line1.color + length_weight * line1.color;
 
     let width_half = line1.width / 2.0;
     let left = vec3<f32>(-width_half, 0.0, 0.0);
@@ -71,13 +71,15 @@ fn linef(
 
 @vertex
 fn vs_main(
-    @location(0) texture_coordinate: vec2<f32>,
+    @location(0) length_weight: f32,
+    @location(1) width_weight: f32,
 ) -> VertexOutput {
-    var line_input: Line;
-    return linef(texture_coordinate, line_input);
+    var line_vertex: LineVertex;
+    return linef(length_weight, width_weight, line_vertex);
 }
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4<f32>(input.color, 1.0);
+    var line_fragment: LineFragment;
+    return vec4<f32>(line_fragment.color, 1.0);
 }

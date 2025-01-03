@@ -284,8 +284,7 @@ impl Simulation {
                 start: line.position_a.clone(),
                 end: line.position_b,
                 width: 0.2.into(),
-                start_color: glam::Vec3::new(1.0, 0.8, 1.0).into(),
-                end_color: glam::Vec3::new(1.0, 0.8, 1.0).into(),
+                color: glam::Vec3::new(1.0, 0.8, 1.0).into(),
             },
         )
         .unwrap();
@@ -298,8 +297,7 @@ impl Simulation {
                 start: boundary.start,
                 end: boundary.end,
                 width: 0.3.into(),
-                start_color: glam::Vec3::new(1.0, 0.8, 1.0).into(),
-                end_color: glam::Vec3::new(1.0, 0.8, 1.0).into(),
+                color: glam::Vec3::new(1.0, 0.8, 1.0).into(),
             },
         )
         .unwrap();
