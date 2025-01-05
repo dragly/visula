@@ -147,6 +147,8 @@ fn integrate<F: TwoBodyForce>(
         particle.velocity += 0.5 * particle.acceleration * dt;
     }
 
+    log::debug!("Bond count {count}", count = bonds.len());
+
     bonds
 }
 
@@ -300,8 +302,16 @@ impl visula::Simulation for Simulation {
         }
         let steps = ((target_fps * time_diff.num_milliseconds() as f32 / 1000.0) as i32)
             .min(self.settings.speed);
+        if steps == 0 {
+            return;
+        }
         for _ in 0..steps {
             let previous_particles = self.particles.clone();
+            log::debug!("Self particles {count}", count = self.particles.len());
+            log::debug!(
+                "Previous particles {count}",
+                count = previous_particles.len()
+            );
             bond_data = integrate(
                 &mut self.particles,
                 &previous_particles,
@@ -311,6 +321,7 @@ impl visula::Simulation for Simulation {
                 &self.bounding_box,
             );
         }
+        log::debug!("Final bond data {count}", count = bond_data.len());
         self.bond_buffer
             .update(&application.device, &application.queue, &bond_data);
 
