@@ -3,17 +3,22 @@ requires = ["maturin>=1.3,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "visula"
-requires-python = ">=3.7"
+name = "visula_pyo3"
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dynamic = ["version"]
-dependencies = ["numpy"]
+dependencies = ["numpy>2"]
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
 python-source = "python"
 module-name = "visula._visula_pyo3"
+
+[tool.uv]
+dev-dependencies = [
+    "maturin>=1.8.1",
+]
