@@ -8,5 +8,19 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 visula = { path = "../visula" }
+visula_core = { path = "../visula_core" }
+visula_derive = { path = "../visula_derive" }
 wasm-bindgen = { workspace = true }
+wgpu = {workspace = true}
+glam = {workspace = true}
+naga = {workspace = true}
+uuid = {workspace = true}
+log = {workspace = true}
+bytemuck = {workspace = true}
+winit = { workspace = true}
+egui = {workspace = true}
+egui-wgpu = {workspace = true}
+egui-winit = {workspace = true}
+pollster = { workspace = true }
+itertools = { workspace = true }
 
