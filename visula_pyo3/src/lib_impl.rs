@@ -738,7 +738,7 @@ fn show(
                         let result = update.call((), None);
                         if let Err(err) = result {
                             println!("Could not call update: {:?}", err);
-                            println!("{}", err.traceback_bound(py).unwrap().format().unwrap());
+                            println!("{}", err.traceback(py).unwrap().format().unwrap());
                         }
                     }
                     WindowEvent::CloseRequested => target.exit(),
