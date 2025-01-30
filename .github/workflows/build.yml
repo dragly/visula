@@ -14,7 +14,7 @@ jobs:
       matrix:
         rust:
           - stable
-          - 1.74.0  # Minimum supported Rust version
+          - 1.84.0  # Minimum supported Rust version
 
     steps:
       - uses: actions/checkout@v2
