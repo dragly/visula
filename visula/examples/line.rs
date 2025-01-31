@@ -3,8 +3,7 @@ use wgpu::TextureViewDescriptor;
 use bytemuck::{Pod, Zeroable};
 use visula::{create_application, create_window, CustomEvent, Renderable};
 use visula::{
-    initialize_logger, Application, Expression, InstanceBuffer,
-    LineDelegate, Lines, RenderData,
+    initialize_logger, Application, Expression, InstanceBuffer, LineDelegate, Lines, RenderData,
 };
 use visula_derive::Instance;
 use wgpu::Color;

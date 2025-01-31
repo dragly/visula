@@ -15,10 +15,7 @@ use wgpu::{
     BackendOptions, Color, CommandEncoder, Device, Dx12BackendOptions, GlBackendOptions,
     InstanceDescriptor, SurfaceTexture, TextureFormat, TextureView, TextureViewDescriptor,
 };
-use winit::{
-    event::WindowEvent,
-    window::Window,
-};
+use winit::{event::WindowEvent, window::Window};
 
 #[derive(Debug)]
 pub struct Application {

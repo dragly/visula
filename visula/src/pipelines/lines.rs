@@ -9,8 +9,8 @@ use std::cell::Ref;
 use std::mem::size_of;
 use visula_core::{BindingBuilder, BufferBinding, Expression};
 use visula_derive::Delegate;
-use wgpu::{util::DeviceExt, BindGroupLayout};
 use wgpu::BufferUsages;
+use wgpu::{util::DeviceExt, BindGroupLayout};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
