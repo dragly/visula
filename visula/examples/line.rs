@@ -137,7 +137,10 @@ impl ApplicationHandler<CustomEvent> for App {
 
     fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: CustomEvent) {
         match event {
-            CustomEvent::Application(application) => self.application = Some(application),
+            CustomEvent::Application(application) => {
+                application.window.request_redraw();
+                self.application = Some(application);
+            }
             CustomEvent::DropEvent(_) => {}
         }
     }
