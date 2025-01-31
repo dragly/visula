@@ -42,6 +42,9 @@ oxifive = { git = "https://github.com/dragly/oxifive", rev = "552366bd4d65c0fb09
 slotmap = "1.0.2"
 clap = { version = "4.5.18", features = ["derive"] }
 
+[build-dependencies]
+pyo3-build-config = { workspace = true }
+
 [dependencies.web-sys]
 version = "0.3"
 features = [
