@@ -62,7 +62,7 @@ fn vs_main(
     var out: VertexOutput;
     let transform_matrix = calculate_transform_matrix(instance.rotation, instance.position, instance.scale);
     out.position = u_globals.model_view_projection_matrix * transform_matrix * vec4<f32>(position, 1.0);
-    let normal_matrix = mat3x3(transform_matrix.x.xyz, transform_matrix.y.xyz, transform_matrix.z.xyz); // TODO figure out how to get hold of inverse
+    let normal_matrix = mat3x3(transform_matrix[0].xyz, transform_matrix[1].xyz, transform_matrix[2].xyz); // TODO figure out how to get hold of inverse
     out.normal = normal_matrix * normal;
     out.color = color;
     return out;
