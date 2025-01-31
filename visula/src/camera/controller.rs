@@ -4,7 +4,7 @@ use crate::camera::uniforms::CameraUniforms;
 use glam::{Mat4, Quat, Vec2, Vec3};
 
 use winit::event::{
-    DeviceEvent, ElementState, Event, MouseButton,
+    DeviceEvent, ElementState, MouseButton,
     MouseScrollDelta::{LineDelta, PixelDelta},
     WindowEvent,
 };
@@ -72,9 +72,69 @@ impl CameraController {
 
     pub fn update(&mut self) {}
 
-    pub fn handle_event<T: std::fmt::Debug>(
+    pub fn device_event(&mut self, event: &DeviceEvent) -> CameraControllerResponse {
+        let mut response = CameraControllerResponse {
+            needs_redraw: false,
+            captured_event: false,
+        };
+        if !self.enabled {
+            return response;
+        }
+        let up = self.up.normalize();
+        let forward = self.forward.normalize();
+        let right = Vec3::cross(forward, up).normalize();
+        let flat_forward = Vec3::cross(up, right).normalize();
+        if let DeviceEvent::MouseMotion { delta, .. } = event {
+            let position_diff = Vec2 {
+                x: delta.0 as f32,
+                y: delta.1 as f32,
+            };
+            if self.left_pressed {
+                if self.control_pressed {
+                    let offset_up = -position_diff.y;
+                    let offset_right = position_diff.x;
+                    let offset = offset_up + offset_right;
+                    let rotation = Quat::from_axis_angle(forward, self.roll_speed * offset);
+                    self.up = (rotation * self.up).normalize();
+                    self.true_up = (rotation * self.true_up).normalize();
+                    self.forward = (rotation * self.forward).normalize();
+                } else {
+                    if (position_diff.x + position_diff.y).abs() < 0.000001 {
+                        return CameraControllerResponse {
+                            needs_redraw: false,
+                            captured_event: false,
+                        };
+                    }
+                    let rotation_x = Quat::from_axis_angle(
+                        self.true_up,
+                        -self.rotational_speed * position_diff.x,
+                    );
+                    let rotation_y =
+                        Quat::from_axis_angle(right, -self.rotational_speed * position_diff.y);
+                    self.forward = (rotation_x * rotation_y * self.forward).normalize();
+                    self.up = (rotation_x * rotation_y * self.up).normalize();
+                }
+                response.needs_redraw = true;
+                response.captured_event = true;
+                self.state = State::Moving;
+            }
+            if self.right_pressed {
+                if self.control_pressed {
+                    self.center += up * position_diff.y - right * position_diff.x;
+                } else {
+                    self.center += flat_forward * position_diff.y - right * position_diff.x;
+                }
+                response.needs_redraw = true;
+                response.captured_event = true;
+            }
+        }
+        response
+    }
+
+    pub fn window_event(
         &mut self,
-        event: &Event<T>,
+        window_id: WindowId,
+        event: &WindowEvent,
     ) -> CameraControllerResponse {
         let mut response = CameraControllerResponse {
             needs_redraw: false,
@@ -84,112 +144,56 @@ impl CameraController {
             return response;
         }
 
-        let up = self.up.normalize();
-        let forward = self.forward.normalize();
-        let right = Vec3::cross(forward, up).normalize();
-        let flat_forward = Vec3::cross(up, right).normalize();
-
+        if window_id != self.window_id {
+            return response;
+        }
         match event {
-            Event::DeviceEvent {
-                event: DeviceEvent::MouseMotion { delta, .. },
-                ..
-            } => {
-                let position_diff = Vec2 {
-                    x: delta.0 as f32,
-                    y: delta.1 as f32,
-                };
-                if self.left_pressed {
-                    if self.control_pressed {
-                        let offset_up = -position_diff.y;
-                        let offset_right = position_diff.x;
-                        let offset = offset_up + offset_right;
-                        let rotation = Quat::from_axis_angle(forward, self.roll_speed * offset);
-                        self.up = (rotation * self.up).normalize();
-                        self.true_up = (rotation * self.true_up).normalize();
-                        self.forward = (rotation * self.forward).normalize();
-                    } else {
-                        if (position_diff.x + position_diff.y).abs() < 0.000001 {
-                            return CameraControllerResponse {
-                                needs_redraw: false,
-                                captured_event: false,
-                            };
-                        }
-                        let rotation_x = Quat::from_axis_angle(
-                            self.true_up,
-                            -self.rotational_speed * position_diff.x,
-                        );
-                        let rotation_y =
-                            Quat::from_axis_angle(right, -self.rotational_speed * position_diff.y);
-                        self.forward = (rotation_x * rotation_y * self.forward).normalize();
-                        self.up = (rotation_x * rotation_y * self.up).normalize();
-                    }
-                    response.needs_redraw = true;
-                    response.captured_event = true;
-                    self.state = State::Moving;
-                }
-                if self.right_pressed {
-                    if self.control_pressed {
-                        self.center += up * position_diff.y - right * position_diff.x;
-                    } else {
-                        self.center += flat_forward * position_diff.y - right * position_diff.x;
-                    }
-                    response.needs_redraw = true;
-                    response.captured_event = true;
-                }
+            WindowEvent::ModifiersChanged(state) => {
+                self.control_pressed = state
+                    .state()
+                    .contains(winit::keyboard::ModifiersState::CONTROL);
             }
-            Event::WindowEvent {
-                event: window_event,
-                window_id,
-            } if *window_id == self.window_id => match window_event {
-                WindowEvent::ModifiersChanged(state) => {
-                    self.control_pressed = state
-                        .state()
-                        .contains(winit::keyboard::ModifiersState::CONTROL);
+            WindowEvent::MouseWheel { delta, .. } => {
+                let diff = match delta {
+                    LineDelta(_x, y) => *y,
+                    PixelDelta(delta) => 0.04 * delta.y as f32,
+                };
+                let factor = 1.0 + 0.1 * diff.abs();
+                if diff > 0.0 {
+                    self.distance /= factor;
+                } else {
+                    self.distance *= factor;
                 }
-                WindowEvent::MouseWheel { delta, .. } => {
-                    let diff = match delta {
-                        LineDelta(_x, y) => *y,
-                        PixelDelta(delta) => 0.04 * delta.y as f32,
-                    };
-                    let factor = 1.0 + 0.1 * diff.abs();
-                    if diff > 0.0 {
-                        self.distance /= factor;
-                    } else {
-                        self.distance *= factor;
+                response.needs_redraw = true;
+                response.captured_event = true;
+            }
+            WindowEvent::MouseInput { state, button, .. } => match &button {
+                MouseButton::Left => match state {
+                    ElementState::Pressed => {
+                        self.left_pressed = true;
+                        self.state = State::PressedWaiting;
                     }
-                    response.needs_redraw = true;
-                    response.captured_event = true;
-                }
-                WindowEvent::MouseInput { state, button, .. } => match &button {
-                    MouseButton::Left => match state {
-                        ElementState::Pressed => {
-                            self.left_pressed = true;
-                            self.state = State::PressedWaiting;
-                        }
-                        ElementState::Released => {
-                            self.left_pressed = false;
-                            response.captured_event = self.state == State::Moving;
-                            self.state = State::Released;
-                        }
-                    },
-                    MouseButton::Right => match state {
-                        ElementState::Pressed => {
-                            self.right_pressed = true;
-                            self.state = State::PressedWaiting;
-                        }
-                        ElementState::Released => {
-                            self.right_pressed = false;
-                            response.captured_event = self.state == State::Moving;
-                            self.state = State::Released;
-                        }
-                    },
-                    _ => {}
+                    ElementState::Released => {
+                        self.left_pressed = false;
+                        response.captured_event = self.state == State::Moving;
+                        self.state = State::Released;
+                    }
+                },
+                MouseButton::Right => match state {
+                    ElementState::Pressed => {
+                        self.right_pressed = true;
+                        self.state = State::PressedWaiting;
+                    }
+                    ElementState::Released => {
+                        self.right_pressed = false;
+                        response.captured_event = self.state == State::Moving;
+                        self.state = State::Released;
+                    }
                 },
                 _ => {}
             },
             _ => {}
         }
-
         response
     }
 

@@ -1,16 +1,16 @@
-use std::sync::Arc;
 use wgpu::TextureViewDescriptor;
 
 use bytemuck::{Pod, Zeroable};
-use visula::Renderable;
+use visula::{create_application, create_window, CustomEvent, Renderable};
 use visula::{
-    initialize_event_loop_and_window, initialize_logger, Application, Expression, InstanceBuffer,
-    LineDelegate, Lines, RenderData,
+    initialize_logger, Application, Expression, InstanceBuffer, LineDelegate, Lines, RenderData,
 };
 use visula_derive::Instance;
 use wgpu::Color;
-use winit::event::Event;
+use winit::application::ApplicationHandler;
+use winit::error::EventLoopError;
 use winit::event::WindowEvent;
+use winit::event_loop::EventLoopProxy;
 
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
@@ -75,54 +75,83 @@ impl Simulation {
     }
 }
 
-async fn run() {
-    initialize_logger();
-    let (event_loop, window) = initialize_event_loop_and_window();
-    let mut application = Application::new(Arc::new(window)).await;
-
-    let mut simulation = Simulation::new(&mut application).expect("Failed to init simulation");
-
-    event_loop
-        .run(move |event, target| match event {
-            Event::WindowEvent {
-                window_id: _,
-                event,
-            } => match event {
-                WindowEvent::RedrawRequested => {
-                    application.update();
-                    simulation.update(&mut application);
-                    let frame = application.next_frame();
-                    let mut encoder = application.encoder();
-
-                    {
-                        let view = frame.texture.create_view(&TextureViewDescriptor {
-                            format: Some(application.config.view_formats[0]),
-                            ..wgpu::TextureViewDescriptor::default()
-                        });
-                        application.clear(&view, &mut encoder, Color::BLACK);
-                        simulation.render(&mut RenderData {
-                            view: &view,
-                            multisampled_framebuffer: &application.multisampled_framebuffer,
-                            depth_texture: &application.depth_texture,
-                            encoder: &mut encoder,
-                            camera: &application.camera,
-                        });
-                    }
-
-                    application.queue.submit(Some(encoder.finish()));
-                    frame.present();
-                    application.window.request_redraw();
-                }
-                WindowEvent::CloseRequested => target.exit(),
-                _ => {}
-            },
-            event => {
-                application.handle_event(&event);
-            }
-        })
-        .expect("Failed to run event loop");
+struct App {
+    application: Option<Application>,
+    simulation: Option<Simulation>,
+    event_loop_proxy: EventLoopProxy<CustomEvent>,
 }
 
-fn main() {
-    visula::spawn(run());
+impl ApplicationHandler<CustomEvent> for App {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        let window = create_window(event_loop);
+        create_application(window, &self.event_loop_proxy);
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        _window_id: winit::window::WindowId,
+        event: winit::event::WindowEvent,
+    ) {
+        let Some(ref mut application) = self.application else {
+            return;
+        };
+        if self.simulation.is_none() {
+            let simulation = Simulation::new(application).expect("Failed to init simulation");
+            self.simulation = Some(simulation);
+        };
+        let Some(ref mut simulation) = self.simulation else {
+            panic!("Simulation must be set at this point!");
+        };
+        match event {
+            WindowEvent::RedrawRequested => {
+                application.update();
+                simulation.update(application);
+                let frame = application.next_frame();
+                let mut encoder = application.encoder();
+
+                {
+                    let view = frame.texture.create_view(&TextureViewDescriptor {
+                        format: Some(application.config.view_formats[0]),
+                        ..wgpu::TextureViewDescriptor::default()
+                    });
+                    application.clear(&view, &mut encoder, Color::BLACK);
+                    simulation.render(&mut RenderData {
+                        view: &view,
+                        multisampled_framebuffer: &application.multisampled_framebuffer,
+                        depth_texture: &application.depth_texture,
+                        encoder: &mut encoder,
+                        camera: &application.camera,
+                    });
+                }
+
+                application.queue.submit(Some(encoder.finish()));
+                frame.present();
+                application.window.request_redraw();
+            }
+            WindowEvent::CloseRequested => event_loop.exit(),
+            _ => {}
+        }
+        // application.handle_event(&event);
+    }
+
+    fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: CustomEvent) {
+        match event {
+            CustomEvent::Application(application) => self.application = Some(application),
+            CustomEvent::DropEvent(_) => {}
+        }
+    }
+}
+
+fn main() -> Result<(), EventLoopError> {
+    initialize_logger();
+    let event_loop = winit::event_loop::EventLoop::with_user_event().build()?;
+    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
+    let mut app = App {
+        application: None,
+        simulation: None,
+        event_loop_proxy: event_loop.create_proxy(),
+    };
+    event_loop.run_app(&mut app)?;
+    Ok(())
 }

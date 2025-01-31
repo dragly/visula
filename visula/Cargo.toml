@@ -21,7 +21,7 @@ pollster = { workspace = true }
 itertools = { workspace = true }
 futures = "0.3"
 wasm-bindgen-futures = "0.4"
-wasm-bindgen = "=0.2.92"
+wasm-bindgen = "0.2.100"
 cgmath = "0.17.0"
 js-sys = "0.3"
 ndarray = "0.15.3"

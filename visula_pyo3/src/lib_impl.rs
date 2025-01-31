@@ -6,19 +6,19 @@ use numpy::PyReadonlyArray2;
 use egui_wgpu::ScreenDescriptor;
 use itertools::Itertools;
 use std::cell::RefCell;
+use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
-use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
+use winit::event_loop::EventLoopProxy;
 
 use std::rc::Rc;
-use std::sync::Arc;
 
 use pyo3::types::PyFunction;
 use pyo3::{buffer::PyBuffer, prelude::*};
 
 use visula::{
-    create_event_loop, create_window, initialize_logger, Application, CustomEvent, Expression,
-    InstanceBuffer, LineDelegate, Lines, PyLineDelegate, PySphereDelegate, RenderData, Renderable,
-    RunConfig, SphereDelegate, Spheres,
+    create_application, create_event_loop, create_window, initialize_logger, Application,
+    CustomEvent, Expression, InstanceBuffer, LineDelegate, Lines, PyLineDelegate, PySphereDelegate,
+    RenderData, Renderable, SphereDelegate, Spheres,
 };
 use visula_core::glam::{Vec3, Vec4};
 use visula_core::uuid::Uuid;
@@ -26,7 +26,7 @@ use visula_core::{UniformBufferInner, UniformField};
 use visula_derive::Instance;
 use wgpu::{BufferUsages, Color};
 
-use winit::{event::Event, event_loop::EventLoop};
+use winit::event_loop::EventLoop;
 
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
@@ -183,6 +183,9 @@ impl PyUniformBuffer {
         name: &str,
     ) -> Self {
         let PyApplication { application, .. } = pyapplication;
+        let Some(application) = application else {
+            panic!("Application not yet initialized");
+        };
 
         let size = fields.iter().fold(0, |acc, field| acc + field.size);
 
@@ -238,6 +241,9 @@ impl PyUniformBuffer {
 
     fn update(&self, py: Python, pyapplication: &PyApplication, buffer: PyBuffer<u8>) {
         let PyApplication { application, .. } = pyapplication;
+        let Some(application) = application else {
+            panic!("Application not yet initialized");
+        };
         let data = buffer.to_vec(py).expect("Could not turn PyBuffer into vec");
         let inner = self.inner.borrow_mut();
         application.queue.write_buffer(&inner.buffer, 0, &data);
@@ -270,10 +276,10 @@ impl PyUniformBuffer {
             for field in &fields {
                 let naga_type_inner = match field.ty.as_ref() {
                     "float" => match field.size {
-                        4 => naga::TypeInner::Scalar {
+                        4 => naga::TypeInner::Scalar(naga::Scalar {
                             kind: naga::ScalarKind::Float,
                             width: 4,
-                        },
+                        }),
                         t => unimplemented!("Float with size {:?} is not yet implemented", t),
                     },
                     t => unimplemented!("Field type {:?} is not yet implemented", t),
@@ -365,6 +371,9 @@ impl PyInstanceBuffer {
     #[new]
     fn new(py: Python, pyapplication: &PyApplication, obj: PyObject) -> Self {
         let PyApplication { application, .. } = pyapplication;
+        let Some(application) = application else {
+            panic!("Application not yet initialized");
+        };
         let x = obj.extract::<PyBuffer<f64>>(py).expect("Could not extract");
         let buffer = InstanceBuffer::<FloatData>::new(&application.device);
         let point_data: Vec<FloatData> = x
@@ -388,6 +397,9 @@ impl PyInstanceBuffer {
         data: PyObject,
     ) -> PyResult<()> {
         let PyApplication { application, .. } = pyapplication;
+        let Some(application) = application else {
+            panic!("Application not yet initialized");
+        };
         let x = data
             .extract::<PyBuffer<f64>>(py)
             .expect("Could not extract");
@@ -427,6 +439,9 @@ fn vec3(x: &PyExpression, y: &PyExpression, z: &PyExpression) -> PyExpression {
 #[pyfunction]
 fn convert(py: Python, pyapplication: &PyApplication, obj: PyObject) -> PyExpression {
     let PyApplication { application, .. } = pyapplication;
+    let Some(application) = application else {
+        panic!("Application not yet initialized");
+    };
     if let Ok(expr) = obj.extract::<PyExpression>(py) {
         return expr;
     }
@@ -532,7 +547,11 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: PyObject) -> PyExpres
 
 #[pyclass(unsendable)]
 pub struct PyApplication {
-    application: Application,
+    application: Option<Application>,
+    event_loop_proxy: EventLoopProxy<CustomEvent>,
+    renderables: Vec<Box<dyn Renderable>>,
+    controls: Vec<Py<PySlider>>,
+    update: Option<Py<PyFunction>>,
 }
 
 #[pyclass(unsendable)]
@@ -554,111 +573,71 @@ impl PyEventLoop {
 impl PyApplication {
     #[new]
     fn new(event_loop: &PyEventLoop) -> Self {
-        let window = create_window(
-            RunConfig {
-                canvas_name: "none".to_owned(),
-            },
-            &event_loop.event_loop,
-        );
-        let application = pollster::block_on(async { Application::new(Arc::new(window)).await });
-        Self { application }
+        Self {
+            application: None,
+            renderables: Vec::new(),
+            controls: Vec::new(),
+            update: None,
+            event_loop_proxy: event_loop.event_loop.create_proxy(),
+        }
     }
 }
+impl ApplicationHandler<CustomEvent> for PyApplication {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        let window = create_window(event_loop);
+        create_application(window, &self.event_loop_proxy);
+    }
 
-#[pyfunction]
-fn show(
-    py: Python,
-    py_event_loop: &mut PyEventLoop,
-    py_application: &Bound<PyApplication>,
-    renderables: Vec<PyObject>,
-    update: &Bound<PyFunction>,
-    mut controls: Vec<Bound<PySlider>>,
-) -> PyResult<()> {
-    // TODO consider making the application retained so that not all the wgpu initialization needs
-    // to be re-done
+    fn window_event(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        window_id: winit::window::WindowId,
+        event: winit::event::WindowEvent,
+    ) {
+        let Some(ref mut application) = self.application else {
+            return;
+        };
+        let Some(ref mut update) = self.update else {
+            return;
+        };
+        application.window_event(window_id, &event);
+        match event {
+            WindowEvent::RedrawRequested => {
+                {
+                    let frame = application.next_frame();
+                    let mut encoder = application.encoder();
+                    let view = frame
+                        .texture
+                        .create_view(&wgpu::TextureViewDescriptor::default());
 
-    let spheres_list: Vec<Box<dyn Renderable>> = {
-        let application = py_application.borrow_mut();
-        renderables
-            .iter()
-            .map(|renderable| -> Box<dyn Renderable> {
-                // TODO automate the conversion
-                if let Ok(pysphere) = renderable.extract::<PySphereDelegate>(py) {
-                    return Box::new(
-                        Spheres::new(
-                            &application.application.rendering_descriptor(),
-                            &SphereDelegate {
-                                position: convert(py, &application, pysphere.position).inner,
-                                radius: convert(py, &application, pysphere.radius).inner,
-                                color: convert(py, &application, pysphere.color).inner,
-                            },
-                        )
-                        .expect("Failed to create spheres"),
-                    );
-                }
-                if let Ok(pylines) = renderable.extract::<PyLineDelegate>(py) {
-                    return Box::new(
-                        Lines::new(
-                            &application.application.rendering_descriptor(),
-                            &LineDelegate {
-                                start: convert(py, &application, pylines.start).inner,
-                                end: convert(py, &application, pylines.end).inner,
-                                width: convert(py, &application, pylines.width).inner,
-                                color: convert(py, &application, pylines.color).inner,
-                            },
-                        )
-                        .expect("Failed to create spheres"),
-                    );
-                }
-                unimplemented!("TODO")
-            })
-            .collect_vec()
-    };
-
-    let PyEventLoop { event_loop } = py_event_loop;
-
-    event_loop
-        .run_on_demand(move |event, target| {
-            py_application.borrow_mut().application.handle_event(&event);
-            if let Event::WindowEvent {
-                window_id: _,
-                event: window_event,
-            } = event
-            {
-                match window_event {
-                    WindowEvent::RedrawRequested => {
-                        {
-                            let application = &mut py_application.borrow_mut().application;
-                            let frame = application.next_frame();
-                            let mut encoder = application.encoder();
-                            let view = frame
-                                .texture
-                                .create_view(&wgpu::TextureViewDescriptor::default());
-
-                            {
-                                application.clear(&view, &mut encoder, Color::BLACK);
-                                let mut render_data = RenderData {
-                                    view: &view,
-                                    multisampled_framebuffer: &application.multisampled_framebuffer,
-                                    depth_texture: &application.depth_texture,
-                                    encoder: &mut encoder,
-                                    camera: &application.camera,
-                                };
-                                for spheres in &spheres_list {
-                                    spheres.render(&mut render_data);
-                                }
-                            }
-                            if !controls.is_empty() {
-                                let raw_input = application
-                                    .egui_renderer
-                                    .state
-                                    .take_egui_input(&application.window);
-                                let full_output = application.egui_renderer.state.egui_ctx().run(
-                                    raw_input,
-                                    |ctx| {
-                                        egui::Window::new("Settings").show(ctx, |ui| {
-                                            for slider in &mut controls {
-                                                let mut slider_mut = slider.borrow_mut();
+                    {
+                        application.clear(&view, &mut encoder, Color::BLACK);
+                        let mut render_data = RenderData {
+                            view: &view,
+                            multisampled_framebuffer: &application.multisampled_framebuffer,
+                            depth_texture: &application.depth_texture,
+                            encoder: &mut encoder,
+                            camera: &application.camera,
+                        };
+                        for spheres in &self.renderables {
+                            spheres.render(&mut render_data);
+                        }
+                    }
+                    if !self.controls.is_empty() {
+                        let raw_input = application
+                            .egui_renderer
+                            .state
+                            .take_egui_input(&application.window);
+                        let full_output =
+                            application
+                                .egui_renderer
+                                .state
+                                .egui_ctx()
+                                .run(raw_input, |ctx| {
+                                    egui::Window::new("Settings").show(ctx, |ui| {
+                                        Python::with_gil(|py| {
+                                            for slider in &mut self.controls {
+                                                let mut slider_mut = slider.borrow_mut(py);
                                                 let minimum = slider_mut.minimum;
                                                 let maximum = slider_mut.maximum;
                                                 ui.label(&slider_mut.name);
@@ -668,85 +647,139 @@ fn show(
                                                 ));
                                             }
                                         });
-                                    },
-                                );
-
-                                application.egui_renderer.state.handle_platform_output(
-                                    &application.window,
-                                    full_output.platform_output,
-                                );
-
-                                let tris = application.egui_renderer.state.egui_ctx().tessellate(
-                                    full_output.shapes,
-                                    application.window.scale_factor() as f32,
-                                );
-                                for (id, image_delta) in &full_output.textures_delta.set {
-                                    application.egui_renderer.renderer.update_texture(
-                                        &application.device,
-                                        &application.queue,
-                                        *id,
-                                        image_delta,
-                                    );
-                                }
-                                let screen_descriptor = ScreenDescriptor {
-                                    size_in_pixels: [
-                                        application.config.width,
-                                        application.config.height,
-                                    ],
-                                    pixels_per_point: application.window.scale_factor() as f32,
-                                };
-                                application.egui_renderer.renderer.update_buffers(
-                                    &application.device,
-                                    &application.queue,
-                                    &mut encoder,
-                                    &tris,
-                                    &screen_descriptor,
-                                );
-                                let mut render_pass =
-                                    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                                        label: Some("egui"),
-                                        color_attachments: &[Some(
-                                            wgpu::RenderPassColorAttachment {
-                                                view: &view,
-                                                resolve_target: None,
-                                                ops: wgpu::Operations {
-                                                    load: wgpu::LoadOp::Load,
-                                                    store: wgpu::StoreOp::Store,
-                                                },
-                                            },
-                                        )],
-                                        depth_stencil_attachment: None,
-                                        occlusion_query_set: None,
-                                        timestamp_writes: None,
                                     });
-                                application.egui_renderer.renderer.render(
-                                    &mut render_pass,
-                                    &tris,
-                                    &screen_descriptor,
-                                );
-                                drop(render_pass);
-                                for x in &full_output.textures_delta.free {
-                                    application.egui_renderer.renderer.free_texture(x)
-                                }
-                            }
+                                });
 
-                            application.queue.submit(Some(encoder.finish()));
-                            frame.present();
-                            application.update();
-                            application.window.request_redraw();
+                        application.egui_renderer.state.handle_platform_output(
+                            &application.window,
+                            full_output.platform_output,
+                        );
+
+                        let tris = application.egui_renderer.state.egui_ctx().tessellate(
+                            full_output.shapes,
+                            application.window.scale_factor() as f32,
+                        );
+                        for (id, image_delta) in &full_output.textures_delta.set {
+                            application.egui_renderer.renderer.update_texture(
+                                &application.device,
+                                &application.queue,
+                                *id,
+                                image_delta,
+                            );
                         }
-                        let result = update.call((), None);
-                        if let Err(err) = result {
-                            println!("Could not call update: {:?}", err);
-                            println!("{}", err.traceback(py).unwrap().format().unwrap());
+                        let screen_descriptor = ScreenDescriptor {
+                            size_in_pixels: [application.config.width, application.config.height],
+                            pixels_per_point: application.window.scale_factor() as f32,
+                        };
+                        application.egui_renderer.renderer.update_buffers(
+                            &application.device,
+                            &application.queue,
+                            &mut encoder,
+                            &tris,
+                            &screen_descriptor,
+                        );
+                        let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            label: Some("egui"),
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: &view,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Load,
+                                    store: wgpu::StoreOp::Store,
+                                },
+                            })],
+                            depth_stencil_attachment: None,
+                            occlusion_query_set: None,
+                            timestamp_writes: None,
+                        });
+                        application.egui_renderer.renderer.render(
+                            &mut render_pass.forget_lifetime(),
+                            &tris,
+                            &screen_descriptor,
+                        );
+                        for x in &full_output.textures_delta.free {
+                            application.egui_renderer.renderer.free_texture(x)
                         }
                     }
-                    WindowEvent::CloseRequested => target.exit(),
-                    _ => {}
+
+                    application.queue.submit(Some(encoder.finish()));
+                    frame.present();
+                    application.update();
+                    application.window.request_redraw();
                 }
+                Python::with_gil(|py| {
+                    let result = update.call(py, (), None);
+                    if let Err(err) = result {
+                        println!("Could not call update: {:?}", err);
+                        println!("{}", err.traceback(py).unwrap().format().unwrap());
+                    }
+                });
             }
-        })
-        .expect("Failed to run event loop");
+            WindowEvent::CloseRequested => event_loop.exit(),
+            _ => {}
+        }
+    }
+    fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: CustomEvent) {
+        match event {
+            CustomEvent::Application(application) => self.application = Some(application),
+            CustomEvent::DropEvent(_) => {}
+        }
+    }
+}
+
+#[pyfunction]
+fn show(
+    py: Python,
+    py_application: &Bound<PyApplication>,
+    py_renderables: Vec<PyObject>,
+    update: Py<PyFunction>,
+    controls: Vec<Py<PySlider>>,
+) -> PyResult<()> {
+    {
+        let mut py_application_mut = py_application.borrow_mut();
+        let Some(ref application) = py_application_mut.application else {
+            panic!("Application not yet initialized");
+        };
+        let renderables: Vec<Box<dyn Renderable>> = py_renderables
+            .iter()
+            .map(|renderable| -> Box<dyn Renderable> {
+                // TODO automate the conversion
+                if let Ok(pysphere) = renderable.extract::<PySphereDelegate>(py) {
+                    return Box::new(
+                        Spheres::new(
+                            &application.rendering_descriptor(),
+                            &SphereDelegate {
+                                position: convert(py, &py_application_mut, pysphere.position).inner,
+                                radius: convert(py, &py_application_mut, pysphere.radius).inner,
+                                color: convert(py, &py_application_mut, pysphere.color).inner,
+                            },
+                        )
+                        .expect("Failed to create spheres"),
+                    );
+                }
+                if let Ok(pylines) = renderable.extract::<PyLineDelegate>(py) {
+                    return Box::new(
+                        Lines::new(
+                            &application.rendering_descriptor(),
+                            &LineDelegate {
+                                start: convert(py, &py_application_mut, pylines.start).inner,
+                                end: convert(py, &py_application_mut, pylines.end).inner,
+                                width: convert(py, &py_application_mut, pylines.width).inner,
+                                color: convert(py, &py_application_mut, pylines.color).inner,
+                            },
+                        )
+                        .expect("Failed to create spheres"),
+                    );
+                }
+                unimplemented!("TODO")
+            })
+            .collect_vec();
+
+        py_application_mut.renderables = renderables;
+        py_application_mut.update = Some(update);
+        py_application_mut.controls = controls;
+    }
+
     Ok(())
 }
 
