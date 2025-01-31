@@ -79,6 +79,7 @@ pub struct RunConfig {
 }
 
 struct App<F, S> {
+    config: RunConfig,
     application: Option<Application>,
     simulation: Option<S>,
     event_loop_proxy: EventLoopProxy<CustomEvent>,
@@ -92,7 +93,7 @@ where
     S: Simulation + 'static,
 {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        let window = create_window(event_loop);
+        let window = create_window_with_config(&self.config, event_loop);
         self.main_window_id = Some(window.id());
         create_application(window, &self.event_loop_proxy);
     }
@@ -158,43 +159,6 @@ where
     )
 }
 
-// pub async fn start<F, S>(
-//     event_loop: EventLoop<CustomEvent>,
-//     window: WindowState,
-//     mut init_simulation: F,
-// ) where
-//     F: FnMut(&mut Application) -> S + 'static,
-//     S: Simulation + 'static,
-// {
-//     let main_window_id = window.id();
-//     let mut application = Application::new(Arc::new(window)).await;
-//
-//     let mut simulation: S = init_simulation(&mut application);
-//
-//     event_loop
-//         .run(move |event, target| {
-//             if !application.handle_event(&event) {
-//                 simulation.handle_event(&mut application, &event);
-//             }
-//             if let Event::WindowEvent { window_id, event } = event {
-//                 if main_window_id != window_id {
-//                     return;
-//                 }
-//                 match event {
-//                     WindowEvent::RedrawRequested => {
-//                         application.update();
-//                         simulation.update(&mut application);
-//                         application.render(&mut simulation);
-//                         application.window.borrow_mut().request_redraw();
-//                     }
-//                     WindowEvent::CloseRequested => target.exit(),
-//                     _ => {}
-//                 }
-//             }
-//         })
-//         .expect("Event loop failed to run");
-// }
-
 pub fn initialize_panic_hook() {
     #[cfg(target_arch = "wasm32")]
     {
@@ -213,19 +177,13 @@ pub fn initialize_logger() {
     }
 }
 
-pub fn initialize_event_loop_and_window() -> (EventLoop<CustomEvent>, WindowState) {
-    initialize_event_loop_and_window_with_config(RunConfig {
-        canvas_name: "glcanvas".to_string(),
-    })
-}
-
 pub fn create_event_loop() -> EventLoop<CustomEvent> {
     EventLoop::<CustomEvent>::with_user_event()
         .build()
         .expect("Failed to create event loop")
 }
 
-pub fn create_window_with_config(config: RunConfig, event_loop: &ActiveEventLoop) -> Arc<Window> {
+pub fn create_window_with_config(config: &RunConfig, event_loop: &ActiveEventLoop) -> Arc<Window> {
     let mut builder = winit::window::Window::default_attributes();
     builder = builder.with_title("Visula");
 
@@ -279,112 +237,11 @@ pub fn create_window_with_config(config: RunConfig, event_loop: &ActiveEventLoop
 
 pub fn create_window(event_loop: &ActiveEventLoop) -> Arc<Window> {
     create_window_with_config(
-        RunConfig {
+        &RunConfig {
             canvas_name: "canvas".to_owned(),
         },
         event_loop,
     )
-}
-
-// use std::cell::RefCell;
-// use std::rc::Rc;
-// let drop_proxy_main = Rc::new(RefCell::new(event_loop.create_proxy()));
-// log::info!("Start");
-// use winit::platform::web::WindowExtWebSys;
-// let drag_enter = Closure::wrap(Box::new(|event: &web_sys::Event| {
-//     event.prevent_default();
-//     log::info!("Drag enter!");
-// }) as Box<dyn FnMut(&web_sys::Event)>);
-// let drag_over = Closure::wrap(Box::new(|event: &web_sys::Event| {
-//     event.prevent_default();
-//     log::info!("Drag over!");
-// }) as Box<dyn FnMut(&web_sys::Event)>);
-//
-// let drop_callback = Closure::wrap(Box::new(move |event: &web_sys::Event| {
-//     event.prevent_default();
-//     let drag_event_ref: &web_sys::DragEvent = JsCast::unchecked_from_js_ref(event);
-//     let drag_event = drag_event_ref.clone();
-//     match drag_event.data_transfer() {
-//         None => {}
-//         Some(data_transfer) => match data_transfer.files() {
-//             None => {}
-//             Some(files) => {
-//                 log::info!("Files {:?}", files.length());
-//                 for i in 0..files.length() {
-//                     if let Some(file) = files.item(i) {
-//                         log::info!("Processing file {i}");
-//                         let drop_proxy_ref = Rc::clone(&drop_proxy_main);
-//                         let name = file.name();
-//                         let read_callback =
-//                             Closure::wrap(Box::new(move |array_buffer: JsValue| {
-//                                 let array = Uint8Array::new(&array_buffer);
-//                                 let bytes: Vec<u8> = array.to_vec();
-//                                 let event_result = (*drop_proxy_ref)
-//                                     .borrow_mut()
-//                                     .send_event(CustomEvent::DropEvent(DropEvent {
-//                                         name: name.clone(),
-//                                         bytes,
-//                                     }));
-//                                 log::info!("Sent event");
-//                                 match event_result {
-//                                     Ok(_) => {}
-//                                     Err(_) => {
-//                                         log::error!(
-//                                     "Could not register drop event! Event loop closed?"
-//                                 );
-//                                     }
-//                                 }
-//                             })
-//                                 as Box<dyn FnMut(JsValue)>);
-//                         let _ = file.array_buffer().then(&read_callback);
-//                         read_callback.forget();
-//                     }
-//                 }
-//             }
-//         },
-//     }
-// }) as Box<dyn FnMut(&web_sys::Event)>);
-//
-// log::info!("Setting up drag and drop features");
-// web_sys::window()
-//     .and_then(|win| {
-//         win.set_ondragenter(Some(JsCast::unchecked_from_js_ref(drag_enter.as_ref())));
-//         win.set_ondragover(Some(JsCast::unchecked_from_js_ref(drag_over.as_ref())));
-//         win.set_ondrop(Some(JsCast::unchecked_from_js_ref(drop_callback.as_ref())));
-//         win.document()
-//     })
-//     .expect("could not set up window");
-//
-// // From the rustwasm documentation:
-// //
-// // The instance of `Closure` that we created will invalidate its
-// // corresponding JS callback whenever it is dropped, so if we were to
-// // normally return from `main` then our registered closure will
-// // raise an exception when invoked.
-// //
-// // Normally we'd store the handle to later get dropped at an appropriate
-// // time but for now we want it to be a global handler so we use the
-// // `forget` method to drop it without invalidating the closure. Note that
-// // this is leaking memory in Rust, so this should be done judiciously!
-// drag_enter.forget();
-// drag_over.forget();
-// drop_callback.forget();
-
-struct WindowState {
-    config: RunConfig,
-    window: Option<Window>,
-}
-
-pub fn initialize_event_loop_and_window_with_config(
-    config: RunConfig,
-) -> (EventLoop<CustomEvent>, WindowState) {
-    let event_loop = create_event_loop();
-    let window_state = WindowState {
-        config,
-        window: None,
-    };
-
-    (event_loop, window_state)
 }
 
 pub fn create_application(window: Arc<Window>, event_loop_proxy: &EventLoopProxy<CustomEvent>) {
@@ -433,6 +290,7 @@ where
     initialize_panic_hook();
     let event_loop = create_event_loop();
     let mut app = App {
+        config,
         application: None,
         simulation: None,
         init_simulation: init,
