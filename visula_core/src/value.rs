@@ -138,8 +138,10 @@ impl Expression {
                 let naga_type = ::naga::Type {
                     name: None,
                     inner: ::naga::TypeInner::Vector {
-                        kind: ::naga::ScalarKind::Float,
-                        width: 4,
+                        scalar: ::naga::Scalar {
+                            kind: ::naga::ScalarKind::Float,
+                            width: 4,
+                        },
                         size: ::naga::VectorSize::Bi,
                     },
                 };
@@ -163,8 +165,10 @@ impl Expression {
                 let naga_type = ::naga::Type {
                     name: None,
                     inner: ::naga::TypeInner::Vector {
-                        kind: ::naga::ScalarKind::Float,
-                        width: 4,
+                        scalar: ::naga::Scalar {
+                            kind: ::naga::ScalarKind::Float,
+                            width: 4,
+                        },
                         size: ::naga::VectorSize::Tri,
                     },
                 };
@@ -188,8 +192,10 @@ impl Expression {
                 let naga_type = ::naga::Type {
                     name: None,
                     inner: ::naga::TypeInner::Vector {
-                        kind: ::naga::ScalarKind::Float,
-                        width: 4,
+                        scalar: ::naga::Scalar {
+                            kind: ::naga::ScalarKind::Float,
+                            width: 4,
+                        },
                         size: ::naga::VectorSize::Quad,
                     },
                 };

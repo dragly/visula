@@ -7,6 +7,7 @@ use self::uniforms::CameraUniforms;
 pub mod controller;
 pub mod uniforms;
 
+#[derive(Debug)]
 pub struct Camera {
     pub bind_group_layout: wgpu::BindGroupLayout,
     pub bind_group: wgpu::BindGroup,

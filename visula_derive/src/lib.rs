@@ -134,6 +134,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
                                                 location: previous_shader_location_offset + #shader_location,
                                                 interpolation: None,
                                                 sampling: None,
+                                                second_blend_source: false,
                                             }),
                                         });
                                 }

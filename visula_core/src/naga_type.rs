@@ -18,8 +18,10 @@ macro_rules! add_naga_float_vector {
             [f32; $size], naga::Type {
                 name: None,
                 inner: naga::TypeInner::Vector {
-                    kind: naga::ScalarKind::Float,
-                    width: 4,
+                    scalar: naga::Scalar {
+                        kind: naga::ScalarKind::Float,
+                        width: 4,
+                    },
                     size: $vector_size,
                 },
             }
@@ -30,20 +32,24 @@ macro_rules! add_naga_float_vector {
 add_naga_type! {
    f32, naga::Type {
         name: None,
-        inner: naga::TypeInner::Scalar {
-            kind: naga::ScalarKind::Float,
-            width: 4,
-        },
+        inner: naga::TypeInner::Scalar(
+            naga::Scalar {
+                kind: naga::ScalarKind::Float,
+                width: 4,
+            }
+        ),
     }
 }
 
 add_naga_type! {
    i32, naga::Type {
         name: None,
-        inner: naga::TypeInner::Scalar {
-            kind: naga::ScalarKind::Sint,
-            width: 4,
-        },
+        inner: naga::TypeInner::Scalar(
+            naga::Scalar{
+                kind: naga::ScalarKind::Sint,
+                width: 4,
+            }
+        ),
     }
 }
 
@@ -57,8 +63,10 @@ macro_rules! add_naga_glam_vector {
             $glam_type, naga::Type {
                 name: None,
                 inner: naga::TypeInner::Vector {
-                    kind: naga::ScalarKind::Float,
-                    width: 4,
+                    scalar: naga::Scalar {
+                        kind: naga::ScalarKind::Float,
+                        width: 4,
+                    },
                     size: $vector_size,
                 },
             }
@@ -79,7 +87,10 @@ macro_rules! add_naga_glam_matrix {
                 inner: naga::TypeInner::Matrix {
                     columns: $columns,
                     rows: $rows,
-                    width: 4,
+                    scalar: naga::Scalar {
+                        kind: naga::ScalarKind::Float,
+                        width: 4,
+                    },
                 },
             }
         }

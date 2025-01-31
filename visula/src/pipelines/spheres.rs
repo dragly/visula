@@ -9,7 +9,7 @@ use std::mem::size_of;
 use visula_core::{BindingBuilder, BufferBinding, Expression};
 use visula_derive::Delegate;
 use wgpu::util::DeviceExt;
-use wgpu::{BindGroupLayout, BufferUsages};
+use wgpu::{BindGroupLayout, BufferUsages, PipelineCompilationOptions};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -149,17 +149,19 @@ impl Spheres {
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader_module,
-                entry_point: "vs_main",
+                entry_point: Some("vs_main"),
                 buffers: &buffers,
+                compilation_options: PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader_module,
-                entry_point: "fs_main",
+                entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: *format,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
+                compilation_options: PipelineCompilationOptions::default(),
             }),
             primitive: wgpu::PrimitiveState {
                 front_face: wgpu::FrontFace::Ccw,
@@ -179,6 +181,7 @@ impl Spheres {
                 alpha_to_coverage_enabled: false,
             },
             multiview: None,
+            cache: None,
         });
         Ok(Spheres {
             render_pipeline,
@@ -232,11 +235,11 @@ impl Renderable for Spheres {
             .values()
             .map(|v| (v, Ref::map(v.inner.borrow(), |v| &v.buffer)))
             .collect();
-        let uniforms: Vec<Ref<wgpu::BindGroup>> = self
+        let uniforms: Vec<wgpu::BindGroup> = self
             .binding_builder
             .uniforms
             .values()
-            .map(|v| Ref::map(v.inner.borrow(), |m| &m.bind_group))
+            .map(|v| v.inner.borrow().bind_group.clone())
             .collect();
         {
             let default_render_pass = DefaultRenderPassDescriptor::new(
