@@ -9,18 +9,16 @@ use std::cell::RefCell;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::EventLoopProxy;
-use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
 
 use std::rc::Rc;
-use std::sync::Arc;
 
 use pyo3::types::PyFunction;
 use pyo3::{buffer::PyBuffer, prelude::*};
 
 use visula::{
-    create_application, create_event_loop, create_window, initialize_logger, renderable,
-    Application, CustomEvent, Expression, InstanceBuffer, LineDelegate, Lines, PyLineDelegate,
-    PySphereDelegate, RenderData, Renderable, RunConfig, SphereDelegate, Spheres,
+    create_application, create_event_loop, create_window, initialize_logger, Application,
+    CustomEvent, Expression, InstanceBuffer, LineDelegate, Lines, PyLineDelegate, PySphereDelegate,
+    RenderData, Renderable, SphereDelegate, Spheres,
 };
 use visula_core::glam::{Vec3, Vec4};
 use visula_core::uuid::Uuid;
@@ -28,7 +26,7 @@ use visula_core::{UniformBufferInner, UniformField};
 use visula_derive::Instance;
 use wgpu::{BufferUsages, Color};
 
-use winit::{event::Event, event_loop::EventLoop};
+use winit::event_loop::EventLoop;
 
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
@@ -680,21 +678,20 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
                             &tris,
                             &screen_descriptor,
                         );
-                        let mut render_pass =
-                            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                                label: Some("egui"),
-                                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                                    view: &view,
-                                    resolve_target: None,
-                                    ops: wgpu::Operations {
-                                        load: wgpu::LoadOp::Load,
-                                        store: wgpu::StoreOp::Store,
-                                    },
-                                })],
-                                depth_stencil_attachment: None,
-                                occlusion_query_set: None,
-                                timestamp_writes: None,
-                            });
+                        let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            label: Some("egui"),
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: &view,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Load,
+                                    store: wgpu::StoreOp::Store,
+                                },
+                            })],
+                            depth_stencil_attachment: None,
+                            occlusion_query_set: None,
+                            timestamp_writes: None,
+                        });
                         application.egui_renderer.renderer.render(
                             &mut render_pass.forget_lifetime(),
                             &tris,
@@ -733,7 +730,6 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
 #[pyfunction]
 fn show(
     py: Python,
-    py_event_loop: &mut PyEventLoop,
     py_application: &Bound<PyApplication>,
     py_renderables: Vec<PyObject>,
     update: Py<PyFunction>,

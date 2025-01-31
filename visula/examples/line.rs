@@ -1,17 +1,15 @@
-use std::sync::Arc;
 use wgpu::TextureViewDescriptor;
 
 use bytemuck::{Pod, Zeroable};
-use visula::{application, create_application, create_window, CustomEvent, Renderable, RunConfig};
+use visula::{create_application, create_window, CustomEvent, Renderable};
 use visula::{
-    initialize_event_loop_and_window, initialize_logger, Application, Expression, InstanceBuffer,
+    initialize_logger, Application, Expression, InstanceBuffer,
     LineDelegate, Lines, RenderData,
 };
 use visula_derive::Instance;
 use wgpu::Color;
 use winit::application::ApplicationHandler;
 use winit::error::EventLoopError;
-use winit::event::Event;
 use winit::event::WindowEvent;
 use winit::event_loop::EventLoopProxy;
 

@@ -1,5 +1,4 @@
 use crate::camera::Camera;
-use crate::custom_event::CustomEvent;
 use crate::rendering_descriptor::RenderingDescriptor;
 use crate::{camera::controller::CameraController, simulation::RenderData};
 use crate::{CameraControllerResponse, Simulation};
@@ -17,7 +16,7 @@ use wgpu::{
     InstanceDescriptor, SurfaceTexture, TextureFormat, TextureView, TextureViewDescriptor,
 };
 use winit::{
-    event::{Event, WindowEvent},
+    event::WindowEvent,
     window::Window,
 };
 
@@ -374,7 +373,7 @@ impl Application {
             &tris,
             &screen_descriptor,
         );
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("egui"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: &view,

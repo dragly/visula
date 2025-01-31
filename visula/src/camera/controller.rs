@@ -4,7 +4,7 @@ use crate::camera::uniforms::CameraUniforms;
 use glam::{Mat4, Quat, Vec2, Vec3};
 
 use winit::event::{
-    DeviceEvent, ElementState, Event, MouseButton,
+    DeviceEvent, ElementState, MouseButton,
     MouseScrollDelta::{LineDelta, PixelDelta},
     WindowEvent,
 };
@@ -84,52 +84,49 @@ impl CameraController {
         let forward = self.forward.normalize();
         let right = Vec3::cross(forward, up).normalize();
         let flat_forward = Vec3::cross(up, right).normalize();
-        match event {
-            DeviceEvent::MouseMotion { delta, .. } => {
-                let position_diff = Vec2 {
-                    x: delta.0 as f32,
-                    y: delta.1 as f32,
-                };
-                if self.left_pressed {
-                    if self.control_pressed {
-                        let offset_up = -position_diff.y;
-                        let offset_right = position_diff.x;
-                        let offset = offset_up + offset_right;
-                        let rotation = Quat::from_axis_angle(forward, self.roll_speed * offset);
-                        self.up = (rotation * self.up).normalize();
-                        self.true_up = (rotation * self.true_up).normalize();
-                        self.forward = (rotation * self.forward).normalize();
-                    } else {
-                        if (position_diff.x + position_diff.y).abs() < 0.000001 {
-                            return CameraControllerResponse {
-                                needs_redraw: false,
-                                captured_event: false,
-                            };
-                        }
-                        let rotation_x = Quat::from_axis_angle(
-                            self.true_up,
-                            -self.rotational_speed * position_diff.x,
-                        );
-                        let rotation_y =
-                            Quat::from_axis_angle(right, -self.rotational_speed * position_diff.y);
-                        self.forward = (rotation_x * rotation_y * self.forward).normalize();
-                        self.up = (rotation_x * rotation_y * self.up).normalize();
+        if let DeviceEvent::MouseMotion { delta, .. } = event {
+            let position_diff = Vec2 {
+                x: delta.0 as f32,
+                y: delta.1 as f32,
+            };
+            if self.left_pressed {
+                if self.control_pressed {
+                    let offset_up = -position_diff.y;
+                    let offset_right = position_diff.x;
+                    let offset = offset_up + offset_right;
+                    let rotation = Quat::from_axis_angle(forward, self.roll_speed * offset);
+                    self.up = (rotation * self.up).normalize();
+                    self.true_up = (rotation * self.true_up).normalize();
+                    self.forward = (rotation * self.forward).normalize();
+                } else {
+                    if (position_diff.x + position_diff.y).abs() < 0.000001 {
+                        return CameraControllerResponse {
+                            needs_redraw: false,
+                            captured_event: false,
+                        };
                     }
-                    response.needs_redraw = true;
-                    response.captured_event = true;
-                    self.state = State::Moving;
+                    let rotation_x = Quat::from_axis_angle(
+                        self.true_up,
+                        -self.rotational_speed * position_diff.x,
+                    );
+                    let rotation_y =
+                        Quat::from_axis_angle(right, -self.rotational_speed * position_diff.y);
+                    self.forward = (rotation_x * rotation_y * self.forward).normalize();
+                    self.up = (rotation_x * rotation_y * self.up).normalize();
                 }
-                if self.right_pressed {
-                    if self.control_pressed {
-                        self.center += up * position_diff.y - right * position_diff.x;
-                    } else {
-                        self.center += flat_forward * position_diff.y - right * position_diff.x;
-                    }
-                    response.needs_redraw = true;
-                    response.captured_event = true;
-                }
+                response.needs_redraw = true;
+                response.captured_event = true;
+                self.state = State::Moving;
             }
-            _ => {}
+            if self.right_pressed {
+                if self.control_pressed {
+                    self.center += up * position_diff.y - right * position_diff.x;
+                } else {
+                    self.center += flat_forward * position_diff.y - right * position_diff.x;
+                }
+                response.needs_redraw = true;
+                response.captured_event = true;
+            }
         }
         response
     }

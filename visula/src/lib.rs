@@ -27,7 +27,7 @@ use std::future::Future;
 use std::sync::Arc;
 use winit::window::Window;
 
-use winit::{event::Event, event_loop::EventLoopBuilder};
+use winit::event::Event;
 
 pub mod derive {
     pub use visula_derive::*;

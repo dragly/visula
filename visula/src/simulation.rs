@@ -1,8 +1,7 @@
 use std::fmt::Debug;
 
 use egui::Context;
-use winit::event::{Event, WindowEvent};
-use winit::window::WindowId;
+use winit::event::Event;
 
 use crate::application::Application;
 use crate::camera::Camera;
