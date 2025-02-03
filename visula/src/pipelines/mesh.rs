@@ -4,6 +4,7 @@ use std::mem::size_of;
 use naga::back::wgsl::WriterFlags;
 use naga::valid::ValidationFlags;
 use wgpu::util::DeviceExt;
+use wgpu::BindGroupLayout;
 use wgpu::PipelineCompilationOptions;
 
 use crate::primitives::mesh_primitive::MeshVertexAttributes;
@@ -55,9 +56,22 @@ impl MeshPipeline {
             label: None,
             source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(&output_str)),
         });
+        let bind_group_layouts: Vec<&BindGroupLayout> = binding_builder
+            .uniforms
+            .values()
+            .map(|binding| binding.bind_group_layout.as_ref())
+            .collect();
+
+        let uniforms = {
+            let mut uniforms = vec![&camera.bind_group_layout];
+            for layout in &bind_group_layouts {
+                uniforms.push(layout);
+            }
+            uniforms
+        };
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Mesh pipeline layout"),
-            bind_group_layouts: &[&camera.bind_group_layout],
+            label: Some("lines pipeline layout"),
+            bind_group_layouts: &uniforms,
             push_constant_ranges: &[],
         });
         let vertex_buffer_layout = wgpu::VertexBufferLayout {
