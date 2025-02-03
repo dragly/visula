@@ -274,6 +274,15 @@ impl Application {
         false
     }
 
+    pub fn device_event(
+        &mut self,
+        _event_loop: &winit::event_loop::ActiveEventLoop,
+        _device_id: winit::event::DeviceId,
+        event: &winit::event::DeviceEvent,
+    ) {
+        self.camera_controller.device_event(event);
+    }
+
     pub fn update(&mut self) {
         self.camera_controller.update();
         let camera_uniforms = self
