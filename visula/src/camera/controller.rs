@@ -47,6 +47,7 @@ pub struct CameraController {
     previous_time: Instant,
     pub current_transform: CameraTransform,
     pub target_transform: CameraTransform,
+    pub smoothing: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -95,6 +96,7 @@ impl CameraController {
             current_transform: transform.clone(),
             target_transform: transform.clone(),
             previous_time: Instant::now(),
+            smoothing: 0.8,
         }
     }
 
@@ -108,8 +110,7 @@ impl CameraController {
         let current_up = self.current_transform.up;
         let current_true_up = self.current_transform.true_up;
         let target_fps = 120.0;
-        let smoothing: f32 = 0.8;
-        let smoothing_dt = 1.0 - smoothing.powf(target_fps * dt);
+        let smoothing_dt = 1.0 - self.smoothing.powf(target_fps * dt);
         let current_distance = self.current_transform.distance;
         let position = lerp(
             current_position,
