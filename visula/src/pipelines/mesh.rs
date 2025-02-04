@@ -4,8 +4,7 @@ use std::mem::size_of;
 use naga::back::wgsl::WriterFlags;
 use naga::valid::ValidationFlags;
 use wgpu::util::DeviceExt;
-use wgpu::BindGroupLayout;
-use wgpu::PipelineCompilationOptions;
+use wgpu::{BindGroupLayout, PipelineCompilationOptions};
 
 use crate::primitives::mesh_primitive::MeshVertexAttributes;
 use crate::{DefaultRenderPassDescriptor, RenderData, RenderingDescriptor};
@@ -70,7 +69,7 @@ impl MeshPipeline {
             uniforms
         };
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("lines pipeline layout"),
+            label: Some("Mesh pipeline layout"),
             bind_group_layouts: &uniforms,
             push_constant_ranges: &[],
         });

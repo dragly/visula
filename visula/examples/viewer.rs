@@ -59,7 +59,9 @@ impl Simulation {
             mesh_vertex_count,
         } = visula::io::zdf::read_zdf(input, &mut application.device);
 
-        application.camera_controller.center = camera_center;
+        application.camera_controller.current_transform.center = camera_center;
+        application.camera_controller.target_transform.center = camera_center;
+
         self.sphere_buffer
             .update(&application.device, &application.queue, &point_cloud[..]);
         self.mesh.index_buffer = mesh_index_buf;
