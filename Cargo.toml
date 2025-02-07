@@ -20,7 +20,7 @@ egui = { git = "https://github.com/emilk/egui/", rev = "50294b5d9f51d4c599c24366
 egui-wgpu = { git = "https://github.com/emilk/egui/", rev = "50294b5d9f51d4c599c243669c464f826ac51728", features = ["winit"] }
 egui-winit = { git = "https://github.com/emilk/egui/", rev = "50294b5d9f51d4c599c243669c464f826ac51728", default-features = false }
 pyo3 = { version = "0.23", features = ["py-clone"] }
-pyo3-build-config = { version = "0.23" }
+pyo3-build-config = { version = "0.23", features = ["resolve-config"] }
 numpy = { version = "0.23", features = ["nalgebra"] }
 pollster = "0.3.0"
 itertools = "0.10.5"

@@ -43,7 +43,7 @@ web-time = "1.1.0"
 slotmap = "1.0.2"
 clap = { version = "4.5.18", features = ["derive"] }
 
-[build-dependencies]
+[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 pyo3-build-config = { workspace = true }
 
 [dependencies.web-sys]
