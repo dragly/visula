@@ -358,16 +358,16 @@ impl Simulation {
 
         let mut world = hecs::World::new();
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut boids = vec![];
         for _ in 0..50 {
             boids.push(world.spawn((
                 Position {
-                    position: 20.0 * (1.0 - 2.0 * Vec3::new(rng.gen(), 0.5, rng.gen())),
+                    position: 20.0 * (1.0 - 2.0 * Vec3::new(rng.random(), 0.5, rng.random())),
                 },
                 Boid {
-                    velocity: 5.0 * Vec3::new(rng.gen(), 0.0, rng.gen()).normalize(),
-                    angular_velocity: 2.0 * rng.gen::<f32>() - 1.0,
+                    velocity: 5.0 * Vec3::new(rng.random(), 0.0, rng.random()).normalize(),
+                    angular_velocity: 2.0 * rng.random::<f32>() - 1.0,
                 },
             )));
         }

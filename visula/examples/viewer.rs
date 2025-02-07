@@ -1,4 +1,6 @@
-use std::{fs::File, io::Cursor, path::Path};
+#[cfg(not(target_arch = "wasm32"))]
+use std::fs::File;
+use std::{io::Cursor, path::Path};
 use visula::Renderable;
 
 use bytemuck::{Pod, Zeroable};
@@ -75,6 +77,7 @@ struct Error {}
 
 impl Simulation {
     fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
+        #[cfg(not(target_arch = "wasm32"))]
         let args = Cli::parse();
         let sphere_buffer = InstanceBuffer::<SpherePrimitive>::new(&application.device);
         let sphere = sphere_buffer.instance();
@@ -104,20 +107,34 @@ impl Simulation {
             },
         )
         .unwrap();
-        let mut simulation = Simulation {
-            render_mode: RenderMode::Points,
-            sphere_buffer,
-            spheres: points,
-            mesh,
-            settings: settings_data,
-            settings_buffer,
-        };
         #[cfg(not(target_arch = "wasm32"))]
-        if let Some(filename) = &args.load_zdf {
-            let input = File::open(filename).unwrap();
-            simulation.handle_zdf(application, input);
+        {
+            let mut simulation = Simulation {
+                render_mode: RenderMode::Points,
+                sphere_buffer,
+                spheres: points,
+                mesh,
+                settings: settings_data,
+                settings_buffer,
+            };
+            if let Some(filename) = &args.load_zdf {
+                let input = File::open(filename).unwrap();
+                simulation.handle_zdf(application, input);
+            }
+            Ok(simulation)
         }
-        Ok(simulation)
+        #[cfg(target_arch = "wasm32")]
+        {
+            let simulation = Simulation {
+                render_mode: RenderMode::Points,
+                sphere_buffer,
+                spheres: points,
+                mesh,
+                settings: settings_data,
+                settings_buffer,
+            };
+            Ok(simulation)
+        }
     }
 }
 

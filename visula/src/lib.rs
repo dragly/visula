@@ -1,5 +1,5 @@
 #[cfg(target_arch = "wasm32")]
-use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::JsCast;
 #[cfg(target_arch = "wasm32")]
 use web_sys::HtmlCanvasElement;
 use winit::application::ApplicationHandler;
@@ -10,14 +10,10 @@ use winit::event_loop::ActiveEventLoop;
 use winit::event_loop::EventLoop;
 use winit::event_loop::EventLoopProxy;
 #[cfg(target_arch = "wasm32")]
-use winit::platform::web::EventLoopExtWebSys;
-#[cfg(target_arch = "wasm32")]
 use winit::platform::web::WindowAttributesExtWebSys;
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::WindowExtWebSys;
 
-#[cfg(target_arch = "wasm32")]
-use js_sys::Uint8Array;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 use winit::window::WindowId;
@@ -244,7 +240,6 @@ pub fn create_window_with_config(config: &RunConfig, event_loop: &ActiveEventLoo
                 .body()
                 .expect("should have a body on document")
                 .append_child(&web_sys::Element::from(window_canvas))
-                .ok()
                 .expect("couldn't append canvas to document body");
         }
         Arc::new(window)

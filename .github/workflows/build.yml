@@ -15,6 +15,9 @@ jobs:
         rust:
           - stable
           - 1.84.0  # Minimum supported Rust version
+        target:
+          - x86_64-unknown-linux-gnu
+          - wasm32-unknown-unknown
 
     steps:
       - uses: actions/checkout@v2
@@ -43,14 +46,16 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.rust }}
+          targets: ${{ matrix.target }}
           components: clippy, rustfmt
       - name: Check formatting
         run: cargo fmt --all --check
       - name: Check
-        run: cargo check --all-features --all-targets
+        run: cargo check --all-features --all-targets --target ${{ matrix.target }}
       - name: Build
-        run: cargo build --all-features --all-targets
+        run: cargo build --all-features --all-targets --target ${{ matrix.target }}
       - name: Test
-        run: cargo test --all-features --all-targets
+        if: matrix.target != 'wasm32-unknown-unknown'
+        run: cargo test --all-features --all-targets --target ${{ matrix.target }}
       - name: Clippy
-        run: cargo clippy --all-features --all-targets -- -D warnings
+        run: cargo clippy --all-features --all-targets --target ${{ matrix.target }} -- -D warnings
