@@ -227,6 +227,7 @@ pub fn create_window_with_config(config: &RunConfig, event_loop: &ActiveEventLoo
             builder = builder.with_canvas(Some(canvas));
             canvas_existed = true;
         }
+        builder = builder.with_active(false);
         let window = event_loop.create_window(builder).unwrap();
         if !canvas_existed {
             let window_canvas = window.canvas().expect("should have made canvas");
