@@ -34,7 +34,7 @@ proc-macro2 = "1.0.29"
 crude-profiler = "0.1.7"
 hecs = "0.10.3"
 strum = { version = "0.25.0", features = ["derive"] }
-rand = "0.8.5"
+rand = "0.9"
 chrono = "0.4.37"
 oxifive = { git = "https://github.com/dragly/oxifive", rev = "552366bd4d65c0fb09582517a9bfe5300ce84e22" }
 web-time = "1.1.0"
@@ -43,7 +43,7 @@ web-time = "1.1.0"
 slotmap = "1.0.2"
 clap = { version = "4.5.18", features = ["derive"] }
 
-[build-dependencies]
+[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 pyo3-build-config = { workspace = true }
 
 [dependencies.web-sys]
@@ -66,3 +66,4 @@ env_logger = {workspace = true}
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"
 console_log = "0.2.0"
+getrandom = { version = "0.3", features = ["wasm_js"] }
