@@ -4,12 +4,15 @@ use web_time::Instant;
 use crate::camera::uniforms::CameraUniforms;
 use glam::{Mat4, Quat, Vec2, Vec3};
 
-use winit::event::{
-    DeviceEvent, ElementState, MouseButton,
-    MouseScrollDelta::{LineDelta, PixelDelta},
-    WindowEvent,
-};
 use winit::window::{Window, WindowId};
+use winit::{
+    dpi::PhysicalPosition,
+    event::{
+        DeviceEvent, ElementState, MouseButton,
+        MouseScrollDelta::{LineDelta, PixelDelta},
+        TouchPhase, WindowEvent,
+    },
+};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum State {
@@ -40,6 +43,7 @@ pub struct CameraController {
     right_pressed: bool,
     control_pressed: bool,
     pub enabled: bool,
+    pub zoom_enabled: bool,
     pub rotational_speed: f32,
     pub roll_speed: f32,
     state: State,
@@ -48,6 +52,7 @@ pub struct CameraController {
     pub current_transform: CameraTransform,
     pub target_transform: CameraTransform,
     pub smoothing: f32,
+    last_touch_position: Option<PhysicalPosition<f64>>,
 }
 
 #[derive(Clone, Debug)]
@@ -86,6 +91,7 @@ impl CameraController {
         };
         CameraController {
             enabled: true,
+            zoom_enabled: true,
             left_pressed: false,
             right_pressed: false,
             control_pressed: false,
@@ -97,6 +103,7 @@ impl CameraController {
             target_transform: transform.clone(),
             previous_time: Instant::now(),
             smoothing: 0.8,
+            last_touch_position: None,
         }
     }
 
@@ -222,7 +229,7 @@ impl CameraController {
                     .state()
                     .contains(winit::keyboard::ModifiersState::CONTROL);
             }
-            WindowEvent::MouseWheel { delta, .. } => {
+            WindowEvent::MouseWheel { delta, .. } if self.zoom_enabled => {
                 let diff = match delta {
                     LineDelta(_x, y) => *y,
                     PixelDelta(delta) => 0.04 * delta.y as f32,
@@ -260,6 +267,50 @@ impl CameraController {
                     }
                 },
                 _ => {}
+            },
+            WindowEvent::Touch(touch) => match touch.phase {
+                TouchPhase::Started => {
+                    self.left_pressed = true;
+                    self.state = State::PressedWaiting;
+                }
+                TouchPhase::Ended => {
+                    self.left_pressed = false;
+                    self.state = State::Released;
+                }
+                TouchPhase::Moved => {
+                    let up = self.target_transform.up.normalize();
+                    let forward = self.target_transform.forward.normalize();
+                    let right = Vec3::cross(forward, up).normalize();
+
+                    let position_diff = match self.last_touch_position {
+                        None => Vec2::ZERO,
+                        Some(last) => Vec2 {
+                            x: (touch.location.x - last.x) as f32,
+                            y: (touch.location.y - last.y) as f32,
+                        },
+                    };
+                    if (position_diff.x + position_diff.y).abs() < 0.000001 {
+                        return CameraControllerResponse {
+                            needs_redraw: false,
+                            captured_event: false,
+                        };
+                    }
+                    let rotation_x = Quat::from_axis_angle(
+                        self.target_transform.true_up,
+                        -self.rotational_speed * position_diff.x,
+                    );
+                    let rotation_y =
+                        Quat::from_axis_angle(right, -self.rotational_speed * position_diff.y);
+                    self.target_transform.forward =
+                        (rotation_x * rotation_y * self.target_transform.forward).normalize();
+                    self.target_transform.up =
+                        (rotation_x * rotation_y * self.target_transform.up).normalize();
+                    self.last_touch_position = Some(touch.location);
+                }
+                TouchPhase::Cancelled => {
+                    self.left_pressed = false;
+                    self.state = State::Released;
+                }
             },
             _ => {}
         }
