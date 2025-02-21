@@ -556,7 +556,7 @@ pub struct PyApplication {
 
 #[pyclass(unsendable)]
 pub struct PyEventLoop {
-    event_loop: EventLoop<CustomEvent>,
+    event_loop: Option<EventLoop<CustomEvent>>,
 }
 
 #[pymethods]
@@ -565,20 +565,27 @@ impl PyEventLoop {
     fn new() -> Self {
         initialize_logger();
         let event_loop = create_event_loop();
-        Self { event_loop }
+        Self {
+            event_loop: Some(event_loop),
+        }
     }
 }
 
 #[pymethods]
 impl PyApplication {
     #[new]
-    fn new(event_loop: &PyEventLoop) -> Self {
+    fn new(py_event_loop: &PyEventLoop) -> Self {
+        let event_loop = py_event_loop
+            .event_loop
+            .as_ref()
+            .expect("Event loop already consumed!");
+
         Self {
             application: None,
             renderables: Vec::new(),
             controls: Vec::new(),
             update: None,
-            event_loop_proxy: event_loop.event_loop.create_proxy(),
+            event_loop_proxy: event_loop.create_proxy(),
         }
     }
 }
@@ -730,7 +737,8 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
 #[pyfunction]
 fn show(
     py: Python,
-    py_application: &Bound<PyApplication>,
+    py_event_loop: Bound<PyEventLoop>,
+    py_application: Bound<PyApplication>,
     py_renderables: Vec<PyObject>,
     update: Py<PyFunction>,
     controls: Vec<Py<PySlider>>,
@@ -779,6 +787,16 @@ fn show(
         py_application_mut.update = Some(update);
         py_application_mut.controls = controls;
     }
+
+    let event_loop = py_event_loop
+        .borrow_mut()
+        .event_loop
+        .take()
+        .expect("Event loop already consumed!");
+
+    event_loop
+        .run_app(&mut *py_application.borrow_mut())
+        .expect("Failed to run event loop!");
 
     Ok(())
 }
