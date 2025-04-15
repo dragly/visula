@@ -256,7 +256,7 @@ impl CameraController {
                     let ndc_ray = Vec4::new(
                         2.0 * position.x as f32 / self.window_size.width as f32 - 1.0,
                         1.0 - 2.0 * position.y as f32 / self.window_size.height as f32,
-                        -1.0,
+                        0.0,
                         1.0,
                     );
                     let mut camera_ray = self
@@ -270,11 +270,13 @@ impl CameraController {
                         .xyz()
                         .normalize();
                     let camera_position = self.target_transform.position();
+                    let camera_center = self.target_transform.center;
+                    let camera_forward = self.target_transform.forward;
                     let t = match self.drag_plane {
                         DragPlane::Z => -camera_position.y / world_ray.y,
                         DragPlane::Camera => {
-                            self.target_transform.distance
-                                / self.target_transform.forward.dot(world_ray)
+                            (camera_center - camera_position).dot(camera_forward)
+                                / camera_forward.dot(world_ray)
                         }
                     };
                     let intersection = camera_position + t * world_ray;
