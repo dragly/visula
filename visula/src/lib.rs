@@ -42,6 +42,7 @@ pub mod custom_event;
 pub mod drop_event;
 pub mod error;
 pub mod io;
+pub mod painter;
 pub mod pipelines;
 pub mod primitives;
 pub mod render_pass;
