@@ -38,6 +38,9 @@ rand = "0.9"
 chrono = "0.4.37"
 oxifive = { git = "https://github.com/dragly/oxifive", rev = "552366bd4d65c0fb09582517a9bfe5300ce84e22" }
 web-time = "1.1.0"
+catppuccin = "2.5.1"
+lyon = "1.0.1"
+ttf-parser = "0.25.1"
 
 [dev-dependencies]
 slotmap = "1.0.2"
