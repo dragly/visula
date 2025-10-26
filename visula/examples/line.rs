@@ -132,14 +132,13 @@ impl ApplicationHandler<CustomEvent> for App {
             WindowEvent::CloseRequested => event_loop.exit(),
             _ => {}
         }
-        // application.handle_event(&event);
     }
 
     fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: CustomEvent) {
         match event {
             CustomEvent::Application(application) => {
                 application.window.request_redraw();
-                self.application = Some(application);
+                self.application = Some(*application);
             }
             CustomEvent::DropEvent(_) => {}
         }

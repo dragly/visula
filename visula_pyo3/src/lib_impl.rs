@@ -369,7 +369,7 @@ struct PyInstanceBuffer {
 #[pymethods]
 impl PyInstanceBuffer {
     #[new]
-    fn new(py: Python, pyapplication: &PyApplication, obj: PyObject) -> Self {
+    fn new(py: Python, pyapplication: &PyApplication, obj: Py<PyAny>) -> Self {
         let PyApplication { application, .. } = pyapplication;
         let Some(application) = application else {
             panic!("Application not yet initialized");
@@ -394,7 +394,7 @@ impl PyInstanceBuffer {
         &self,
         py: Python,
         pyapplication: &PyApplication,
-        data: PyObject,
+        data: Py<PyAny>,
     ) -> PyResult<()> {
         let PyApplication { application, .. } = pyapplication;
         let Some(application) = application else {
@@ -437,7 +437,7 @@ fn vec3(x: &PyExpression, y: &PyExpression, z: &PyExpression) -> PyExpression {
 }
 
 #[pyfunction]
-fn convert(py: Python, pyapplication: &PyApplication, obj: PyObject) -> PyExpression {
+fn convert(py: Python, pyapplication: &PyApplication, obj: Py<PyAny>) -> PyExpression {
     let PyApplication { application, .. } = pyapplication;
     let Some(application) = application else {
         panic!("Application not yet initialized");
@@ -635,7 +635,7 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
                                 .egui_ctx()
                                 .run(raw_input, |ctx| {
                                     egui::Window::new("Settings").show(ctx, |ui| {
-                                        Python::with_gil(|py| {
+                                        Python::attach(|py| {
                                             for slider in &mut self.controls {
                                                 let mut slider_mut = slider.borrow_mut(py);
                                                 let minimum = slider_mut.minimum;
@@ -683,6 +683,7 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
                             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                                 view: &view,
                                 resolve_target: None,
+                                depth_slice: None,
                                 ops: wgpu::Operations {
                                     load: wgpu::LoadOp::Load,
                                     store: wgpu::StoreOp::Store,
@@ -707,10 +708,10 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
                     application.update();
                     application.window.request_redraw();
                 }
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     let result = update.call(py, (), None);
                     if let Err(err) = result {
-                        println!("Could not call update: {:?}", err);
+                        println!("Could not call update: {err:?}");
                         println!("{}", err.traceback(py).unwrap().format().unwrap());
                     }
                 });
@@ -721,7 +722,7 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
     }
     fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: CustomEvent) {
         match event {
-            CustomEvent::Application(application) => self.application = Some(application),
+            CustomEvent::Application(application) => self.application = Some(*application),
             CustomEvent::DropEvent(_) => {}
         }
     }
@@ -731,7 +732,7 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
 fn show(
     py: Python,
     py_application: &Bound<PyApplication>,
-    py_renderables: Vec<PyObject>,
+    py_renderables: Vec<Py<PyAny>>,
     update: Py<PyFunction>,
     controls: Vec<Py<PySlider>>,
 ) -> PyResult<()> {

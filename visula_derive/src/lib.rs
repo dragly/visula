@@ -40,12 +40,10 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                 _ => unimplemented!(),
             };
             let pyclass_struct_name = format_ident!("Py{}", struct_ident);
-            let pyclass_attribute: TokenStream2 = format!(
-                "#[::pyo3::pyclass(name = \"{}\", unsendable)]",
-                struct_ident
-            )
-            .parse()
-            .unwrap();
+            let pyclass_attribute: TokenStream2 =
+                format!("#[::pyo3::pyclass(name = \"{struct_ident}\", unsendable)]")
+                    .parse()
+                    .unwrap();
             quote! {
                 #[cfg(not(target_arch = "wasm32"))]
                 #pyclass_attribute
@@ -134,7 +132,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
                                                 location: previous_shader_location_offset + #shader_location,
                                                 interpolation: None,
                                                 sampling: None,
-                                                second_blend_source: false,
+                                                blend_src: None,
                                             }),
                                         });
                                 }

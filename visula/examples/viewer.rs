@@ -29,7 +29,7 @@ enum RenderMode {
 
 impl std::fmt::Display for RenderMode {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -160,7 +160,7 @@ impl visula::Simulation for Simulation {
                 ..
             } => match window_event {
                 WindowEvent::DroppedFile(path) => {
-                    log::info!("Dropped file {:?}", path);
+                    log::info!("Dropped file {path:?}");
                     let bytes = std::fs::read(path).unwrap();
                     let drop_event = DropEvent {
                         name: path.to_str().unwrap().to_string(),
@@ -174,7 +174,7 @@ impl visula::Simulation for Simulation {
                                     self.handle_zdf(app, input);
                                 }
                                 _ => {
-                                    log::warn!("Unsupported format {}", extension);
+                                    log::warn!("Unsupported format {extension}");
                                 }
                             }
                         }
@@ -207,7 +207,7 @@ impl visula::Simulation for Simulation {
                                 self.handle_zdf(app, input);
                             }
                             _ => {
-                                log::warn!("Unsupported format {}", extension);
+                                log::warn!("Unsupported format {extension}");
                             }
                         }
                     }

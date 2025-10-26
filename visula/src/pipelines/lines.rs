@@ -101,14 +101,14 @@ impl Lines {
             usage: wgpu::BufferUsages::INDEX | BufferUsages::COPY_DST,
         });
 
-        log::debug!("Validating line shader\n{:#?}", module);
+        log::debug!("Validating line shader\n{module:#?}");
         let info =
             naga::valid::Validator::new(ValidationFlags::empty(), naga::valid::Capabilities::all())
                 .validate(&module)
                 .unwrap();
         let output_str =
             naga::back::wgsl::write_string(&module, &info, WriterFlags::all()).unwrap();
-        log::debug!("Resulting lines shader code:\n{}", output_str);
+        log::debug!("Resulting lines shader code:\n{output_str}");
 
         let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
@@ -268,7 +268,7 @@ impl Renderable for Lines {
             let mut instance_count = 0;
             for (binding, buffer) in bindings.iter() {
                 let slot = binding.slot;
-                log::trace!("Setting vertex buffer {}", slot);
+                log::trace!("Setting vertex buffer {slot}");
                 render_pass.set_vertex_buffer(slot, buffer.slice(..));
                 instance_count = instance_count.max(binding.inner.borrow().count);
             }
