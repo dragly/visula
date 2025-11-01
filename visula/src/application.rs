@@ -64,8 +64,6 @@ impl EguiRenderer {
     pub fn new(
         device: &Device,
         output_color_format: TextureFormat,
-        output_depth_format: Option<TextureFormat>,
-        msaa_samples: u32,
         window: &Window,
     ) -> EguiRenderer {
         let egui_context = Context::default();
@@ -81,9 +79,11 @@ impl EguiRenderer {
         let egui_renderer = egui_wgpu::Renderer::new(
             device,
             output_color_format,
-            output_depth_format,
-            msaa_samples,
-            false,
+            egui_wgpu::RendererOptions {
+                depth_stencil_format: None,
+                msaa_samples: 1,
+                ..Default::default()
+            },
         );
 
         EguiRenderer {
@@ -108,12 +108,18 @@ impl Application {
         let instance = wgpu::Instance::new(&InstanceDescriptor {
             backends,
             backend_options: BackendOptions {
-                gl: GlBackendOptions { gles_minor_version },
+                gl: GlBackendOptions {
+                    gles_minor_version,
+                    fence_behavior: wgpu::GlFenceBehavior::default(),
+                },
                 dx12: Dx12BackendOptions {
                     shader_compiler: dx12_shader_compiler,
+                    ..Default::default()
                 },
+                noop: wgpu::NoopBackendOptions::default(),
             },
             flags: wgpu::InstanceFlags::from_build_config().with_env(),
+            memory_budget_thresholds: wgpu::MemoryBudgetThresholds::default(),
         });
         let surface = instance.create_surface(window.clone()).unwrap();
         let adapter = instance
@@ -126,18 +132,17 @@ impl Application {
             .expect("Failed to find an appropriate adapter");
 
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: None,
-                    required_features: wgpu::Features::empty(),
-                    #[cfg(target_arch = "wasm32")]
-                    required_limits: wgpu::Limits::downlevel_webgl2_defaults(),
-                    #[cfg(not(target_arch = "wasm32"))]
-                    required_limits: wgpu::Limits::default(),
-                    memory_hints: wgpu::MemoryHints::Performance,
-                },
-                None,
-            )
+            .request_device(&wgpu::DeviceDescriptor {
+                label: None,
+                required_features: wgpu::Features::empty(),
+                #[cfg(target_arch = "wasm32")]
+                required_limits: wgpu::Limits::downlevel_webgl2_defaults(),
+                #[cfg(not(target_arch = "wasm32"))]
+                required_limits: wgpu::Limits::default(),
+                memory_hints: wgpu::MemoryHints::Performance,
+                experimental_features: Default::default(),
+                trace: Default::default(),
+            })
             .await
             .unwrap();
 
@@ -175,7 +180,7 @@ impl Application {
         let camera = Camera::new(&device);
 
         let egui_ctx = create_egui_context();
-        let egui_renderer = EguiRenderer::new(&device, surface_view_format, None, 1, &window);
+        let egui_renderer = EguiRenderer::new(&device, surface_view_format, &window);
 
         Application {
             device,
@@ -314,6 +319,7 @@ impl Application {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: &self.multisampled_framebuffer,
                 resolve_target: Some(view),
+                depth_slice: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(clear_color),
                     store: wgpu::StoreOp::Store,
@@ -384,6 +390,7 @@ impl Application {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: &view,
                 resolve_target: None,
+                depth_slice: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Load,
                     store: wgpu::StoreOp::Store,
@@ -406,7 +413,7 @@ impl Application {
         frame.present();
     }
 
-    pub fn rendering_descriptor(&self) -> RenderingDescriptor {
+    pub fn rendering_descriptor(&self) -> RenderingDescriptor<'_> {
         RenderingDescriptor {
             device: &self.device,
             format: &self.config.format,

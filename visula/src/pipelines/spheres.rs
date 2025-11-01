@@ -97,7 +97,7 @@ impl Spheres {
                 .unwrap();
         let output_str =
             naga::back::wgsl::write_string(&module, &info, WriterFlags::all()).unwrap();
-        log::debug!("Resulting spheres shader code:\n{}", output_str);
+        log::debug!("Resulting spheres shader code:\n{output_str}");
 
         let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
@@ -257,7 +257,7 @@ impl Renderable for Spheres {
             let mut instance_count = 0;
             for (binding, buffer) in bindings.iter() {
                 let slot = binding.slot;
-                log::debug!("Setting vertex buffer {}", slot);
+                log::debug!("Setting vertex buffer {slot}");
                 render_pass.set_vertex_buffer(slot, buffer.slice(..));
                 instance_count = instance_count.max(binding.inner.borrow().count);
             }
@@ -265,7 +265,7 @@ impl Renderable for Spheres {
                 log::debug!("Setting bind group {}", 1);
                 render_pass.set_bind_group(1, bind_group, &[]);
             }
-            log::debug!("Drawing {} instances", instance_count);
+            log::debug!("Drawing {instance_count} instances");
             render_pass.draw_indexed(0..self.index_count as u32, 0, 0..instance_count as u32);
         }
     }

@@ -16,6 +16,7 @@ impl DefaultRenderPassDescriptor<'_> {
         let color_attachments = [Some(wgpu::RenderPassColorAttachment {
             view: multisampled_framebuffer,
             resolve_target: Some(view),
+            depth_slice: None,
             ops: wgpu::Operations {
                 load: wgpu::LoadOp::Load,
                 store: wgpu::StoreOp::Store,
@@ -27,7 +28,7 @@ impl DefaultRenderPassDescriptor<'_> {
             depth_texture,
         }
     }
-    pub fn build(&self) -> RenderPassDescriptor {
+    pub fn build(&self) -> RenderPassDescriptor<'_> {
         wgpu::RenderPassDescriptor {
             label: Some(&self.label),
             color_attachments: &self.color_attachments,

@@ -152,7 +152,7 @@ where
         match event {
             CustomEvent::Application(application) => {
                 application.window.request_redraw();
-                self.application = Some(application);
+                self.application = Some(*application);
             }
             CustomEvent::DropEvent(_) => {}
         }
@@ -264,7 +264,7 @@ pub fn create_application(window: Arc<Window>, event_loop_proxy: &EventLoopProxy
     {
         let application = pollster::block_on(async move { Application::new(window_handle).await });
         assert!(proxy
-            .send_event(CustomEvent::Application(application))
+            .send_event(CustomEvent::Application(Box::new(application)))
             .is_ok());
     }
 
@@ -273,7 +273,7 @@ pub fn create_application(window: Arc<Window>, event_loop_proxy: &EventLoopProxy
         wasm_bindgen_futures::spawn_local(async move {
             let application = Application::new(window_handle).await;
             assert!(proxy
-                .send_event(CustomEvent::Application(application))
+                .send_event(CustomEvent::Application(Box::new(application)))
                 .is_ok());
         });
     }

@@ -17,7 +17,7 @@ pub struct VertexBufferLayoutBuilder {
 }
 
 impl VertexBufferLayoutBuilder {
-    pub fn build(&self) -> VertexBufferLayout {
+    pub fn build(&self) -> VertexBufferLayout<'_> {
         VertexBufferLayout {
             array_stride: self.array_stride,
             step_mode: self.step_mode,

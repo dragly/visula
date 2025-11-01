@@ -78,7 +78,7 @@ pub fn inject(
             .validate(module)
             .unwrap();
     let output_str = naga::back::wgsl::write_string(module, &info, WriterFlags::all()).unwrap();
-    log::debug!("Resulting lines shader code:\n{}", output_str);
+    log::debug!("Resulting lines shader code:\n{output_str}");
 }
 
 #[cfg(test)]
