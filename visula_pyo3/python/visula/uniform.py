@@ -1,11 +1,12 @@
-from dataclasses import dataclass, fields
 import sys
+from dataclasses import dataclass, fields
 from typing import Type
 
+import numpy as np
+
+from ._visula_pyo3 import PyUniformBuffer, PyUniformField
 from .application import Visula
 from .expression import Expression
-from ._visula_pyo3 import PyUniformBuffer, PyUniformField
-import numpy as np
 
 
 def _target_type(ty: Type) -> Type:
@@ -22,14 +23,21 @@ class Uniform:
         for field in fields(self):
             size = np.dtype(_target_type(field.type)).itemsize
             total_size += size
-            uniform_fields.append(PyUniformField(name=field.name, ty="float", size=size))
+            uniform_fields.append(
+                PyUniformField(name=field.name, ty="float", size=size)
+            )
 
-        self._inner = PyUniformBuffer(Visula.application(), uniform_fields, type(self).__name__)
+        self._inner = PyUniformBuffer(
+            Visula.application(), uniform_fields, type(self).__name__
+        )
         self._size = total_size
         self._buffer = np.zeros(self._size, dtype=np.uint8)
 
     def instance(self):
-        new_fields = {field.name: self._inner.field(index) for index, field in enumerate(fields(self))}
+        new_fields = {
+            field.name: self._inner.field(index)
+            for index, field in enumerate(fields(self))
+        }
         result = type("UniformInstance", (object,), new_fields)()
         # TODO: Create instance on Rust side that
         # includes the relevant code to generate the shader
@@ -48,4 +56,4 @@ class Uniform:
             )
             offset += itemsize
 
-        self._inner.update(Visula.application(), buffer=self._buffer)
+        self._inner.update(buffer=self._buffer)
