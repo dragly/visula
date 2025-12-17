@@ -346,7 +346,7 @@ impl PyUniformBuffer {
                 bind_group_layout: self.inner.borrow().bind_group_layout.clone(),
                 buffer_handle: self.inner.borrow().handle,
                 inner: self.inner.clone(),
-                integrate_buffer: Rc::new(RefCell::new(integrate)),
+                integrate_uniform: Rc::new(RefCell::new(integrate)),
             }),
         }
     }

@@ -25,7 +25,7 @@ pub struct UniformField {
     pub buffer_handle: uuid::Uuid,
     pub field_index: usize,
     pub inner: Rc<RefCell<UniformBufferInner>>,
-    pub integrate_buffer: IntegrateUniform,
+    pub integrate_uniform: IntegrateUniform,
 }
 
 pub trait UniformHandle {}

@@ -79,6 +79,7 @@ pub fn parse_gltf(
                                     vertices.push(MeshVertexAttributes {
                                         position,
                                         normal,
+                                        uv: [0.0, 0.0],
                                         color,
                                     });
                                 }

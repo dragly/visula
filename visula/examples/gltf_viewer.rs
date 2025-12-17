@@ -4,9 +4,10 @@ use glam::{Quat, Vec3};
 use std::io::BufReader;
 
 use clap::Parser;
+use glam::Vec4;
 use visula::{
     io::gltf::{parse_gltf, GltfMesh},
-    MeshDelegate, MeshPipeline, RenderData,
+    MeshGeometry, MeshMaterial, MeshPipeline, RenderData,
 };
 
 #[derive(Parser)]
@@ -49,10 +50,13 @@ impl Simulation {
             .map(|mesh| {
                 let mut mesh_pipeline = MeshPipeline::new(
                     &application.rendering_descriptor(),
-                    &MeshDelegate {
+                    &MeshGeometry {
                         position: Vec3::new(0.0, 0.0, 0.0).into(),
                         rotation: Quat::IDENTITY.into(),
                         scale: Vec3::ONE.into(),
+                    },
+                    &MeshMaterial {
+                        color: Vec4::ONE.into(),
                     },
                 )
                 .unwrap();

@@ -1,7 +1,7 @@
 #[cfg(not(target_arch = "wasm32"))]
 use std::fs::File;
 use std::{io::Cursor, path::Path};
-use visula::Renderable;
+use visula::{MeshMaterial, Renderable};
 
 use bytemuck::{Pod, Zeroable};
 use clap::Parser;
@@ -9,8 +9,9 @@ use glam::{Quat, Vec3};
 use oxifive::ReadSeek;
 use winit::event::{Event, KeyEvent, WindowEvent};
 
+use glam::Vec4;
 use visula::{
-    CustomEvent, DropEvent, InstanceBuffer, MeshDelegate, MeshPipeline, RenderData, SphereDelegate,
+    CustomEvent, DropEvent, InstanceBuffer, MeshGeometry, MeshPipeline, RenderData, SphereDelegate,
     SpherePrimitive, Spheres, UniformBuffer,
 };
 use visula_derive::Uniform;
@@ -100,10 +101,13 @@ impl Simulation {
         .unwrap();
         let mesh = MeshPipeline::new(
             &application.rendering_descriptor(),
-            &MeshDelegate {
+            &MeshGeometry {
                 position: Vec3::new(0.0, 0.0, 0.0).into(),
                 rotation: Quat::IDENTITY.into(),
                 scale: Vec3::ONE.into(),
+            },
+            &MeshMaterial {
+                color: Vec4::splat(1.0).into(),
             },
         )
         .unwrap();

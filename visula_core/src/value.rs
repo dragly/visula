@@ -3,7 +3,9 @@ use std::{
     ops::{Add, Deref, Div, Mul, Neg, Rem, Sub},
 };
 
-use crate::{BindingBuilder, InstanceField, UniformField};
+use naga::{GlobalVariable, ResourceBinding, Span};
+
+use crate::{BindingBuilder, InstanceField, TextureField, UniformField};
 
 #[derive(Clone)]
 pub struct ExpressionInner {
@@ -24,6 +26,7 @@ pub enum Expression {
     Literal(naga::Literal),
     InstanceField(InstanceField),
     UniformField(UniformField),
+    TextureField(TextureField),
     Vector2 {
         x: ExpressionInner,
         y: ExpressionInner,
@@ -49,6 +52,7 @@ pub enum Expression {
     Cos(ExpressionInner),
     Sin(ExpressionInner),
     Tan(ExpressionInner),
+    UV,
 }
 
 impl Expression {
@@ -361,8 +365,8 @@ impl Expression {
                     )
             }
             Expression::InstanceField(field) => {
-                if !binding_builder.bindings.contains_key(&field.buffer_handle) {
-                    (field.integrate_buffer)(
+                if !binding_builder.instances.contains_key(&field.buffer_handle) {
+                    (field.integrate_instance)(
                         &field.inner,
                         &field.buffer_handle,
                         module,
@@ -374,17 +378,101 @@ impl Expression {
                     .expressions
                     .append(
                         naga::Expression::FunctionArgument(
-                            binding_builder.bindings[&field.buffer_handle].fields
+                            binding_builder.instances[&field.buffer_handle].fields
                                 [field.field_index]
                                 .function_argument,
                         ),
                         naga::Span::default(),
                     )
             }
+            Expression::TextureField(field) => {
+                binding_builder
+                    .textures
+                    .entry(field.handle)
+                    .or_insert(crate::TextureBinding {
+                        inner: field.inner.clone(),
+                    });
+                let sampler_type = module.types.insert(
+                    naga::Type {
+                        name: None,
+                        inner: naga::TypeInner::Sampler { comparison: false },
+                    },
+                    naga::Span::default(),
+                );
+                let sampler_variable = module.global_variables.append(
+                    GlobalVariable {
+                        name: Some("u_sampler".to_string()),
+                        space: naga::AddressSpace::Handle,
+                        binding: Some(ResourceBinding {
+                            group: 1,
+                            binding: 0,
+                        }),
+                        ty: sampler_type,
+                        init: None,
+                    },
+                    Span::default(),
+                );
+                let texture_type = module.types.insert(
+                    naga::Type {
+                        name: None,
+                        inner: naga::TypeInner::Image {
+                            dim: naga::ImageDimension::D2,
+                            arrayed: false,
+                            class: naga::ImageClass::Sampled {
+                                kind: naga::ScalarKind::Float,
+                                multi: false,
+                            },
+                        },
+                    },
+                    naga::Span::default(),
+                );
+                let texture = module.global_variables.append(
+                    GlobalVariable {
+                        name: Some("u_texture".to_string()),
+                        space: naga::AddressSpace::Handle,
+                        binding: Some(ResourceBinding {
+                            group: 1,
+                            binding: 1,
+                        }),
+                        ty: texture_type,
+                        init: None,
+                    },
+                    Span::default(),
+                );
+                let image = module.entry_points[binding_builder.entry_point_index]
+                    .function
+                    .expressions
+                    .append(naga::Expression::GlobalVariable(texture), Span::default());
+                let sampler = module.entry_points[binding_builder.entry_point_index]
+                    .function
+                    .expressions
+                    .append(
+                        naga::Expression::GlobalVariable(sampler_variable),
+                        Span::default(),
+                    );
+                let coordinate = field.coordinate.setup(module, binding_builder);
+                module.entry_points[binding_builder.entry_point_index]
+                    .function
+                    .expressions
+                    .append(
+                        naga::Expression::ImageSample {
+                            image,
+                            sampler,
+                            gather: None,
+                            coordinate,
+                            array_index: None,
+                            offset: None,
+                            level: naga::SampleLevel::Auto,
+                            depth_ref: None,
+                            clamp_to_edge: false,
+                        },
+                        naga::Span::default(),
+                    )
+            }
             Expression::UniformField(field) => {
                 let inner = field.inner.borrow();
-                if !binding_builder.bindings.contains_key(&field.buffer_handle) {
-                    (field.integrate_buffer.borrow())(
+                if !binding_builder.instances.contains_key(&field.buffer_handle) {
+                    (field.integrate_uniform.borrow())(
                         &field.inner,
                         &field.buffer_handle,
                         module,
@@ -412,6 +500,23 @@ impl Expression {
                         naga::Span::default(),
                     )
             }
+            Expression::UV => {
+                let function_argument = module.entry_points[binding_builder.entry_point_index]
+                    .function
+                    .expressions
+                    .append(naga::Expression::FunctionArgument(0), Span::default());
+
+                module.entry_points[binding_builder.entry_point_index]
+                    .function
+                    .expressions
+                    .append(
+                        naga::Expression::AccessIndex {
+                            base: function_argument,
+                            index: 2,
+                        },
+                        Span::default(),
+                    )
+            }
         }
     }
 }
@@ -437,6 +542,9 @@ impl std::fmt::Debug for Expression {
             }
             Expression::InstanceField(_) => {
                 write!(fmt, "InstanceField")?;
+            }
+            Expression::TextureField(_) => {
+                write!(fmt, "TextureField")?;
             }
             Expression::UniformField(_) => {
                 write!(fmt, "UniformField")?;
@@ -470,6 +578,9 @@ impl std::fmt::Debug for Expression {
             }
             Expression::Tan(_) => {
                 write!(fmt, "Tan")?;
+            }
+            Expression::UV => {
+                write!(fmt, "UV")?;
             }
         }
         Ok(())
