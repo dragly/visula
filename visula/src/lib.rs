@@ -33,7 +33,8 @@ pub use cgmath;
 pub use egui_wgpu;
 pub use visula_core;
 pub use visula_core::{
-    glam, naga, uuid, wgpu, Expression, InstanceBuffer, InstanceDeviceExt, UniformBuffer,
+    glam, naga, uuid, wgpu, Expression, InstanceBuffer, InstanceDeviceExt, TextureInput,
+    UniformBuffer,
 };
 
 pub mod application;

@@ -69,7 +69,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                         let fields = vec![
                             #(#field_insertions)*
                         ];
-                        ::visula_core::inject::inject(module, binding_builder, ::visula_core::naga::ShaderStage::Vertex, shader_variable_name, &fields);
+                        ::visula_core::inject::inject(module, binding_builder,  shader_variable_name, &fields);
                     }
                 }
             }
@@ -142,7 +142,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
                                     buffer_handle: inner.borrow().handle,
                                     inner: inner.clone(),
                                     field_index: #field_index,
-                                    integrate_buffer: #instance_struct_name::integrate,
+                                    integrate_instance: #instance_struct_name::integrate,
                                 })
                             });
                             attributes.push(quote! {
@@ -190,7 +190,7 @@ pub fn instance(input: TokenStream) -> TokenStream {
 
                 #(#module_fields)*
 
-                binding_builder.bindings.insert(handle.clone(), visula_core::BufferBinding {
+                binding_builder.instances.insert(handle.clone(), visula_core::InstanceBinding {
                     layout: visula_core::VertexBufferLayoutBuilder {
                         array_stride: std::mem::size_of::<#name>() as ::visula_core::wgpu::BufferAddress,
                         step_mode: ::visula_core::wgpu::VertexStepMode::Instance,
@@ -285,7 +285,7 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                                     inner: inner.clone(),
                                     field_index: #field_index,
                                     bind_group_layout: inner.borrow().bind_group_layout.clone(),
-                                    integrate_buffer: ::std::rc::Rc::new(::std::cell::RefCell::new(#uniform_struct_name::integrate)),
+                                    integrate_uniform: ::std::rc::Rc::new(::std::cell::RefCell::new(#uniform_struct_name::integrate)),
                                 })
                             });
                             field_index += 1;

@@ -55,31 +55,37 @@ pub fn read_zdf<R: ReadSeek>(input: R, device: &mut wgpu::Device) -> ZdfFile {
                     position: [corner_tr[0], corner_tr[1], corner_tr[2]],
                     color,
                     normal: [1.0, 0.0, 0.0],
+                    uv: [0.0, 0.0],
                 });
                 vertices.push(MeshVertexAttributes {
                     position: [corner_tl[0], corner_tl[1], corner_tl[2]],
                     color,
                     normal: [1.0, 0.0, 0.0],
+                    uv: [0.0, 0.0],
                 });
                 vertices.push(MeshVertexAttributes {
                     position: [corner_br[0], corner_br[1], corner_br[2]],
                     color,
                     normal: [1.0, 0.0, 0.0],
+                    uv: [0.0, 0.0],
                 });
                 vertices.push(MeshVertexAttributes {
                     position: [corner_tl[0], corner_tl[1], corner_tl[2]],
                     color,
                     normal: [1.0, 0.0, 0.0],
+                    uv: [0.0, 0.0],
                 });
                 vertices.push(MeshVertexAttributes {
                     position: [corner_bl[0], corner_bl[1], corner_bl[2]],
                     color,
                     normal: [1.0, 0.0, 0.0],
+                    uv: [0.0, 0.0],
                 });
                 vertices.push(MeshVertexAttributes {
                     position: [corner_br[0], corner_br[1], corner_br[2]],
                     color,
                     normal: [1.0, 0.0, 0.0],
+                    uv: [0.0, 0.0],
                 });
             }
         }

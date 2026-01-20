@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::io::Cursor;
 use std::iter::FromIterator;
+use visula::MeshMaterial;
 use visula::Renderable;
 
 use bytemuck::{Pod, Zeroable};
@@ -13,7 +14,7 @@ use strum::EnumIter;
 use strum::IntoEnumIterator;
 use visula::io::gltf::{parse_gltf, GltfMesh};
 use visula::{
-    CustomEvent, InstanceBuffer, LineDelegate, Lines, MeshDelegate, MeshPipeline, RenderData,
+    CustomEvent, InstanceBuffer, LineDelegate, Lines, MeshGeometry, MeshPipeline, RenderData,
     SphereDelegate, Spheres,
 };
 use visula_derive::Instance;
@@ -332,10 +333,13 @@ impl Simulation {
 
         let mut mesh = MeshPipeline::new(
             &application.rendering_descriptor(),
-            &MeshDelegate {
+            &MeshGeometry {
                 position: mesh_instance.position,
                 rotation: mesh_instance.rotation,
                 scale: Vec3::ONE.into(),
+            },
+            &MeshMaterial {
+                color: Vec4::new(1.0, 1.0, 1.0, 1.0).into(),
             },
         )
         .unwrap();

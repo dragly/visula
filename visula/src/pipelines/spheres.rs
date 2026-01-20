@@ -6,7 +6,7 @@ use itertools::Itertools;
 use naga::{back::wgsl::WriterFlags, valid::ValidationFlags};
 use std::cell::Ref;
 use std::mem::size_of;
-use visula_core::{BindingBuilder, BufferBinding, Expression};
+use visula_core::{BindingBuilder, Expression, InstanceBinding};
 use visula_derive::Delegate;
 use wgpu::util::DeviceExt;
 use wgpu::{BindGroupLayout, BufferUsages, PipelineCompilationOptions};
@@ -207,7 +207,7 @@ impl Renderable for Spheres {
     ) {
         log::debug!("Rendering spheres");
         let mut count = None;
-        for binding in self.binding_builder.bindings.values() {
+        for binding in self.binding_builder.instances.values() {
             let other = binding.inner.borrow().count;
             if other == 0 {
                 count = None;
@@ -229,9 +229,9 @@ impl Renderable for Spheres {
             log::debug!("Empty spheres buffer detected. Aborting render of spheres.");
             return;
         }
-        let bindings: Vec<(&BufferBinding, Ref<wgpu::Buffer>)> = self
+        let bindings: Vec<(&InstanceBinding, Ref<wgpu::Buffer>)> = self
             .binding_builder
-            .bindings
+            .instances
             .values()
             .map(|v| (v, Ref::map(v.inner.borrow(), |v| &v.buffer)))
             .collect();

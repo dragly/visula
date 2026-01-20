@@ -5,5 +5,6 @@ use bytemuck::{Pod, Zeroable};
 pub struct MeshVertexAttributes {
     pub position: [f32; 3],
     pub normal: [f32; 3],
+    pub uv: [f32; 2],
     pub color: [u8; 4],
 }

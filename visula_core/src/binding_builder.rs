@@ -1,7 +1,7 @@
-use crate::{InstanceBufferInner, UniformBufferInner};
+use crate::{InstanceBufferInner, TextureBufferInner, UniformBufferInner};
 use itertools::Itertools;
-use naga::Module;
 use naga::{Expression, Handle};
+use naga::{Module, ShaderStage};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -32,11 +32,15 @@ pub struct BufferBindingField {
 }
 
 #[derive(Clone, Debug)]
-pub struct BufferBinding {
+pub struct InstanceBinding {
     pub slot: u32,
     pub fields: Vec<BufferBindingField>,
     pub layout: VertexBufferLayoutBuilder,
     pub inner: Rc<RefCell<InstanceBufferInner>>,
+}
+
+pub struct TextureBinding {
+    pub inner: Rc<RefCell<TextureBufferInner>>,
 }
 
 pub struct UniformBinding {
@@ -45,18 +49,21 @@ pub struct UniformBinding {
     pub inner: Rc<RefCell<UniformBufferInner>>,
 }
 
-pub type BindingMap = HashMap<uuid::Uuid, BufferBinding>;
+pub type InstanceMap = HashMap<uuid::Uuid, InstanceBinding>;
 pub type UniformMap = HashMap<uuid::Uuid, UniformBinding>;
+pub type TextureMap = HashMap<uuid::Uuid, TextureBinding>;
 pub type BindGroupMap = HashMap<uuid::Uuid, BindGroup>;
 
 pub struct BindingBuilder {
-    pub bindings: BindingMap,
+    pub instances: InstanceMap,
     pub uniforms: UniformMap,
+    pub textures: TextureMap,
     pub bind_groups: BindGroupMap,
     pub shader_location_offset: u32,
     pub entry_point_index: usize,
     pub current_slot: u32,
     pub current_bind_group: u32,
+    pub shader_stage: ShaderStage,
 }
 
 impl BindingBuilder {
@@ -70,6 +77,8 @@ impl BindingBuilder {
             .enumerate()
             .find(|(_index, entry_point)| entry_point.name == entry_point_name)
             .unwrap();
+
+        let shader_stage = entry_point.stage;
 
         let shader_location_offset = entry_point.function.arguments.len() as u32;
         log::debug!("shader_location_offset: {shader_location_offset}");
@@ -92,18 +101,20 @@ impl BindingBuilder {
         log::debug!("current_bind_group: {current_bind_group}");
 
         BindingBuilder {
-            bindings: HashMap::new(),
+            instances: HashMap::new(),
             uniforms: HashMap::new(),
+            textures: HashMap::new(),
             bind_groups: HashMap::new(),
             entry_point_index,
             shader_location_offset,
             current_slot,
             current_bind_group,
+            shader_stage,
         }
     }
 
-    pub fn sorted_bindings(&self) -> Vec<BufferBinding> {
-        let mut sorted_bindings = self.bindings.values().cloned().collect_vec();
+    pub fn sorted_bindings(&self) -> Vec<InstanceBinding> {
+        let mut sorted_bindings = self.instances.values().cloned().collect_vec();
 
         sorted_bindings.sort_by(|a, b| a.slot.cmp(&b.slot));
         sorted_bindings

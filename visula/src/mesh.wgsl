@@ -14,13 +14,17 @@ var<uniform> u_globals: Globals;
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) normal: vec3<f32>,
-    @location(1) color: vec4<f32>,
+    @location(1) uv: vec2<f32>,
 };
 
-struct MeshInstance {
+struct MeshGeometry {
     rotation: vec4<f32>,
     position: vec3<f32>,
     scale: vec3<f32>,
+};
+
+struct MeshMaterial {
+    color: vec4<f32>,
 };
 
 fn calculate_transform_matrix(
@@ -55,16 +59,16 @@ fn calculate_transform_matrix(
 fn vs_main(
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
-    @location(2) color: vec4<f32>,
+    @location(2) uv: vec2<f32>,
 ) -> VertexOutput {
-    var instance: MeshInstance;
+    var geometry: MeshGeometry;
     // modification happens here
     var out: VertexOutput;
-    let transform_matrix = calculate_transform_matrix(instance.rotation, instance.position, instance.scale);
+    let transform_matrix = calculate_transform_matrix(geometry.rotation, geometry.position, geometry.scale);
     out.position = u_globals.model_view_projection_matrix * transform_matrix * vec4<f32>(position, 1.0);
     let normal_matrix = mat3x3(transform_matrix[0].xyz, transform_matrix[1].xyz, transform_matrix[2].xyz); // TODO figure out how to get hold of inverse
     out.normal = normal_matrix * normal;
-    out.color = color;
+    out.uv = uv;
     return out;
 }
 
@@ -82,5 +86,9 @@ fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
         0.5 * clamp(normalDotSun1, 0.0, 1.0) +
         0.5 * clamp(normalDotSun2, 0.0, 1.0)
     );
-    return vec4<f32>(vertex.color.xyz * clamp(intensity, 0.0, 1.0), 1.0);
+
+    var material: MeshMaterial;
+
+    // return vec4<f32>(material.color.xyz * clamp(intensity, 0.0, 1.0), 1.0);
+    return vec4<f32>(material.color.xyz, 1.0);
 }
