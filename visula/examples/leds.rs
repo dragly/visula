@@ -1,8 +1,12 @@
 use bytemuck::{Pod, Zeroable};
+use clap::Parser;
+use dxf::entities::EntityType;
+use dxf::Drawing;
 use slotmap::{DefaultKey, SlotMap};
+use std::path::PathBuf;
 use visula::Renderable;
 
-use glam::{Vec3, Vec4};
+use glam::{Vec2, Vec3, Vec4};
 use visula::{
     CustomEvent, Expression, InstanceBuffer, LineDelegate, Lines, RenderData, SphereDelegate,
     Spheres, UniformBuffer,
@@ -39,6 +43,14 @@ struct BondData {
     _padding: f32,
 }
 
+#[repr(C, align(16))]
+#[derive(Clone, Copy, Instance, Pod, Zeroable)]
+struct Wall {
+    start: Vec3,
+    end: Vec3,
+    _padding: [f32; 2],
+}
+
 fn lennard_jones(position_a: Vec3, position_b: Vec3, eps: f32, sigma: f32) -> Vec3 {
     let r = position_a - position_b;
     let r_l = r.length();
@@ -60,6 +72,51 @@ struct Settings {
     //_padding: f32,
 }
 
+#[derive(Parser, Debug)]
+#[command(author, version, about)]
+struct Args {
+    #[arg(value_name = "DXF_PATH")]
+    dxf_path: PathBuf,
+}
+
+fn load_walls_from_dxf(path: &PathBuf) -> Vec<Wall> {
+    let drawing = match Drawing::load_file(path) {
+        Ok(drawing) => drawing,
+        Err(err) => {
+            eprintln!("Failed to read DXF file {}: {}", path.display(), err);
+            return Vec::new();
+        }
+    };
+
+    let mut walls = Vec::new();
+
+    for entity in drawing.entities() {
+        match &entity.specific {
+            EntityType::Line(line) => {
+                walls.push(Wall {
+                    start: Vec3::new(line.p1.x as f32 * 10.0, 0.0, line.p1.y as f32 * 10.0),
+                    end: Vec3::new(line.p2.x as f32 * 10.0, 0.0, line.p2.y as f32 * 10.0),
+                    _padding: [0.0; 2],
+                });
+            }
+            _ => {}
+        }
+    }
+
+    walls
+}
+
+fn closest_point_on_segment_2d(point: Vec2, a: Vec2, b: Vec2) -> Vec2 {
+    let ab = b - a;
+    let denom = ab.length_squared();
+    if denom == 0.0 {
+        return a;
+    }
+    let t = (point - a).dot(ab) / denom;
+    let t = t.clamp(0.0, 1.0);
+    a + ab * t
+}
+
 struct Mouse {
     position: Option<PhysicalPosition<f64>>,
 }
@@ -72,17 +129,23 @@ struct Simulation {
     settings: Settings,
     settings_buffer: UniformBuffer<Settings>,
     lines_buffer: InstanceBuffer<BondData>,
+    walls: Vec<Wall>,
+    wall_lines: Lines,
+    wall_buffer: InstanceBuffer<Wall>,
     compartments: SlotMap<DefaultKey, Compartment>,
     mouse: Mouse,
 }
 
 impl Simulation {
-    fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
+    fn new(application: &mut visula::Application, walls: Vec<Wall>) -> Result<Simulation, Error> {
         let particle_buffer = InstanceBuffer::<Particle>::new(&application.device);
         let particle = particle_buffer.instance();
 
         let lines_buffer = InstanceBuffer::<BondData>::new(&application.device);
         let bond = lines_buffer.instance();
+
+        let wall_buffer = InstanceBuffer::<Wall>::new(&application.device);
+        let wall = wall_buffer.instance();
 
         let settings_data = Settings {
             radius: 10.0,
@@ -112,7 +175,7 @@ impl Simulation {
             &LineDelegate {
                 start: bond.position_a,
                 end: bond.position_b,
-                width: settings.width,
+                width: settings.width.clone(),
                 color: Expression::Vector3 {
                     x: bond.strength.clone().into(),
                     y: 0.8.into(),
@@ -121,6 +184,23 @@ impl Simulation {
             },
         )
         .unwrap();
+
+        let wall_lines = Lines::new(
+            &application.rendering_descriptor(),
+            &LineDelegate {
+                start: wall.start,
+                end: wall.end,
+                width: settings.width.clone(),
+                color: Expression::Vector3 {
+                    x: 0.9.into(),
+                    y: 0.2.into(),
+                    z: 0.2.into(),
+                },
+            },
+        )
+        .unwrap();
+
+        wall_buffer.update(&application.device, &application.queue, &walls);
 
         let mut compartments = SlotMap::<DefaultKey, Compartment>::new();
         compartments.insert(Compartment {
@@ -153,6 +233,9 @@ impl Simulation {
             lines,
             settings: settings_data,
             settings_buffer,
+            walls,
+            wall_lines,
+            wall_buffer,
             compartments,
             mouse: Mouse { position: None },
         })
@@ -170,6 +253,8 @@ impl visula::Simulation for Simulation {
         let eps = 1.4;
         let max_velocity = node_radius * 2.0 / 3.0;
         let min_velocity = node_radius * 0.05;
+        let wall_padding = node_radius * 0.8;
+        let walls = &self.walls;
         let mut bonds = vec![];
         for _ in 0..self.settings.speed {
             for (_key, compartment) in compartments.iter_mut() {
@@ -182,6 +267,39 @@ impl visula::Simulation for Simulation {
                     compartment.velocity *= 0.0;
                 }
                 compartment.position += compartment.velocity * dt;
+
+                for wall in walls {
+                    let p = Vec2::new(compartment.position.x, compartment.position.z);
+                    let a = Vec2::new(wall.start.x, wall.start.z);
+                    let b = Vec2::new(wall.end.x, wall.end.z);
+                    let closest = closest_point_on_segment_2d(p, a, b);
+                    let delta = p - closest;
+                    let distance = delta.length();
+                    if distance < wall_padding {
+                        let normal = if distance > 0.0001 {
+                            delta / distance
+                        } else {
+                            let ab = b - a;
+                            let n = Vec2::new(-ab.y, ab.x);
+                            if n.length() > 0.0001 {
+                                n.normalize()
+                            } else {
+                                Vec2::new(1.0, 0.0)
+                            }
+                        };
+                        let push = normal * (wall_padding - distance);
+                        compartment.position.x += push.x;
+                        compartment.position.z += push.y;
+
+                        let velocity = Vec2::new(compartment.velocity.x, compartment.velocity.z);
+                        let normal_velocity = normal * velocity.dot(normal);
+                        let tangent_velocity = velocity - normal_velocity;
+                        let reflected_velocity = tangent_velocity - normal_velocity * 0.5;
+                        compartment.velocity.x = reflected_velocity.x;
+                        compartment.velocity.z = reflected_velocity.y;
+                    }
+                }
+
                 compartment.acceleration = Vec3::new(0.0, 0.0, 0.0);
                 compartment.influence = 0.0;
             }
@@ -252,6 +370,7 @@ impl visula::Simulation for Simulation {
     fn render(&mut self, data: &mut RenderData) {
         self.spheres.render(data);
         self.lines.render(data);
+        self.wall_lines.render(data);
     }
 
     fn gui(&mut self, _application: &visula::Application, context: &egui::Context) {
@@ -326,5 +445,8 @@ impl visula::Simulation for Simulation {
 }
 
 fn main() {
-    visula::run(|app| Simulation::new(app).expect("Initializing simulation failed"));
+    let args = Args::parse();
+    let walls = load_walls_from_dxf(&args.dxf_path);
+
+    visula::run(move |app| Simulation::new(app, walls.clone()).expect("Initializing simulation failed"));
 }
