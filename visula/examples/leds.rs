@@ -88,22 +88,170 @@ fn load_walls_from_dxf(path: &PathBuf) -> Vec<Wall> {
         }
     };
 
-    let mut walls = Vec::new();
+    let mut segments = Vec::new();
+    let mut points = Vec::new();
 
     for entity in drawing.entities() {
         match &entity.specific {
             EntityType::Line(line) => {
-                walls.push(Wall {
-                    start: Vec3::new(line.p1.x as f32 * 10.0, 0.0, line.p1.y as f32 * 10.0),
-                    end: Vec3::new(line.p2.x as f32 * 10.0, 0.0, line.p2.y as f32 * 10.0),
-                    _padding: [0.0; 2],
-                });
+                let start = Vec2::new(line.p1.x as f32 * 10.0, line.p1.y as f32 * 10.0);
+                let end = Vec2::new(line.p2.x as f32 * 10.0, line.p2.y as f32 * 10.0);
+                points.push(start);
+                points.push(end);
+                segments.push((start, end));
             }
-            _ => {}
+            EntityType::Arc(arc) => {
+                let center = Vec2::new(arc.center.x as f32 * 10.0, arc.center.y as f32 * 10.0);
+                let radius = arc.radius as f32 * 10.0;
+                let arc_segments = tessellate_arc_segments_between(
+                    center,
+                    radius,
+                    arc.start_angle as f32,
+                    arc.end_angle as f32,
+                    5.0,
+                );
+                for (start, end) in arc_segments {
+                    points.push(start);
+                    points.push(end);
+                    segments.push((start, end));
+                }
+            }
+            EntityType::LwPolyline(polyline) => {
+                if polyline.vertices.len() >= 2 {
+                    for i in 0..(polyline.vertices.len() - 1) {
+                        let v1 = &polyline.vertices[i];
+                        let v2 = &polyline.vertices[i + 1];
+                        let p1 = Vec2::new(v1.x as f32 * 10.0, v1.y as f32 * 10.0);
+                        let p2 = Vec2::new(v2.x as f32 * 10.0, v2.y as f32 * 10.0);
+                        let bulge = v1.bulge as f32;
+                        let segs = tessellate_bulge_segment(p1, p2, bulge, 5.0);
+                        for (start, end) in segs {
+                            points.push(start);
+                            points.push(end);
+                            segments.push((start, end));
+                        }
+                    }
+                    if polyline.flags & 1 != 0 {
+                        let v1 = polyline.vertices.last().unwrap();
+                        let v2 = &polyline.vertices[0];
+                        let p1 = Vec2::new(v1.x as f32 * 10.0, v1.y as f32 * 10.0);
+                        let p2 = Vec2::new(v2.x as f32 * 10.0, v2.y as f32 * 10.0);
+                        let bulge = v1.bulge as f32;
+                        let segs = tessellate_bulge_segment(p1, p2, bulge, 5.0);
+                        for (start, end) in segs {
+                            points.push(start);
+                            points.push(end);
+                            segments.push((start, end));
+                        }
+                    }
+                }
+            }
+            EntityType::Circle(circle) => {
+                let center = Vec2::new(circle.center.x as f32 * 10.0, circle.center.y as f32 * 10.0);
+                let radius = circle.radius as f32 * 10.0;
+                let circle_segments =
+                    tessellate_arc_segments_by_sweep(center, radius, 0.0, 360.0, 5.0);
+                for (start, end) in circle_segments {
+                    points.push(start);
+                    points.push(end);
+                    segments.push((start, end));
+                }
+            }
+            other => {
+                panic!("Unsupported DXF entity encountered: {:?}", other);
+            }
         }
     }
 
+    let mean = if points.is_empty() {
+        Vec2::ZERO
+    } else {
+        points.iter().fold(Vec2::ZERO, |acc, p| acc + *p) / points.len() as f32
+    };
+
+    let mut walls = Vec::new();
+    for (start, end) in segments {
+        let centered_start = start - mean;
+        let centered_end = end - mean;
+        walls.push(Wall {
+            start: Vec3::new(centered_start.x, 0.0, centered_start.y),
+            end: Vec3::new(centered_end.x, 0.0, centered_end.y),
+            _padding: [0.0; 2],
+        });
+    }
+
     walls
+}
+
+fn tessellate_arc_segments_between(
+    center: Vec2,
+    radius: f32,
+    start_deg: f32,
+    end_deg: f32,
+    max_segment_length: f32,
+) -> Vec<(Vec2, Vec2)> {
+    let mut sweep_deg = end_deg - start_deg;
+    if sweep_deg < 0.0 {
+        sweep_deg += 360.0;
+    }
+    tessellate_arc_segments_by_sweep(center, radius, start_deg, sweep_deg, max_segment_length)
+}
+
+fn tessellate_arc_segments_by_sweep(
+    center: Vec2,
+    radius: f32,
+    start_deg: f32,
+    sweep_deg: f32,
+    max_segment_length: f32,
+) -> Vec<(Vec2, Vec2)> {
+    let sweep_rad = sweep_deg.to_radians();
+    let arc_length = radius.abs() * sweep_rad.abs();
+    let segments = (arc_length / max_segment_length.max(0.001)).ceil().max(1.0) as usize;
+
+    let mut points = Vec::with_capacity(segments + 1);
+    for i in 0..=segments {
+        let t = i as f32 / segments as f32;
+        let angle = (start_deg + sweep_deg * t).to_radians();
+        let point = center + Vec2::new(angle.cos(), angle.sin()) * radius;
+        points.push(point);
+    }
+
+    let mut segments_out = Vec::with_capacity(segments);
+    for pair in points.windows(2) {
+        segments_out.push((pair[0], pair[1]));
+    }
+    segments_out
+}
+
+fn tessellate_bulge_segment(
+    p1: Vec2,
+    p2: Vec2,
+    bulge: f32,
+    max_segment_length: f32,
+) -> Vec<(Vec2, Vec2)> {
+    if bulge == 0.0 {
+        return vec![(p1, p2)];
+    }
+
+    let chord = p2 - p1;
+    let chord_len = chord.length();
+    if chord_len < 0.0001 {
+        return Vec::new();
+    }
+
+    let theta = 4.0 * bulge.atan();
+    let radius = (chord_len / (2.0 * (theta / 2.0).sin())).abs();
+    let mid = (p1 + p2) * 0.5;
+    let perp = Vec2::new(-chord.y, chord.x) / chord_len;
+    let offset = radius * (theta / 2.0).cos();
+    let direction = if bulge >= 0.0 { perp } else { -perp };
+    let center = mid + direction * offset;
+
+    let start_vec = p1 - center;
+    let start_deg = start_vec.y.atan2(start_vec.x).to_degrees();
+    let sweep_deg = theta.to_degrees();
+
+    tessellate_arc_segments_by_sweep(center, radius, start_deg, sweep_deg, max_segment_length)
 }
 
 fn closest_point_on_segment_2d(point: Vec2, a: Vec2, b: Vec2) -> Vec2 {
