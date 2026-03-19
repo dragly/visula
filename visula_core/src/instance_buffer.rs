@@ -92,6 +92,26 @@ pub trait InstanceDeviceExt {
         T: Instance + Pod;
 }
 
+impl InstanceBufferInner {
+    #[cfg(test)]
+    pub fn new_for_testing(label: &str) -> Self {
+        let device = crate::test_helpers::test_device();
+        let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            mapped_at_creation: false,
+            size: 0,
+            label: Some(label),
+            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+        });
+        Self {
+            label: label.into(),
+            buffer,
+            count: 0,
+            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+            handle: uuid::Uuid::new_v4(),
+        }
+    }
+}
+
 impl InstanceDeviceExt for wgpu::Device {
     fn create_instance_buffer<T>(&self) -> InstanceBuffer<T>
     where

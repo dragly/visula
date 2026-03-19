@@ -16,3 +16,4 @@ itertools = {workspace = true}
 
 [dev-dependencies]
 env_logger = {workspace = true}
+pollster = {workspace = true}

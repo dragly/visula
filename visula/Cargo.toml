@@ -45,6 +45,7 @@ ttf-parser = "0.25.1"
 [dev-dependencies]
 slotmap = "1.0.7"
 clap = { version = "4.5.50", features = ["derive"] }
+dxf = "0.6"
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 pyo3-build-config = { workspace = true }

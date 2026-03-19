@@ -763,6 +763,14 @@ impl Sub<&Expression> for &Expression {
     }
 }
 
+impl Sub<Expression> for glam::Vec3 {
+    type Output = Expression;
+
+    fn sub(self, other: Expression) -> Expression {
+        other - Expression::from(self)
+    }
+}
+
 impl Neg for Expression {
     type Output = Expression;
 

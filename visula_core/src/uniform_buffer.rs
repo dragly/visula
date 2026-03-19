@@ -118,6 +118,48 @@ impl<T: Pod> UniformBuffer<T> {
     }
 }
 
+impl UniformBufferInner {
+    #[cfg(test)]
+    pub fn new_for_testing(label: &str) -> Self {
+        let device = crate::test_helpers::test_device();
+        let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            mapped_at_creation: false,
+            size: 64,
+            label: Some(label),
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+        });
+        let bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: None,
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+        });
+        Self {
+            label: label.into(),
+            buffer,
+            handle: uuid::Uuid::new_v4(),
+            bind_group,
+            bind_group_layout: Rc::new(bind_group_layout),
+        }
+    }
+}
+
 impl<T: Uniform + Pod> UniformBuffer<T> {
     // TODO move T to Buffer<T>
     pub fn uniform(&self) -> T::Type {

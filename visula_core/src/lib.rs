@@ -3,6 +3,7 @@ pub mod inject;
 pub mod input;
 pub mod instance_binding;
 pub mod instance_buffer;
+pub mod integration;
 pub mod naga_type;
 pub mod texture_binding;
 pub mod texture_buffer;
@@ -12,10 +13,14 @@ pub mod value;
 pub mod vertex_attr;
 pub mod vertex_attr_format;
 
+#[cfg(test)]
+pub(crate) mod test_helpers;
+
 pub use binding_builder::*;
 pub use input::*;
 pub use instance_binding::*;
 pub use instance_buffer::*;
+pub use integration::*;
 pub use naga_type::*;
 pub use texture_binding::*;
 pub use texture_buffer::*;

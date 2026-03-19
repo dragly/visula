@@ -85,14 +85,10 @@ pub fn instance(input: TokenStream) -> TokenStream {
 
     let name = input.ident;
 
-    let mut attributes = Vec::new();
-    let mut sizes = Vec::new();
-    let mut shader_location: u32 = 0;
     let mut field_index: usize = 0;
     let mut instance_struct_fields = Vec::new();
-    let mut module_fields = Vec::new();
     let mut instance_field_values = Vec::new();
-    let mut binding_fields = Vec::new();
+    let mut field_descriptors = Vec::new();
 
     let instance_struct_name = format_ident!("{}Instance", name);
 
@@ -104,38 +100,8 @@ pub fn instance(input: TokenStream) -> TokenStream {
                     match field_name {
                         Some(field_name) => {
                             let field_type = &field.ty;
-                            let size = quote! {
-                                (std::mem::size_of::<#field_type>() as u64)
-                            };
-                            let offset = quote! {
-                                0 #(+ #sizes)*
-                            };
-                            let format = quote! {
-                                < #field_type as visula_core::VertexAttrFormat >::vertex_attr_format()
-                            };
                             instance_struct_fields.push(quote! {
                                 pub #field_name: visula_core::Expression
-                            });
-                            let naga_type = quote! {
-                                < #field_type as visula_core::NagaType >::naga_type()
-                            };
-                            module_fields.push(quote! {
-                                {
-                                    let field_type = module.types.insert(#naga_type, ::visula_core::naga::Span::default());
-                                    module.entry_points[entry_point_index]
-                                        .function
-                                        .arguments
-                                        .push(::visula_core::naga::FunctionArgument {
-                                            name: Some(stringify!(#field_name).into()),
-                                            ty: field_type,
-                                            binding: Some(::visula_core::naga::Binding::Location {
-                                                location: previous_shader_location_offset + #shader_location,
-                                                interpolation: None,
-                                                sampling: None,
-                                                blend_src: None,
-                                            }),
-                                        });
-                                }
                             });
                             instance_field_values.push(quote! {
                                 #field_name: visula_core::Expression::InstanceField(visula_core::InstanceField {
@@ -145,20 +111,14 @@ pub fn instance(input: TokenStream) -> TokenStream {
                                     integrate_instance: #instance_struct_name::integrate,
                                 })
                             });
-                            attributes.push(quote! {
-                                ::visula_core::wgpu::VertexAttribute{
-                                    format: #format,
-                                    offset: #offset as u64,
-                                    shader_location: previous_shader_location_offset + #shader_location,
+                            field_descriptors.push(quote! {
+                                visula_core::InstanceFieldDescriptor {
+                                    name: stringify!(#field_name).into(),
+                                    naga_type: < #field_type as visula_core::NagaType >::naga_type(),
+                                    vertex_attr_format: < #field_type as visula_core::VertexAttrFormat >::vertex_attr_format(),
+                                    size: std::mem::size_of::<#field_type>() as u64,
                                 }
                             });
-                            binding_fields.push(quote! {
-                                ::visula_core::BufferBindingField {
-                                    function_argument: previous_shader_location_offset + #shader_location,
-                                }
-                            });
-                            sizes.push(size);
-                            shader_location += 1;
                             field_index += 1;
                         }
                         None => unimplemented!(),
@@ -184,29 +144,17 @@ pub fn instance(input: TokenStream) -> TokenStream {
                 binding_builder: &mut visula_core::BindingBuilder,
             )
             {
-                let entry_point_index = binding_builder.entry_point_index;
-                let previous_shader_location_offset = binding_builder.shader_location_offset;
-                let slot = binding_builder.current_slot;
-
-                #(#module_fields)*
-
-                binding_builder.instances.insert(handle.clone(), visula_core::InstanceBinding {
-                    layout: visula_core::VertexBufferLayoutBuilder {
-                        array_stride: std::mem::size_of::<#name>() as ::visula_core::wgpu::BufferAddress,
-                        step_mode: ::visula_core::wgpu::VertexStepMode::Instance,
-                        attributes: vec![
-                            #(#attributes),*
-                        ],
-                    },
-                    slot: binding_builder.current_slot,
-                    fields: vec![
-                        #(#binding_fields,)*
-                    ],
-                    inner: inner.clone(),
-                });
-
-                binding_builder.shader_location_offset += #shader_location;
-                binding_builder.current_slot += 1;
+                let fields = vec![
+                    #(#field_descriptors,)*
+                ];
+                visula_core::integrate_instance(
+                    &fields,
+                    std::mem::size_of::<#name>() as ::visula_core::wgpu::BufferAddress,
+                    inner,
+                    handle,
+                    module,
+                    binding_builder,
+                );
             }
 
         }
@@ -236,11 +184,9 @@ pub fn uniform(input: TokenStream) -> TokenStream {
 
     let name = input.ident;
 
-    let mut sizes = Vec::new();
     let mut uniform_struct_fields = Vec::new();
-    let mut uniform_field_types_init = Vec::new();
-    let mut uniform_fields = Vec::new();
     let mut uniform_field_values = Vec::new();
+    let mut field_descriptors = Vec::new();
     let mut field_index: usize = 0;
 
     let uniform_struct_name = format_ident!("{}Uniform", name);
@@ -256,29 +202,6 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                             uniform_struct_fields.push(quote! {
                                 #field_name: visula_core::Expression
                             });
-                            let size = quote! {
-                                (std::mem::size_of::<#field_type>() as u32)
-                            };
-                            // TODO figure out why this cannot be visula_core and needs to be
-                            // visula
-                            let naga_type = quote! {
-                                < #field_type as visula_core::NagaType >::naga_type()
-                            };
-                            let field_type_declaration = format_ident!("{}_type", field_name);
-                            uniform_field_types_init.push(quote! {
-                                let #field_type_declaration = module.types.insert(#naga_type, ::visula_core::naga::Span::default());
-                            });
-                            let offset = quote! {
-                                0 #(+ #sizes)*
-                            };
-                            uniform_fields.push(quote! {
-                                ::visula_core::naga::StructMember {
-                                    name: Some(stringify!(#field_name).into()),
-                                    ty: #field_type_declaration,
-                                    binding: None,
-                                    offset: #offset,
-                                }
-                            });
                             uniform_field_values.push(quote! {
                                 #field_name: visula_core::Expression::UniformField(visula_core::UniformField {
                                     buffer_handle: inner.borrow().handle,
@@ -288,8 +211,14 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                                     integrate_uniform: ::std::rc::Rc::new(::std::cell::RefCell::new(#uniform_struct_name::integrate)),
                                 })
                             });
+                            field_descriptors.push(quote! {
+                                visula_core::UniformFieldDescriptor {
+                                    name: stringify!(#field_name).into(),
+                                    naga_type: < #field_type as visula_core::NagaType >::naga_type(),
+                                    size: std::mem::size_of::<#field_type>() as u32,
+                                }
+                            });
                             field_index += 1;
-                            sizes.push(size);
                         }
                         None => unimplemented!(),
                     }
@@ -299,6 +228,8 @@ pub fn uniform(input: TokenStream) -> TokenStream {
         },
         Data::Enum(_) | Data::Union(_) => unimplemented!(),
     }
+
+    let name_lower = name.to_string().to_lowercase();
 
     let expanded = quote! {
         struct #uniform_struct_name {
@@ -318,53 +249,19 @@ pub fn uniform(input: TokenStream) -> TokenStream {
                 bind_group_layout: &std::rc::Rc<::visula_core::wgpu::BindGroupLayout>,
             )
             {
-                if binding_builder.uniforms.contains_key(&handle.clone()) {
-                    return;
+                let fields = vec![
+                    #(#field_descriptors,)*
+                ];
+                let params = visula_core::IntegrateUniformParams {
+                    struct_name: stringify!(#uniform_struct_name),
+                    variable_name: #name_lower,
+                    fields: &fields,
+                    struct_span: std::mem::size_of::<#uniform_struct_name>() as u32,
+                    inner,
+                    handle,
+                    bind_group_layout,
                 };
-
-                let entry_point_index = binding_builder.entry_point_index;
-                let previous_shader_location_offset = binding_builder.shader_location_offset;
-                let slot = binding_builder.current_slot;
-                let bind_group = binding_builder.current_bind_group;
-
-                #(#uniform_field_types_init)*
-
-                let uniform_type = module.types.insert(
-                    ::visula_core::naga::Type {
-                        name: Some(stringify!(#uniform_struct_name).into()),
-                        inner: ::visula_core::naga::TypeInner::Struct {
-                            members: vec![
-                                #(#uniform_fields),*
-                            ],
-                            span: ::std::mem::size_of::<#uniform_struct_name>() as u32,
-                        },
-                    },
-                    ::visula_core::naga::Span::default(),
-                );
-                let uniform_variable = module.global_variables.append(
-                    ::visula_core::naga::GlobalVariable {
-                        name: Some(stringify!(#name).to_lowercase().into()),
-                        binding: Some(::visula_core::naga::ResourceBinding {
-                            group: bind_group,
-                            binding: 0,
-                        }),
-                        space: ::visula_core::naga::AddressSpace::Uniform,
-                        ty: uniform_type,
-                        init: None,
-                    },
-                    ::visula_core::naga::Span::default(),
-                );
-                let settings_expression = module.entry_points[entry_point_index]
-                    .function
-                    .expressions
-                    .append(::visula_core::naga::Expression::GlobalVariable(uniform_variable), ::visula_core::naga::Span::default());
-
-                binding_builder.uniforms.insert(handle.clone(), visula_core::UniformBinding {
-                    expression: settings_expression,
-                    bind_group_layout: bind_group_layout.clone(),
-                    inner: inner.clone(),
-                });
-                binding_builder.current_bind_group += 1;
+                visula_core::integrate_uniform(&params, module, binding_builder);
             }
 
         }
@@ -390,33 +287,19 @@ pub fn vertex_attr(input: TokenStream) -> TokenStream {
 
     let name = input.ident;
 
-    let mut attributes = Vec::new();
-    let mut sizes = Vec::new();
-    let mut shader_location: u32 = 0;
+    let mut field_descriptors = Vec::new();
 
     match input.data {
         Data::Struct(ref data) => match data.fields {
             Fields::Named(ref fields) => {
                 for field in &fields.named {
-                    let field_ident = &field.ty;
-                    let size = quote! {
-                        (std::mem::size_of::<#field_ident>() as u64)
-                    };
-                    let offset = quote! {
-                        0 #(+ #sizes)*
-                    };
-                    let format = quote! {
-                        < #field_ident as visula_core::VertexAttrFormat >::vertex_attr_format()
-                    };
-                    attributes.push(quote! {
-                        ::visula_core::wgpu::VertexAttribute{
-                            format: #format,
-                            offset: #offset as u64,
-                            shader_location: #shader_location + shader_location_offset,
-                        }
+                    let field_type = &field.ty;
+                    field_descriptors.push(quote! {
+                        (
+                            < #field_type as visula_core::VertexAttrFormat >::vertex_attr_format(),
+                            std::mem::size_of::<#field_type>() as u64,
+                        )
                     });
-                    sizes.push(size);
-                    shader_location += 1;
                 }
             }
             Fields::Unnamed(_) | Fields::Unit => unimplemented!(),
@@ -427,9 +310,10 @@ pub fn vertex_attr(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         impl crate::VertexAttr for #name {
             fn attributes(shader_location_offset: u32) -> Vec<::visula_core::wgpu::VertexAttribute> {
-                vec![
-                    #( #attributes, )*
-                ]
+                let fields = vec![
+                    #(#field_descriptors,)*
+                ];
+                visula_core::compute_vertex_attributes(&fields, shader_location_offset)
             }
         }
     };
