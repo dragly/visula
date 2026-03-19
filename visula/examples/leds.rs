@@ -147,7 +147,8 @@ fn load_walls_from_dxf(path: &PathBuf) -> Vec<Wall> {
                 }
             }
             EntityType::Circle(circle) => {
-                let center = Vec2::new(circle.center.x as f32 * 10.0, circle.center.y as f32 * 10.0);
+                let center =
+                    Vec2::new(circle.center.x as f32 * 10.0, circle.center.y as f32 * 10.0);
                 let radius = circle.radius as f32 * 10.0;
                 let circle_segments =
                     tessellate_arc_segments_by_sweep(center, radius, 0.0, 360.0, 5.0);
@@ -267,11 +268,17 @@ fn closest_point_on_segment_2d(point: Vec2, a: Vec2, b: Vec2) -> Vec2 {
 
 struct Mouse {
     position: Option<PhysicalPosition<f64>>,
+    left_down: bool,
+    right_down: bool,
+    drag_origin: Option<Vec3>,
+    camera_center_origin: Option<Vec3>,
+    last_paint_position: Option<Vec3>,
 }
 
 struct Simulation {
     particles: Vec<Particle>,
-    spheres: Spheres,
+    led_spheres: Spheres,
+    lens_spheres: Spheres,
     particle_buffer: InstanceBuffer<Particle>,
     lines: Lines,
     settings: Settings,
@@ -286,6 +293,20 @@ struct Simulation {
 
 impl Simulation {
     fn new(application: &mut visula::Application, walls: Vec<Wall>) -> Result<Simulation, Error> {
+        application.camera_controller.enabled = false;
+        application.camera_controller.current_transform.center = Vec3::new(0.0, 0.0, 0.0);
+        application.camera_controller.current_transform.forward = Vec3::new(0.0, -1.0, 0.0);
+        application.camera_controller.current_transform.up = Vec3::new(0.0, 0.0, 1.0);
+        application.camera_controller.current_transform.distance = 1400.0;
+        application.camera_controller.target_transform.center =
+            application.camera_controller.current_transform.center;
+        application.camera_controller.target_transform.forward =
+            application.camera_controller.current_transform.forward;
+        application.camera_controller.target_transform.up =
+            application.camera_controller.current_transform.up;
+        application.camera_controller.target_transform.distance =
+            application.camera_controller.current_transform.distance;
+
         let particle_buffer = InstanceBuffer::<Particle>::new(&application.device);
         let particle = particle_buffer.instance();
 
@@ -296,7 +317,7 @@ impl Simulation {
         let wall = wall_buffer.instance();
 
         let settings_data = Settings {
-            radius: 10.0,
+            radius: 35.0 / 2.0,
             width: 4.0,
             speed: 4,
             //_padding: 0.0,
@@ -304,15 +325,29 @@ impl Simulation {
         let settings_buffer = UniformBuffer::new_with_init(&application.device, &settings_data);
         let settings = settings_buffer.uniform();
         let pos = &particle.position;
-        let spheres = Spheres::new(
+        let led_spheres = Spheres::new(
+            &application.rendering_descriptor(),
+            &SphereDelegate {
+                position: pos.clone() + Vec3::new(0.0, 20.0, 0.0),
+                radius: (35.0 / 2.0).into(),
+                color: Expression::Vector3 {
+                    x: 0.3.into(),
+                    y: 0.4.into(),
+                    z: 0.5.into(),
+                },
+            },
+        )
+        .unwrap();
+
+        let lens_spheres = Spheres::new(
             &application.rendering_descriptor(),
             &SphereDelegate {
                 position: pos.clone(),
-                radius: settings.radius,
+                radius: (45.0 / 2.0).into(),
                 color: Expression::Vector3 {
-                    x: (0.1 + (particle.voltage.clone() + 10.0) / 120.0).into(),
-                    y: (0.2 + (particle.voltage.clone() + 10.0) / 120.0).into(),
-                    z: (0.3 + (particle.voltage.clone() + 10.0) / 120.0).into(),
+                    x: 0.6.into(),
+                    y: 0.7.into(),
+                    z: 0.8.into(),
                 },
             },
         )
@@ -375,7 +410,8 @@ impl Simulation {
 
         Ok(Simulation {
             particles: vec![],
-            spheres,
+            led_spheres,
+            lens_spheres,
             particle_buffer,
             lines_buffer,
             lines,
@@ -385,7 +421,14 @@ impl Simulation {
             wall_lines,
             wall_buffer,
             compartments,
-            mouse: Mouse { position: None },
+            mouse: Mouse {
+                position: None,
+                left_down: false,
+                right_down: false,
+                drag_origin: None,
+                camera_center_origin: None,
+                last_paint_position: None,
+            },
         })
     }
 }
@@ -395,12 +438,12 @@ impl visula::Simulation for Simulation {
     fn update(&mut self, application: &mut visula::Application) {
         let compartments = &mut self.compartments;
         let dt = 0.01;
-        let node_radius = 15.0;
+        let node_radius = 45.0 / 2.0;
         let connection_distance = 5.0 * node_radius;
-        let sigma = 3.0 * node_radius;
+        let sigma = 2.0 * node_radius;
         let eps = 1.4;
         let max_velocity = node_radius * 2.0 / 3.0;
-        let min_velocity = node_radius * 0.05;
+        let min_velocity = node_radius * 0.0;
         let wall_padding = node_radius * 0.8;
         let walls = &self.walls;
         let mut bonds = vec![];
@@ -448,6 +491,10 @@ impl visula::Simulation for Simulation {
                     }
                 }
 
+                compartment.position.y = 0.0;
+                compartment.velocity.y = 0.0;
+                compartment.acceleration.y = 0.0;
+
                 compartment.acceleration = Vec3::new(0.0, 0.0, 0.0);
                 compartment.influence = 0.0;
             }
@@ -493,6 +540,9 @@ impl visula::Simulation for Simulation {
             for (_key, compartment) in &mut next_compartments {
                 compartment.acceleration /= 1.0 + compartment.influence;
                 compartment.acceleration += -0.5 * compartment.velocity;
+                compartment.position.y = 0.0;
+                compartment.velocity.y = 0.0;
+                compartment.acceleration.y = 0.0;
             }
 
             *compartments = next_compartments;
@@ -511,12 +561,13 @@ impl visula::Simulation for Simulation {
             .update(&application.device, &application.queue, &self.particles);
         self.settings_buffer
             .update(&application.queue, &self.settings);
-        self.lines_buffer
-            .update(&application.device, &application.queue, &bonds);
+        // self.lines_buffer
+        //     .update(&application.device, &application.queue, &bonds);
     }
 
     fn render(&mut self, data: &mut RenderData) {
-        self.spheres.render(data);
+        self.led_spheres.render(data);
+        self.lens_spheres.render(data);
         self.lines.render(data);
         self.wall_lines.render(data);
     }
@@ -526,65 +577,124 @@ impl visula::Simulation for Simulation {
             ui.label("Simulation speed");
             ui.add(egui::Slider::new(&mut self.settings.speed, 1..=20));
             ui.label("Radius");
-            ui.add(egui::Slider::new(&mut self.settings.radius, 1.0..=20.0));
+            ui.add(egui::Slider::new(&mut self.settings.radius, 1.0..=50.0));
             ui.label("Width");
             ui.add(egui::Slider::new(&mut self.settings.width, 1.0..=20.0));
         });
     }
 
     fn handle_event(&mut self, application: &mut visula::Application, event: &Event<CustomEvent>) {
+        let mouse_world_position = |application: &visula::Application,
+                                    mouse: &Mouse|
+         -> Option<Vec3> {
+            let mouse_physical_position = match mouse.position {
+                Some(p) => p,
+                None => {
+                    return None;
+                }
+            };
+            let screen_position = Vec4::new(
+                2.0 * mouse_physical_position.x as f32 / application.config.width as f32 - 1.0,
+                1.0 - 2.0 * mouse_physical_position.y as f32 / application.config.height as f32,
+                1.0,
+                1.0,
+            );
+            let ray_clip = Vec4::new(screen_position.x, screen_position.y, -1.0, 1.0);
+            let aspect_ratio = application.config.width as f32 / application.config.height as f32;
+            let inv_projection = application
+                .camera_controller
+                .projection_matrix(aspect_ratio)
+                .inverse();
+
+            let ray_eye = inv_projection * ray_clip;
+            let ray_eye = Vec4::new(ray_eye.x, ray_eye.y, -1.0, 0.0);
+            let inv_view_matrix = application.camera_controller.view_matrix().inverse();
+            let ray_world = inv_view_matrix * ray_eye;
+            let ray_world = Vec3::new(ray_world.x, ray_world.y, ray_world.z).normalize();
+            if ray_world.y.abs() < 0.0001 {
+                return None;
+            }
+            let ray_origin = application.camera_controller.position();
+            let t = -ray_origin.y / ray_world.y;
+            let intersection = ray_origin + t * ray_world;
+            Some(Vec3::new(intersection.x, 0.0, intersection.z))
+        };
+
         match event {
             Event::WindowEvent {
-                event:
-                    WindowEvent::MouseInput {
-                        state: ElementState::Released,
-                        button: MouseButton::Left,
-                        ..
-                    },
+                event: WindowEvent::MouseInput { state, button, .. },
                 ..
-            } => {
-                let position = match self.mouse.position {
-                    Some(p) => p,
-                    None => {
-                        return;
+            } => match (button, state) {
+                (MouseButton::Left, ElementState::Pressed) => {
+                    self.mouse.left_down = true;
+                    self.mouse.right_down = false;
+                    self.mouse.drag_origin = None;
+                    self.mouse.camera_center_origin = None;
+                    if let Some(world) = mouse_world_position(application, &self.mouse) {
+                        self.mouse.last_paint_position = Some(world);
+                        self.compartments.insert(Compartment {
+                            position: Vec3::new(world.x, 0.0, world.z),
+                            velocity: Vec3::new(0.0, 0.0, 0.0),
+                            acceleration: Vec3::new(0.0, 0.0, 0.0),
+                            influence: 0.0,
+                            _padding: Default::default(),
+                        });
                     }
-                };
-                let screen_position = Vec4::new(
-                    2.0 * position.x as f32 / application.config.width as f32 - 1.0,
-                    1.0 - 2.0 * position.y as f32 / application.config.height as f32,
-                    1.0,
-                    1.0,
-                );
-                let ray_clip = Vec4::new(screen_position.x, screen_position.y, -1.0, 1.0);
-                let aspect_ratio =
-                    application.config.width as f32 / application.config.height as f32;
-                let inv_projection = application
-                    .camera_controller
-                    .projection_matrix(aspect_ratio)
-                    .inverse();
-
-                let ray_eye = inv_projection * ray_clip;
-                let ray_eye = Vec4::new(ray_eye.x, ray_eye.y, -1.0, 0.0);
-                let inv_view_matrix = application.camera_controller.view_matrix().inverse();
-                let ray_world = inv_view_matrix * ray_eye;
-                let ray_world = Vec3::new(ray_world.x, ray_world.y, ray_world.z).normalize();
-                let ray_origin = application.camera_controller.position();
-                let t = -ray_origin.y / ray_world.y;
-                let intersection = ray_origin + t * ray_world;
-                let intersection = Vec3::new(intersection.x, intersection.y, intersection.z);
-                self.compartments.insert(Compartment {
-                    position: intersection,
-                    velocity: Vec3::new(0.0, 0.0, 0.0),
-                    acceleration: Vec3::new(0.0, 0.0, 0.0),
-                    influence: 0.0,
-                    _padding: Default::default(),
-                });
-            }
+                }
+                (MouseButton::Left, ElementState::Released) => {
+                    self.mouse.left_down = false;
+                    self.mouse.last_paint_position = None;
+                    if !self.mouse.right_down {}
+                }
+                (MouseButton::Right, ElementState::Pressed) => {
+                    self.mouse.right_down = true;
+                    self.mouse.left_down = false;
+                    if let Some(world) = mouse_world_position(application, &self.mouse) {
+                        self.mouse.drag_origin = Some(world);
+                        self.mouse.camera_center_origin =
+                            Some(application.camera_controller.target_transform.center);
+                    }
+                }
+                (MouseButton::Right, ElementState::Released) => {
+                    self.mouse.right_down = false;
+                    self.mouse.drag_origin = None;
+                    self.mouse.camera_center_origin = None;
+                }
+                _ => {}
+            },
             Event::WindowEvent {
                 event: WindowEvent::CursorMoved { position, .. },
                 ..
             } => {
                 self.mouse.position = Some(*position);
+                if self.mouse.left_down {
+                    if let Some(world) = mouse_world_position(application, &self.mouse) {
+                        let should_paint = match self.mouse.last_paint_position {
+                            None => true,
+                            Some(prev) => prev.distance(world) >= 40.0,
+                        };
+                        if should_paint {
+                            self.mouse.last_paint_position = Some(world);
+                            self.compartments.insert(Compartment {
+                                position: Vec3::new(world.x, 0.0, world.z),
+                                velocity: Vec3::new(0.0, 0.0, 0.0),
+                                acceleration: Vec3::new(0.0, 0.0, 0.0),
+                                influence: 0.0,
+                                _padding: Default::default(),
+                            });
+                        }
+                    }
+                } else if self.mouse.right_down {
+                    if let (Some(origin), Some(center_origin)) =
+                        (self.mouse.drag_origin, self.mouse.camera_center_origin)
+                    {
+                        if let Some(world) = mouse_world_position(application, &self.mouse) {
+                            let delta = world - origin;
+                            application.camera_controller.target_transform.center =
+                                center_origin - delta;
+                        }
+                    }
+                }
             }
 
             _ => {}
@@ -596,5 +706,7 @@ fn main() {
     let args = Args::parse();
     let walls = load_walls_from_dxf(&args.dxf_path);
 
-    visula::run(move |app| Simulation::new(app, walls.clone()).expect("Initializing simulation failed"));
+    visula::run(move |app| {
+        Simulation::new(app, walls.clone()).expect("Initializing simulation failed")
+    });
 }
