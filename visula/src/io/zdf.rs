@@ -14,15 +14,29 @@ pub struct ZdfFile {
     pub mesh_vertex_count: usize,
 }
 
-pub fn read_zdf<R: ReadSeek>(input: R, device: &mut wgpu::Device) -> ZdfFile {
-    let file = oxifive::FileReader::new(input).unwrap();
-    let data = file.group("data").unwrap();
-    let pointcloud = data.dataset("pointcloud").unwrap();
-    let rgba_image = data.dataset("rgba_image").unwrap();
+pub fn read_zdf<R: ReadSeek>(
+    input: R,
+    device: &mut wgpu::Device,
+) -> Result<ZdfFile, crate::error::Error> {
+    let file = oxifive::FileReader::new(input)
+        .map_err(|e| crate::error::Error::Zdf(format!("failed to open ZDF file: {e}")))?;
+    let data = file
+        .group("data")
+        .map_err(|e| crate::error::Error::Zdf(format!("missing 'data' group: {e}")))?;
+    let pointcloud = data
+        .dataset("pointcloud")
+        .map_err(|e| crate::error::Error::Zdf(format!("missing 'pointcloud' dataset: {e}")))?;
+    let rgba_image = data
+        .dataset("rgba_image")
+        .map_err(|e| crate::error::Error::Zdf(format!("missing 'rgba_image' dataset: {e}")))?;
 
     let mut vertices = vec![];
-    let points = pointcloud.read::<f32, Ix3>().unwrap();
-    let colors = rgba_image.read::<u8, Ix3>().unwrap();
+    let points = pointcloud
+        .read::<f32, Ix3>()
+        .map_err(|e| crate::error::Error::Zdf(format!("failed to read pointcloud: {e}")))?;
+    let colors = rgba_image
+        .read::<u8, Ix3>()
+        .map_err(|e| crate::error::Error::Zdf(format!("failed to read rgba_image: {e}")))?;
     for col in 0..(points.shape()[0] - 1) {
         for row in 0..(points.shape()[1] - 1) {
             let col_m = (col as i64 - 1).max(0) as usize;
@@ -95,8 +109,12 @@ pub fn read_zdf<R: ReadSeek>(input: R, device: &mut wgpu::Device) -> ZdfFile {
     assert!(points.shape()[2] == 3);
     let points_shape = (points.shape()[0] * points.shape()[1], points.shape()[2]);
     let colors_shape = (colors.shape()[0] * colors.shape()[1], colors.shape()[2]);
-    let points_flat = points.into_shape(points_shape).unwrap();
-    let colors_flat = colors.into_shape(colors_shape).unwrap();
+    let points_flat = points
+        .into_shape(points_shape)
+        .map_err(|e| crate::error::Error::Zdf(format!("failed to reshape points: {e}")))?;
+    let colors_flat = colors
+        .into_shape(colors_shape)
+        .map_err(|e| crate::error::Error::Zdf(format!("failed to reshape colors: {e}")))?;
     let point_cloud: Vec<SpherePrimitive> = points_flat
         .outer_iter()
         .zip(colors_flat.outer_iter())
@@ -142,11 +160,11 @@ pub fn read_zdf<R: ReadSeek>(input: R, device: &mut wgpu::Device) -> ZdfFile {
         usage: wgpu::BufferUsages::INDEX,
     });
 
-    ZdfFile {
+    Ok(ZdfFile {
         point_cloud,
         mesh_vertex_buf: vertex_buffer,
         mesh_index_buf: index_buffer,
         mesh_vertex_count: vertices.len(),
         camera_center,
-    }
+    })
 }

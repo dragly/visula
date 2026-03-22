@@ -14,9 +14,11 @@ pub mod vertex_attr;
 pub mod vertex_attr_format;
 
 pub mod delegate;
+pub mod error;
 
 pub use binding_builder::*;
 pub use delegate::*;
+pub use error::*;
 pub use input::*;
 pub use instance_binding::*;
 pub use instance_buffer::*;

@@ -63,7 +63,7 @@ impl Circles {
     pub fn new(
         rendering_descriptor: &RenderingDescriptor,
         delegate: &CircleDelegate,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    ) -> Result<Self, visula_core::ShaderError> {
         let (vertex_data, index_data) = create_vertices();
         Ok(Circles(QuadPipeline::new(
             rendering_descriptor,

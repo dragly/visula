@@ -3606,6 +3606,7 @@ dependencies = [
  "slotmap",
  "strum",
  "syn 1.0.109",
+ "thiserror 2.0.18",
  "ttf-parser",
  "usvg",
  "uuid",
@@ -3652,6 +3653,7 @@ dependencies = [
  "itertools 0.10.5",
  "log",
  "naga",
+ "thiserror 2.0.18",
  "uuid",
  "wgpu",
 ]

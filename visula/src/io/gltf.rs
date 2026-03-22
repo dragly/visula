@@ -6,18 +6,6 @@ use crate::error::Error;
 use crate::primitives::mesh_primitive::MeshVertexAttributes;
 use crate::Application;
 
-impl From<gltf::Error> for Error {
-    fn from(_: gltf::Error) -> Self {
-        Error {}
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(_: std::io::Error) -> Self {
-        Error {}
-    }
-}
-
 pub struct GltfFile {
     pub scenes: Vec<GltfScene>,
 }
@@ -32,12 +20,15 @@ pub struct GltfMesh {
     pub index_count: usize,
 }
 
-pub fn import_buffer_data(document: &gltf::Document, mut blob: Option<Vec<u8>>) -> Vec<Vec<u8>> {
+pub fn import_buffer_data(
+    document: &gltf::Document,
+    mut blob: Option<Vec<u8>>,
+) -> Result<Vec<Vec<u8>>, Error> {
     let mut buffers = Vec::new();
     for buffer in document.buffers() {
         let mut data = match buffer.source() {
-            gltf::buffer::Source::Uri(_) => panic!("Unsupported URI buffer"),
-            gltf::buffer::Source::Bin => blob.take().unwrap(),
+            gltf::buffer::Source::Uri(_) => return Err(Error::GltfMissingBlobData),
+            gltf::buffer::Source::Bin => blob.take().ok_or(Error::GltfMissingBlobData)?,
         };
         assert!(
             data.len() >= buffer.length(),
@@ -48,7 +39,7 @@ pub fn import_buffer_data(document: &gltf::Document, mut blob: Option<Vec<u8>>) 
         }
         buffers.push(data);
     }
-    buffers
+    Ok(buffers)
 }
 
 pub fn parse_gltf(
@@ -58,7 +49,7 @@ pub fn parse_gltf(
     let file = gltf::Gltf::from_reader(reader)?;
     let document = file.document;
     let blob = file.blob;
-    let buffers = import_buffer_data(&document, blob);
+    let buffers = import_buffer_data(&document, blob)?;
 
     let mut scenes = vec![];
     for scene in document.scenes() {

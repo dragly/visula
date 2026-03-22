@@ -59,7 +59,7 @@ impl Lines {
     pub fn new(
         rendering_descriptor: &RenderingDescriptor,
         delegate: &LineDelegate,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    ) -> Result<Self, visula_core::ShaderError> {
         let (vertex_data, index_data) = create_vertices();
         Ok(Lines(QuadPipeline::new(
             rendering_descriptor,

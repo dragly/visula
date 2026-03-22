@@ -2,6 +2,7 @@ use naga::back::wgsl::WriterFlags;
 use naga::valid::ValidationFlags;
 use naga::Module;
 
+use crate::error::ShaderError;
 use crate::{BindingBuilder, Expression};
 
 macro_rules! entry_point {
@@ -10,7 +11,7 @@ macro_rules! entry_point {
             .entry_points
             .iter_mut()
             .find(|e| e.stage == $shader_stage)
-            .expect(&format!("Could not find entry point in shader"))
+            .ok_or_else(|| ShaderError::EntryPointNotFound(format!("{:?}", $shader_stage)))?
     };
 }
 
@@ -19,12 +20,12 @@ pub fn inject(
     binding_builder: &mut BindingBuilder,
     variable_name: &str,
     fields: &[Expression],
-) {
+) -> Result<(), ShaderError> {
     let variable = entry_point!(module, binding_builder.shader_stage)
         .function
         .local_variables
         .fetch_if(|variable| variable.name == Some(variable_name.into()))
-        .unwrap_or_else(|| panic!("Could not find variable with name '{variable_name}' in shader"));
+        .ok_or_else(|| ShaderError::VariableNotFound(variable_name.to_string()))?;
     let variable_expression = entry_point!(module, binding_builder.shader_stage)
         .function
         .expressions
@@ -32,7 +33,7 @@ pub fn inject(
             naga::Expression::LocalVariable(v) => v == &variable,
             _ => false,
         })
-        .unwrap_or_else(|| panic!("Failed to find local variable '{variable_name}'"));
+        .ok_or_else(|| ShaderError::VariableNotFound(variable_name.to_string()))?;
 
     let fields_setup = fields
         .iter()
@@ -49,12 +50,12 @@ pub fn inject(
                     },
                     naga::Span::default(),
                 );
-            ::naga::Statement::Store {
+            Ok(::naga::Statement::Store {
                 pointer: access_index,
                 value: expression,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, ShaderError>>()?;
     let mut new_body = ::naga::Block::from_vec(fields_setup);
 
     for (statement, span) in entry_point!(module, binding_builder.shader_stage)
@@ -77,9 +78,10 @@ pub fn inject(
     let info =
         naga::valid::Validator::new(ValidationFlags::empty(), naga::valid::Capabilities::all())
             .validate(module)
-            .unwrap();
-    let output_str = naga::back::wgsl::write_string(module, &info, WriterFlags::all()).unwrap();
-    log::debug!("Resulting lines shader code:\n{output_str}");
+            .map_err(Box::new)?;
+    let output_str = naga::back::wgsl::write_string(module, &info, WriterFlags::all())?;
+    log::debug!("Resulting shader code:\n{output_str}");
+    Ok(())
 }
 
 #[cfg(test)]
@@ -90,7 +92,7 @@ mod tests {
 
     #[test]
     fn test_inject() {
-        env_logger::try_init().unwrap();
+        let _ = env_logger::try_init();
         let mut module =
             naga::front::wgsl::parse_str(include_str!("./shaders/basic.wgsl")).unwrap();
         let vertex_fields: Vec<Expression> = vec![
@@ -98,21 +100,23 @@ mod tests {
             Vec3::new(1.0, 0.0, 0.0).into(),
             1.0.into(),
         ];
-        let mut binding_builder = BindingBuilder::new(&module, "vs_main", 2);
+        let mut binding_builder = BindingBuilder::new(&module, "vs_main", 2).unwrap();
         inject(
             &mut module,
             &mut binding_builder,
             "line_vertex",
             &vertex_fields,
-        );
+        )
+        .unwrap();
 
-        let mut binding_builder = BindingBuilder::new(&module, "fs_main", 2);
+        let mut binding_builder = BindingBuilder::new(&module, "fs_main", 2).unwrap();
         let fragment_fields: Vec<Expression> = vec![Vec3::new(1.0, 1.0, 0.0).into()];
         inject(
             &mut module,
             &mut binding_builder,
             "line_fragment",
             &fragment_fields,
-        );
+        )
+        .unwrap();
     }
 }

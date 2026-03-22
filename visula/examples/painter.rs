@@ -9,18 +9,15 @@ struct Simulation {
 }
 
 impl Simulation {
-    fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
+    fn new(application: &mut visula::Application) -> Result<Simulation, visula::error::Error> {
         Ok(Simulation {
-            painter: Painter::new(application),
+            painter: Painter::new(application)?,
         })
     }
 }
 
-#[derive(Debug)]
-struct Error;
-
 impl visula::Simulation for Simulation {
-    type Error = Error;
+    type Error = visula::error::Error;
     fn update(&mut self, application: &mut visula::Application) {
         self.painter.spheres(&[Sphere {
             position: Vec3::ZERO,

@@ -37,7 +37,7 @@ impl Polygons {
         delegate: &PolygonDelegate,
         vertices: &[PolygonVertex],
         indices: &[u32],
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    ) -> Result<Self, visula_core::ShaderError> {
         Ok(Polygons(QuadPipeline::new(
             rendering_descriptor,
             &QuadPipelineDescriptor {

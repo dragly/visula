@@ -16,13 +16,14 @@ pub struct PyEventLoop {
 #[pymethods]
 impl PyEventLoop {
     #[new]
-    fn new() -> Self {
+    fn new() -> PyResult<Self> {
         initialize_logger();
-        let event_loop = create_event_loop();
+        let event_loop = create_event_loop()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to create event loop: {e}")))?;
         info!("Created winit EventLoop");
-        Self {
+        Ok(Self {
             event_loop: Some(event_loop),
-        }
+        })
     }
 
     pub fn run(&mut self, py_application: &Bound<PyApplication>) -> PyResult<()> {

@@ -65,11 +65,11 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                 }
 
                 impl ::visula_core::Delegate for #struct_ident {
-                    fn inject(&self, shader_variable_name: &str, module: &mut ::naga::Module, binding_builder: &mut ::visula_core::BindingBuilder) {
+                    fn inject(&self, shader_variable_name: &str, module: &mut ::naga::Module, binding_builder: &mut ::visula_core::BindingBuilder) -> Result<(), ::visula_core::ShaderError> {
                         let fields = vec![
                             #(#field_insertions)*
                         ];
-                        ::visula_core::inject::inject(module, binding_builder,  shader_variable_name, &fields);
+                        ::visula_core::inject::inject(module, binding_builder, shader_variable_name, &fields)
                     }
                 }
             }

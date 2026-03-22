@@ -60,7 +60,13 @@ impl Simulation {
             mesh_vertex_buf,
             mesh_index_buf,
             mesh_vertex_count,
-        } = visula::io::zdf::read_zdf(input, &mut application.device);
+        } = match visula::io::zdf::read_zdf(input, &mut application.device) {
+            Ok(f) => f,
+            Err(e) => {
+                log::error!("Failed to read ZDF file: {e}");
+                return;
+            }
+        };
 
         application.camera_controller.current_transform.center = camera_center;
         application.camera_controller.target_transform.center = camera_center;

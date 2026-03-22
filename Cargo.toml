@@ -25,6 +25,7 @@ numpy = { version = "0.27", features = ["nalgebra"] }
 pollster = "0.3.0"
 itertools = "0.10.5"
 env_logger = "0.11"
+thiserror = "2"
 
 [profile.optimized-dev]
 inherits = "dev"

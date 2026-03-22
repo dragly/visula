@@ -1,3 +1,4 @@
+use crate::error::ShaderError;
 use crate::{InstanceBufferInner, TextureBufferInner, UniformBufferInner};
 use itertools::Itertools;
 use naga::{Expression, Handle};
@@ -67,7 +68,11 @@ pub struct BindingBuilder {
 }
 
 impl BindingBuilder {
-    pub fn new(module: &Module, entry_point_name: &str, current_slot: u32) -> BindingBuilder {
+    pub fn new(
+        module: &Module,
+        entry_point_name: &str,
+        current_slot: u32,
+    ) -> Result<BindingBuilder, ShaderError> {
         log::debug!(
             "Making binding builder for entry point {entry_point_name} and slot {current_slot}"
         );
@@ -76,7 +81,7 @@ impl BindingBuilder {
             .iter()
             .enumerate()
             .find(|(_index, entry_point)| entry_point.name == entry_point_name)
-            .unwrap();
+            .ok_or_else(|| ShaderError::EntryPointNotFound(entry_point_name.to_string()))?;
 
         let shader_stage = entry_point.stage;
 
@@ -100,7 +105,7 @@ impl BindingBuilder {
             });
         log::debug!("current_bind_group: {current_bind_group}");
 
-        BindingBuilder {
+        Ok(BindingBuilder {
             instances: HashMap::new(),
             uniforms: HashMap::new(),
             textures: HashMap::new(),
@@ -110,7 +115,7 @@ impl BindingBuilder {
             current_slot,
             current_bind_group,
             shader_stage,
-        }
+        })
     }
 
     pub fn sorted_bindings(&self) -> Vec<InstanceBinding> {

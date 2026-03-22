@@ -48,7 +48,7 @@ impl Spheres {
     pub fn new(
         rendering_descriptor: &RenderingDescriptor,
         delegate: &SphereDelegate,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    ) -> Result<Self, visula_core::ShaderError> {
         let (vertex_data, index_data) = create_vertices();
         Ok(Spheres(QuadPipeline::new(
             rendering_descriptor,

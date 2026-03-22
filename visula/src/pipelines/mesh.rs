@@ -37,7 +37,7 @@ impl MeshPipeline {
         rendering_descriptor: &RenderingDescriptor,
         geometry: &MeshGeometry,
         material: &MeshMaterial,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    ) -> Result<Self, visula_core::ShaderError> {
         let &RenderingDescriptor {
             device,
             camera,
@@ -47,28 +47,25 @@ impl MeshPipeline {
 
         let vertex_size = size_of::<MeshVertexAttributes>();
 
-        let mut module = naga::front::wgsl::parse_str(include_str!("../mesh.wgsl"))
-            .unwrap_or_else(|_| panic!("{}", "Failed to parse {file_name}"));
+        let mut module = naga::front::wgsl::parse_str(include_str!("../mesh.wgsl"))?;
         let info =
             naga::valid::Validator::new(ValidationFlags::empty(), naga::valid::Capabilities::all())
                 .validate(&module)
-                .unwrap_or_else(|_| panic!("{}", "Failed to validate {file_name}"));
-        let pre_output_str = naga::back::wgsl::write_string(&module, &info, WriterFlags::all())
-            .unwrap_or_else(|_| panic!("{}", "Failed to write new shader mased on {file_name}"));
+                .map_err(Box::new)?;
+        let pre_output_str = naga::back::wgsl::write_string(&module, &info, WriterFlags::all())?;
         log::debug!("Original shader code:\n{pre_output_str}");
         log::debug!("Injecting instance");
-        let mut vertex_binding_builder = BindingBuilder::new(&module, "vs_main", 1);
-        geometry.inject("geometry", &mut module, &mut vertex_binding_builder);
-        let mut fragment_binding_builder = BindingBuilder::new(&module, "fs_main", 0);
-        material.inject("material", &mut module, &mut fragment_binding_builder);
+        let mut vertex_binding_builder = BindingBuilder::new(&module, "vs_main", 1)?;
+        geometry.inject("geometry", &mut module, &mut vertex_binding_builder)?;
+        let mut fragment_binding_builder = BindingBuilder::new(&module, "fs_main", 0)?;
+        material.inject("material", &mut module, &mut fragment_binding_builder)?;
 
         log::debug!("Validating generated mesh shader\n{module:#?}");
         let info =
             naga::valid::Validator::new(ValidationFlags::empty(), naga::valid::Capabilities::all())
                 .validate(&module)
-                .unwrap_or_else(|_| panic!("{}", "Failed to validate modified {file_name}"));
-        let output_str = naga::back::wgsl::write_string(&module, &info, WriterFlags::all())
-            .unwrap_or_else(|_| panic!("{}", "Failed to write new shader for {file_name}"));
+                .map_err(Box::new)?;
+        let output_str = naga::back::wgsl::write_string(&module, &info, WriterFlags::all())?;
         log::debug!("Resulting mesh shader code:\n{output_str}");
 
         let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
