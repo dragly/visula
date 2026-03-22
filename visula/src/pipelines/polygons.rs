@@ -1,16 +1,12 @@
+use crate::pipelines::quad::{QuadPipeline, QuadPipelineDescriptor};
 use crate::rendering_descriptor::RenderingDescriptor;
-use crate::{DefaultRenderPassDescriptor, RenderData, Renderable};
+use crate::simulation::RenderData;
+use crate::Renderable;
 use bytemuck::{Pod, Zeroable};
 use glam::{Vec3, Vec4};
-use itertools::Itertools;
-use naga::back::wgsl::WriterFlags;
-use naga::valid::ValidationFlags;
-use std::cell::Ref;
 use std::mem::size_of;
-use visula_core::{BindingBuilder, Expression, InstanceBinding};
+use visula_core::Expression;
 use visula_derive::Delegate;
-use wgpu::BufferUsages;
-use wgpu::{util::DeviceExt, BindGroupLayout};
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -18,13 +14,7 @@ pub struct PolygonVertex {
     pub position: [f32; 2],
 }
 
-pub struct Polygons {
-    pub render_pipeline: wgpu::RenderPipeline,
-    pub vertex_buffer: wgpu::Buffer,
-    pub index_buffer: wgpu::Buffer,
-    pub index_count: usize,
-    binding_builder: BindingBuilder,
-}
+pub struct Polygons(QuadPipeline);
 
 #[derive(Delegate)]
 pub struct PolygonDelegate {
@@ -48,191 +38,25 @@ impl Polygons {
         vertices: &[PolygonVertex],
         indices: &[u32],
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let &RenderingDescriptor {
-            device,
-            format,
-            camera,
-            ..
-        } = rendering_descriptor;
-        let mut module =
-            naga::front::wgsl::parse_str(include_str!("../shaders/polygon.wgsl")).unwrap();
-        let mut binding_builder = BindingBuilder::new(&module, "vs_main", 1);
-
-        log::info!("Injecting polygon shader delegate");
-        delegate.inject("polygon", &mut module, &mut binding_builder);
-
-        let vertex_size = size_of::<PolygonVertex>();
-        let index_count = indices.len();
-
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Polygon vertex buffer"),
-            contents: bytemuck::cast_slice(vertices),
-            usage: wgpu::BufferUsages::VERTEX | BufferUsages::COPY_DST,
-        });
-
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Polygon index buffer"),
-            contents: bytemuck::cast_slice(indices),
-            usage: wgpu::BufferUsages::INDEX | BufferUsages::COPY_DST,
-        });
-
-        log::debug!("Validating polygon shader\n{module:#?}");
-        let info =
-            naga::valid::Validator::new(ValidationFlags::empty(), naga::valid::Capabilities::all())
-                .validate(&module)
-                .unwrap();
-        let output_str =
-            naga::back::wgsl::write_string(&module, &info, WriterFlags::all()).unwrap();
-        log::debug!("Resulting polygon shader code:\n{output_str}");
-
-        let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: None,
-            source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(&output_str)),
-        });
-
-        let bind_group_layouts: Vec<&BindGroupLayout> = binding_builder
-            .uniforms
-            .values()
-            .map(|binding| binding.bind_group_layout.as_ref())
-            .collect();
-
-        let uniforms = {
-            let mut uniforms = vec![&camera.bind_group_layout];
-            for layout in &bind_group_layouts {
-                uniforms.push(layout);
-            }
-            uniforms
-        };
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("polygons pipeline layout"),
-            bind_group_layouts: &uniforms,
-            push_constant_ranges: &[],
-        });
-
-        let vertex_buffer_layout = wgpu::VertexBufferLayout {
-            array_stride: vertex_size as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[wgpu::VertexAttribute {
-                format: wgpu::VertexFormat::Float32x2,
-                offset: 0,
-                shader_location: 0,
-            }],
-        };
-        let sorted_bindings = binding_builder.sorted_bindings();
-        let mut layouts = sorted_bindings
-            .iter()
-            .map(|binding| binding.layout.build())
-            .collect_vec();
-
-        let buffers = {
-            let mut buffers = vec![vertex_buffer_layout];
-            buffers.append(&mut layouts);
-            buffers
-        };
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("polygons render pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader_module,
-                entry_point: Some("vs_main"),
-                buffers: &buffers,
-                compilation_options: Default::default(),
+        Ok(Polygons(QuadPipeline::new(
+            rendering_descriptor,
+            &QuadPipelineDescriptor {
+                label: "polygons",
+                shader_source: include_str!("../shaders/polygon.wgsl"),
+                shader_variable_name: "polygon",
+                vertex_data: bytemuck::cast_slice(vertices),
+                vertex_stride: size_of::<PolygonVertex>(),
+                vertex_format: wgpu::VertexFormat::Float32x2,
+                index_data: bytemuck::cast_slice(indices),
+                index_format: wgpu::IndexFormat::Uint32,
             },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader_module,
-                entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: *format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: Default::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
-                ..Default::default()
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
-            multisample: wgpu::MultisampleState {
-                count: rendering_descriptor.sample_count,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-            cache: None,
-        });
-        Ok(Polygons {
-            render_pipeline,
-            vertex_buffer,
-            index_buffer,
-            index_count,
-            binding_builder,
-        })
+            delegate,
+        )?))
     }
 }
 
 impl Renderable for Polygons {
-    fn render(
-        &self,
-        RenderData {
-            encoder,
-            view,
-            multisampled_framebuffer,
-            depth_texture,
-            camera,
-            ..
-        }: &mut RenderData,
-    ) {
-        log::trace!("Rendering polygons");
-        if self.index_count == 0 {
-            return;
-        }
-
-        let bindings: Vec<(&InstanceBinding, Ref<wgpu::Buffer>)> = self
-            .binding_builder
-            .instances
-            .values()
-            .map(|v| (v, Ref::map(v.inner.borrow(), |v| &v.buffer)))
-            .collect();
-        let uniforms: Vec<wgpu::BindGroup> = self
-            .binding_builder
-            .uniforms
-            .values()
-            .map(|v| v.inner.borrow().bind_group.clone())
-            .collect();
-        {
-            let default_render_pass = DefaultRenderPassDescriptor::new(
-                "polygons",
-                view,
-                multisampled_framebuffer,
-                depth_texture,
-            );
-            let mut render_pass = encoder.begin_render_pass(&default_render_pass.build());
-            render_pass.set_bind_group(0, &camera.bind_group, &[]);
-
-            render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-
-            let mut instance_count = 1;
-            for (binding, buffer) in bindings.iter() {
-                let slot = binding.slot;
-                log::trace!("Setting vertex buffer {slot}");
-                render_pass.set_vertex_buffer(slot, buffer.slice(..));
-                instance_count = instance_count.max(binding.inner.borrow().count);
-            }
-            for bind_group in uniforms.iter() {
-                log::trace!("Setting bind group {}", 1);
-                render_pass.set_bind_group(1, bind_group, &[]);
-            }
-            render_pass.draw_indexed(0..self.index_count as u32, 0, 0..instance_count as u32);
-        }
+    fn render(&self, render_data: &mut RenderData) {
+        self.0.render(render_data);
     }
 }

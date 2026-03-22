@@ -8,7 +8,7 @@ use wgpu::{BindGroupLayout, PipelineCompilationOptions};
 
 use crate::primitives::mesh_primitive::MeshVertexAttributes;
 use crate::{DefaultRenderPassDescriptor, RenderData, RenderingDescriptor};
-use visula_core::{BindingBuilder, Expression, InstanceBinding};
+use visula_core::{BindingBuilder, Delegate as _, Expression, InstanceBinding};
 use visula_derive::Delegate;
 
 pub struct MeshPipeline {
