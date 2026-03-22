@@ -1,13 +1,19 @@
+pub mod circles;
 pub mod instanced;
 pub mod lines;
 pub mod mesh;
 pub mod pipeline;
+pub mod polygons;
+pub mod rects;
 pub mod renderable;
 pub mod spheres;
 
+pub use circles::*;
 pub use instanced::*;
 pub use lines::*;
 pub use mesh::*;
 pub use pipeline::*;
+pub use polygons::*;
+pub use rects::*;
 pub use renderable::*;
 pub use spheres::*;
