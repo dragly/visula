@@ -1,23 +1,11 @@
 use std::{cell::RefCell, rc::Rc};
-use wgpu::BindGroupLayout;
 
-use crate::{uniform_buffer::UniformBufferInner, BindingBuilder};
+use crate::{integrate::UniformDescriptor, uniform_buffer::UniformBufferInner};
+
 pub trait Uniform {
     type Type;
     fn uniform(inner: Rc<RefCell<UniformBufferInner>>) -> Self::Type;
 }
-
-type IntegrateUniform = Rc<
-    RefCell<
-        dyn Fn(
-            &Rc<RefCell<UniformBufferInner>>,
-            &uuid::Uuid,
-            &mut naga::Module,
-            &mut BindingBuilder,
-            &Rc<BindGroupLayout>,
-        ),
-    >,
->;
 
 #[derive(Clone)]
 pub struct UniformField {
@@ -25,7 +13,7 @@ pub struct UniformField {
     pub buffer_handle: uuid::Uuid,
     pub field_index: usize,
     pub inner: Rc<RefCell<UniformBufferInner>>,
-    pub integrate_uniform: IntegrateUniform,
+    pub descriptor: Rc<UniformDescriptor>,
 }
 
 pub trait UniformHandle {}

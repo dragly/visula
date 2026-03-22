@@ -366,7 +366,8 @@ impl Expression {
             }
             Expression::InstanceField(field) => {
                 if !binding_builder.instances.contains_key(&field.buffer_handle) {
-                    (field.integrate_instance)(
+                    crate::integrate::integrate_instance(
+                        &field.descriptor,
                         &field.inner,
                         &field.buffer_handle,
                         module,
@@ -470,14 +471,14 @@ impl Expression {
                     )
             }
             Expression::UniformField(field) => {
-                let inner = field.inner.borrow();
-                if !binding_builder.instances.contains_key(&field.buffer_handle) {
-                    (field.integrate_uniform.borrow())(
+                if !binding_builder.uniforms.contains_key(&field.buffer_handle) {
+                    crate::integrate::integrate_uniform(
+                        &field.descriptor,
                         &field.inner,
                         &field.buffer_handle,
                         module,
                         binding_builder,
-                        &inner.bind_group_layout,
+                        &field.bind_group_layout,
                     );
                 }
                 let access_index = module.entry_points[binding_builder.entry_point_index]

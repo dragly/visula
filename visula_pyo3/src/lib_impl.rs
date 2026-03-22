@@ -246,99 +246,35 @@ impl PyUniformBuffer {
     }
 
     fn field(&self, field_index: usize) -> PyExpression {
-        let fields = self.fields.clone();
-        let name = self.name.clone();
-        let size = self.size as u32;
-        let integrate = move |inner: &std::rc::Rc<
-            std::cell::RefCell<visula_core::UniformBufferInner>,
-        >,
-                              handle: &::visula_core::uuid::Uuid,
-                              module: &mut ::visula_core::naga::Module,
-                              binding_builder: &mut visula_core::BindingBuilder,
-                              bind_group_layout: &std::rc::Rc<
-            ::visula_core::wgpu::BindGroupLayout,
-        >| {
-            if binding_builder.uniforms.contains_key(&handle.clone()) {
-                return;
+        let mut descriptor_fields = Vec::new();
+        for field in &self.fields {
+            let naga_type_inner = match field.ty.as_ref() {
+                "float" => match field.size {
+                    4 => naga::TypeInner::Scalar(naga::Scalar {
+                        kind: naga::ScalarKind::Float,
+                        width: 4,
+                    }),
+                    t => unimplemented!("Float with size {:?} is not yet implemented", t),
+                },
+                t => unimplemented!("Field type {:?} is not yet implemented", t),
             };
 
-            let entry_point_index = binding_builder.entry_point_index;
-            let _previous_shader_location_offset = binding_builder.shader_location_offset;
-            let _slot = binding_builder.current_slot;
-            let bind_group = binding_builder.current_bind_group;
-
-            let mut uniform_field_definitions = vec![];
-            let mut offset = 0;
-            for field in &fields {
-                let naga_type_inner = match field.ty.as_ref() {
-                    "float" => match field.size {
-                        4 => naga::TypeInner::Scalar(naga::Scalar {
-                            kind: naga::ScalarKind::Float,
-                            width: 4,
-                        }),
-                        t => unimplemented!("Float with size {:?} is not yet implemented", t),
-                    },
-                    t => unimplemented!("Field type {:?} is not yet implemented", t),
-                };
-
-                let naga_type = naga::Type {
+            descriptor_fields.push(visula_core::UniformFieldDescriptor {
+                name: field.name.clone(),
+                size: field.size as u32,
+                naga_type: naga::Type {
                     name: None,
                     inner: naga_type_inner,
-                };
-
-                let field_type = module
-                    .types
-                    .insert(naga_type, ::visula_core::naga::Span::default());
-                uniform_field_definitions.push(::visula_core::naga::StructMember {
-                    name: Some(field.name.clone()),
-                    ty: field_type,
-                    binding: None,
-                    offset,
-                });
-                offset += field.size as u32;
-            }
-
-            let uniform_type = module.types.insert(
-                ::visula_core::naga::Type {
-                    name: Some(name.clone()), // TODO increment a counter to avoid collisions?
-                    inner: ::visula_core::naga::TypeInner::Struct {
-                        members: uniform_field_definitions,
-                        span: size,
-                    },
                 },
-                ::visula_core::naga::Span::default(),
-            );
-            let uniform_variable = module.global_variables.append(
-                ::visula_core::naga::GlobalVariable {
-                    name: Some(name.to_lowercase()),
-                    binding: Some(::visula_core::naga::ResourceBinding {
-                        group: bind_group,
-                        binding: 0,
-                    }),
-                    space: ::visula_core::naga::AddressSpace::Uniform,
-                    ty: uniform_type,
-                    init: None,
-                },
-                ::visula_core::naga::Span::default(),
-            );
-            let uniform_expression = module.entry_points[entry_point_index]
-                .function
-                .expressions
-                .append(
-                    ::visula_core::naga::Expression::GlobalVariable(uniform_variable),
-                    ::visula_core::naga::Span::default(),
-                );
+            });
+        }
 
-            binding_builder.uniforms.insert(
-                *handle,
-                visula_core::UniformBinding {
-                    expression: uniform_expression,
-                    bind_group_layout: bind_group_layout.clone(),
-                    inner: inner.clone(),
-                },
-            );
-            binding_builder.current_bind_group += 1;
-        };
+        let descriptor = Rc::new(visula_core::UniformDescriptor {
+            struct_name: self.name.clone(),
+            variable_name: self.name.to_lowercase(),
+            struct_span: self.size as u32,
+            fields: descriptor_fields,
+        });
 
         PyExpression {
             inner: Expression::UniformField(UniformField {
@@ -346,7 +282,7 @@ impl PyUniformBuffer {
                 bind_group_layout: self.inner.borrow().bind_group_layout.clone(),
                 buffer_handle: self.inner.borrow().handle,
                 inner: self.inner.clone(),
-                integrate_uniform: Rc::new(RefCell::new(integrate)),
+                descriptor,
             }),
         }
     }
