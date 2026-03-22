@@ -49,6 +49,7 @@ pub mod primitives;
 pub mod render_pass;
 pub mod rendering_descriptor;
 pub mod simulation;
+pub mod text;
 pub mod vec_to_buffer;
 
 pub use application::Application;
