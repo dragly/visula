@@ -34,7 +34,7 @@ impl QuadPipeline {
         rendering_descriptor: &RenderingDescriptor,
         descriptor: &QuadPipelineDescriptor,
         delegate: &dyn Delegate,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    ) -> Result<Self, visula_core::ShaderError> {
         let &RenderingDescriptor {
             device,
             camera,
@@ -42,14 +42,14 @@ impl QuadPipeline {
             ..
         } = rendering_descriptor;
 
-        let mut module = naga::front::wgsl::parse_str(descriptor.shader_source).unwrap();
-        let mut binding_builder = BindingBuilder::new(&module, "vs_main", 1);
+        let mut module = naga::front::wgsl::parse_str(descriptor.shader_source)?;
+        let mut binding_builder = BindingBuilder::new(&module, "vs_main", 1)?;
 
         delegate.inject(
             descriptor.shader_variable_name,
             &mut module,
             &mut binding_builder,
-        );
+        )?;
 
         let index_count = match descriptor.index_format {
             wgpu::IndexFormat::Uint16 => descriptor.index_data.len() / 2,
@@ -72,9 +72,8 @@ impl QuadPipeline {
         let info =
             naga::valid::Validator::new(ValidationFlags::empty(), naga::valid::Capabilities::all())
                 .validate(&module)
-                .unwrap();
-        let output_str =
-            naga::back::wgsl::write_string(&module, &info, WriterFlags::all()).unwrap();
+                .map_err(Box::new)?;
+        let output_str = naga::back::wgsl::write_string(&module, &info, WriterFlags::all())?;
         log::debug!("Resulting {} shader code:\n{output_str}", descriptor.label);
 
         let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {

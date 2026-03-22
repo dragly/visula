@@ -93,7 +93,8 @@ where
     S: Simulation + 'static,
 {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        let window = create_window_with_config(&self.config, event_loop);
+        let window =
+            create_window_with_config(&self.config, event_loop).expect("Failed to create window");
         self.main_window_id = Some(window.id());
         create_application(window, &self.event_loop_proxy);
     }
@@ -123,7 +124,7 @@ where
                 },
             );
         }
-        if self.main_window_id.unwrap() != window_id {
+        if self.main_window_id.is_none_or(|id| id != window_id) {
             return;
         }
         match event {
@@ -184,7 +185,7 @@ pub fn initialize_panic_hook() {
 pub fn initialize_logger() {
     #[cfg(target_arch = "wasm32")]
     {
-        console_log::init().expect("could not initialize logger");
+        let _ = console_log::init();
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
@@ -192,13 +193,14 @@ pub fn initialize_logger() {
     }
 }
 
-pub fn create_event_loop() -> EventLoop<CustomEvent> {
-    EventLoop::<CustomEvent>::with_user_event()
-        .build()
-        .expect("Failed to create event loop")
+pub fn create_event_loop() -> Result<EventLoop<CustomEvent>, error::Error> {
+    Ok(EventLoop::<CustomEvent>::with_user_event().build()?)
 }
 
-pub fn create_window_with_config(config: &RunConfig, event_loop: &ActiveEventLoop) -> Arc<Window> {
+pub fn create_window_with_config(
+    config: &RunConfig,
+    event_loop: &ActiveEventLoop,
+) -> Result<Arc<Window>, error::Error> {
     let mut builder = winit::window::Window::default_attributes();
     builder = builder.with_title("Visula");
 
@@ -208,7 +210,7 @@ pub fn create_window_with_config(config: &RunConfig, event_loop: &ActiveEventLoo
             "Ignoring canvas name on non-wasm platforms: '{}'",
             config.canvas_name
         );
-        Arc::new(event_loop.create_window(builder).unwrap())
+        Ok(Arc::new(event_loop.create_window(builder)?))
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -231,12 +233,12 @@ pub fn create_window_with_config(config: &RunConfig, event_loop: &ActiveEventLoo
             canvas_existed = true;
         }
         builder = builder.with_active(false);
-        let window = event_loop.create_window(builder).unwrap();
+        let window = event_loop.create_window(builder)?;
         if !canvas_existed {
             let window_canvas = window.canvas().expect("should have made canvas");
             window_canvas
                 .set_attribute("style", "width: 100%; height: 100%")
-                .unwrap();
+                .expect("could not set canvas style");
             web_sys::window()
                 .expect("no global `window` exists")
                 .document()
@@ -246,11 +248,11 @@ pub fn create_window_with_config(config: &RunConfig, event_loop: &ActiveEventLoo
                 .append_child(&web_sys::Element::from(window_canvas))
                 .expect("couldn't append canvas to document body");
         }
-        Arc::new(window)
+        Ok(Arc::new(window))
     }
 }
 
-pub fn create_window(event_loop: &ActiveEventLoop) -> Arc<Window> {
+pub fn create_window(event_loop: &ActiveEventLoop) -> Result<Arc<Window>, error::Error> {
     create_window_with_config(
         &RunConfig {
             canvas_name: "canvas".to_owned(),
@@ -264,19 +266,21 @@ pub fn create_application(window: Arc<Window>, event_loop_proxy: &EventLoopProxy
     let window_handle = window.clone();
     #[cfg(not(target_arch = "wasm32"))]
     {
-        let application = pollster::block_on(async move { Application::new(window_handle).await });
-        assert!(proxy
-            .send_event(CustomEvent::Application(Box::new(application)))
-            .is_ok());
+        let application = pollster::block_on(async move {
+            Application::new(window_handle)
+                .await
+                .expect("Failed to create application")
+        });
+        let _ = proxy.send_event(CustomEvent::Application(Box::new(application)));
     }
 
     #[cfg(target_arch = "wasm32")]
     {
         wasm_bindgen_futures::spawn_local(async move {
-            let application = Application::new(window_handle).await;
-            assert!(proxy
-                .send_event(CustomEvent::Application(Box::new(application)))
-                .is_ok());
+            let application = Application::new(window_handle)
+                .await
+                .expect("Failed to create application");
+            let _ = proxy.send_event(CustomEvent::Application(Box::new(application)));
         });
     }
 }
@@ -303,7 +307,7 @@ where
 {
     initialize_logger();
     initialize_panic_hook();
-    let event_loop = create_event_loop();
+    let event_loop = create_event_loop().expect("Failed to create event loop");
     let mut app = App {
         config,
         application: None,

@@ -17,8 +17,12 @@ impl TessellatedGeometry {
     }
 }
 
-pub fn tessellate_text(font_data: &[u8], text: &str, scale: f32) -> TessellatedGeometry {
-    let face = ttf_parser::Face::parse(font_data, 0).expect("Failed to parse font");
+pub fn tessellate_text(
+    font_data: &[u8],
+    text: &str,
+    scale: f32,
+) -> Result<TessellatedGeometry, crate::error::Error> {
+    let face = ttf_parser::Face::parse(font_data, 0).map_err(|_| crate::error::Error::FontParse)?;
     let units_per_em = face.units_per_em() as f32;
     let scale_factor = scale / units_per_em;
 
@@ -57,29 +61,27 @@ pub fn tessellate_text(font_data: &[u8], text: &str, scale: f32) -> TessellatedG
         cursor_x += advance;
     }
 
-    TessellatedGeometry {
+    Ok(TessellatedGeometry {
         vertices: all_vertices,
         indices: all_indices,
-    }
+    })
 }
 
-pub fn tessellate_path(path: &Path) -> TessellatedGeometry {
+pub fn tessellate_path(path: &Path) -> Result<TessellatedGeometry, crate::error::Error> {
     let mut geometry: VertexBuffers<PolygonVertex, u32> = VertexBuffers::new();
     let mut tessellator = FillTessellator::new();
-    tessellator
-        .tessellate_path(
-            path,
-            &FillOptions::tolerance(0.01),
-            &mut BuffersBuilder::new(&mut geometry, |vertex: FillVertex| PolygonVertex {
-                position: [vertex.position().x, vertex.position().y],
-            }),
-        )
-        .expect("Path tessellation failed");
+    tessellator.tessellate_path(
+        path,
+        &FillOptions::tolerance(0.01),
+        &mut BuffersBuilder::new(&mut geometry, |vertex: FillVertex| PolygonVertex {
+            position: [vertex.position().x, vertex.position().y],
+        }),
+    )?;
 
-    TessellatedGeometry {
+    Ok(TessellatedGeometry {
         vertices: geometry.vertices,
         indices: geometry.indices,
-    }
+    })
 }
 
 pub fn tessellate_regular_polygon(
@@ -87,7 +89,7 @@ pub fn tessellate_regular_polygon(
     cy: f32,
     radius: f32,
     sides: u32,
-) -> TessellatedGeometry {
+) -> Result<TessellatedGeometry, crate::error::Error> {
     let mut builder = Path::builder();
     for i in 0..sides {
         let angle = std::f32::consts::TAU * i as f32 / sides as f32 - std::f32::consts::FRAC_PI_2;
@@ -110,7 +112,7 @@ pub fn tessellate_star(
     outer_radius: f32,
     inner_radius: f32,
     points: u32,
-) -> TessellatedGeometry {
+) -> Result<TessellatedGeometry, crate::error::Error> {
     let mut builder = Path::builder();
     let total = points * 2;
     for i in 0..total {

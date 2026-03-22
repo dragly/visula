@@ -13,6 +13,7 @@ uuid = {workspace = true}
 log = {workspace = true}
 bytemuck = {workspace = true}
 itertools = {workspace = true}
+thiserror = {workspace = true}
 
 [dev-dependencies]
 env_logger = {workspace = true}

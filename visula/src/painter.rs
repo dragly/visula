@@ -48,7 +48,7 @@ pub struct Painter {
 }
 
 impl Painter {
-    pub fn new(application: &mut Application) -> Self {
+    pub fn new(application: &mut Application) -> Result<Self, crate::error::Error> {
         let sphere_data = Vec::new();
         let sphere_buffer: InstanceBuffer<SphereData> = application.device.create_instance_buffer();
         let spheres_instance = sphere_buffer.instance();
@@ -59,8 +59,7 @@ impl Painter {
                 radius: spheres_instance.radius,
                 color: spheres_instance.color,
             },
-        )
-        .unwrap();
+        )?;
 
         let line_data = Vec::new();
         let line_buffer: InstanceBuffer<LineData> = application.device.create_instance_buffer();
@@ -73,17 +72,16 @@ impl Painter {
                 width: 2.0.into(),
                 color: line_instance.color.clone(),
             },
-        )
-        .expect("Failed to create camera shape line");
+        )?;
 
-        Self {
+        Ok(Self {
             line_data,
             line_buffer,
             lines,
             sphere_data,
             sphere_buffer,
             spheres,
-        }
+        })
     }
 
     pub fn clear(&mut self) {

@@ -48,7 +48,13 @@ impl PyApplication {
 }
 impl ApplicationHandler<CustomEvent> for PyApplication {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        let window = create_window(event_loop);
+        let window = match create_window(event_loop) {
+            Ok(w) => w,
+            Err(e) => {
+                log::error!("Failed to create window: {e}");
+                return;
+            }
+        };
         create_application(window, &self.event_loop_proxy);
     }
 
@@ -68,7 +74,13 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
         match event {
             WindowEvent::RedrawRequested => {
                 {
-                    let frame = application.next_frame();
+                    let frame = match application.next_frame() {
+                        Ok(f) => f,
+                        Err(e) => {
+                            log::error!("Failed to get next frame: {e}");
+                            return;
+                        }
+                    };
                     let mut encoder = application.encoder();
                     let view = frame
                         .texture

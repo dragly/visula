@@ -8,11 +8,11 @@ use bytemuck::{Pod, Zeroable};
 use numpy::ndarray::Axis;
 use numpy::PyReadonlyArray2;
 
-use itertools::Itertools;
 use std::cell::RefCell;
 
 use std::rc::Rc;
 
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::types::PyFunction;
 use pyo3::{buffer::PyBuffer, prelude::*};
 
@@ -180,10 +180,10 @@ impl PyUniformBuffer {
         pyapplication: &PyApplication,
         fields: Vec<PyUniformField>,
         name: &str,
-    ) -> Self {
+    ) -> PyResult<Self> {
         let PyApplication { application, .. } = pyapplication;
         let Some(application) = application else {
-            panic!("Application not yet initialized");
+            return Err(PyRuntimeError::new_err("Application not yet initialized"));
         };
 
         let size = fields.iter().fold(0, |acc, field| acc + field.size);
@@ -224,7 +224,7 @@ impl PyUniformBuffer {
                 }],
             });
 
-        Self {
+        Ok(Self {
             inner: Rc::new(RefCell::new(UniformBufferInner {
                 label: name.into(),
                 buffer,
@@ -236,16 +236,17 @@ impl PyUniformBuffer {
             name: name.into(),
             size,
             queue: application.queue.clone(),
-        }
+        })
     }
 
-    fn update(&self, py: Python, buffer: PyBuffer<u8>) {
-        let data = buffer.to_vec(py).expect("Could not turn PyBuffer into vec");
+    fn update(&self, py: Python, buffer: PyBuffer<u8>) -> PyResult<()> {
+        let data = buffer.to_vec(py)?;
         let inner = self.inner.borrow_mut();
         self.queue.write_buffer(&inner.buffer, 0, &data);
+        Ok(())
     }
 
-    fn field(&self, field_index: usize) -> PyExpression {
+    fn field(&self, field_index: usize) -> PyResult<PyExpression> {
         let mut descriptor_fields = Vec::new();
         for field in &self.fields {
             let naga_type_inner = match field.ty.as_ref() {
@@ -254,9 +255,17 @@ impl PyUniformBuffer {
                         kind: naga::ScalarKind::Float,
                         width: 4,
                     }),
-                    t => unimplemented!("Float with size {:?} is not yet implemented", t),
+                    t => {
+                        return Err(PyRuntimeError::new_err(format!(
+                            "Float with size {t:?} is not yet implemented"
+                        )))
+                    }
                 },
-                t => unimplemented!("Field type {:?} is not yet implemented", t),
+                t => {
+                    return Err(PyRuntimeError::new_err(format!(
+                        "Field type {t:?} is not yet implemented"
+                    )))
+                }
             };
 
             descriptor_fields.push(visula_core::UniformFieldDescriptor {
@@ -276,7 +285,7 @@ impl PyUniformBuffer {
             fields: descriptor_fields,
         });
 
-        PyExpression {
+        Ok(PyExpression {
             inner: Expression::UniformField(UniformField {
                 field_index,
                 bind_group_layout: self.inner.borrow().bind_group_layout.clone(),
@@ -284,7 +293,7 @@ impl PyUniformBuffer {
                 inner: self.inner.clone(),
                 descriptor,
             }),
-        }
+        })
     }
 }
 
@@ -301,16 +310,15 @@ struct PyInstanceBuffer {
 #[pymethods]
 impl PyInstanceBuffer {
     #[new]
-    fn new(py: Python, pyapplication: &PyApplication, obj: Py<PyAny>) -> Self {
+    fn new(py: Python, pyapplication: &PyApplication, obj: Py<PyAny>) -> PyResult<Self> {
         let PyApplication { application, .. } = pyapplication;
         let Some(application) = application else {
-            panic!("Application not yet initialized");
+            return Err(PyRuntimeError::new_err("Application not yet initialized"));
         };
-        let x = obj.extract::<PyBuffer<f64>>(py).expect("Could not extract");
+        let x = obj.extract::<PyBuffer<f64>>(py)?;
         let buffer = InstanceBuffer::<FloatData>::new(&application.device);
         let point_data: Vec<FloatData> = x
-            .to_vec(py)
-            .expect("Cannot convert to vec")
+            .to_vec(py)?
             .iter()
             .copied()
             .map(|x| FloatData {
@@ -319,7 +327,7 @@ impl PyInstanceBuffer {
             })
             .collect();
         buffer.update(&application.device, &application.queue, &point_data);
-        PyInstanceBuffer { inner: buffer }
+        Ok(PyInstanceBuffer { inner: buffer })
     }
 
     fn update_buffer(
@@ -330,14 +338,11 @@ impl PyInstanceBuffer {
     ) -> PyResult<()> {
         let PyApplication { application, .. } = pyapplication;
         let Some(application) = application else {
-            panic!("Application not yet initialized");
+            return Err(PyRuntimeError::new_err("Application not yet initialized"));
         };
-        let x = data
-            .extract::<PyBuffer<f64>>(py)
-            .expect("Could not extract");
+        let x = data.extract::<PyBuffer<f64>>(py)?;
         let point_data: Vec<FloatData> = x
-            .to_vec(py)
-            .expect("Cannot convert to vec")
+            .to_vec(py)?
             .iter()
             .copied()
             .map(|x| FloatData {
@@ -369,17 +374,17 @@ fn vec3(x: &PyExpression, y: &PyExpression, z: &PyExpression) -> PyExpression {
 }
 
 #[pyfunction]
-fn convert(py: Python, pyapplication: &PyApplication, obj: Py<PyAny>) -> PyExpression {
+fn convert(py: Python, pyapplication: &PyApplication, obj: Py<PyAny>) -> PyResult<PyExpression> {
     let PyApplication { application, .. } = pyapplication;
     let Some(application) = application else {
-        panic!("Application not yet initialized");
+        return Err(PyRuntimeError::new_err("Application not yet initialized"));
     };
     if let Ok(expr) = obj.extract::<PyExpression>(py) {
-        return expr;
+        return Ok(expr);
     }
     if let Ok(inner) = obj.getattr(py, "inner") {
         if let Ok(expr) = inner.extract::<PyExpression>(py) {
-            return expr;
+            return Ok(expr);
         }
     }
     if let Ok(x) = obj.extract::<PyReadonlyArray2<f64>>(py) {
@@ -389,10 +394,16 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: Py<PyAny>) -> PyExpre
                 match index {
                     0 => 1,
                     1 => 0,
-                    i => panic!("Got index {i} in what was supposed to be a 2D array"),
+                    i => {
+                        return Err(PyRuntimeError::new_err(format!(
+                            "Got index {i} in what was supposed to be a 2D array"
+                        )))
+                    }
                 }
             } else {
-                panic!("Must have a dimensions with three elements");
+                return Err(PyRuntimeError::new_err(
+                    "Must have a dimension with three elements",
+                ));
             }
         };
         let buffer = InstanceBuffer::<PointData>::new(&application.device);
@@ -408,19 +419,15 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: Py<PyAny>) -> PyExpre
 
         buffer.update(&application.device, &application.queue, &point_data);
 
-        return PyExpression {
+        return Ok(PyExpression {
             inner: instance.position,
-        };
+        });
     }
     if let Ok(x) = obj.extract::<PyBuffer<f64>>(py) {
-        // TODO optimize the case where the same PyBuffer has already
-        // been written to a wgpu Buffer, for instance by creating
-        // a cache
         let buffer = InstanceBuffer::<FloatData>::new(&application.device);
         let instance = buffer.instance();
         let point_data: Vec<FloatData> = x
-            .to_vec(py)
-            .expect("Cannot convert to vec")
+            .to_vec(py)?
             .iter()
             .copied()
             .map(|x| FloatData {
@@ -431,19 +438,15 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: Py<PyAny>) -> PyExpre
 
         buffer.update(&application.device, &application.queue, &point_data);
 
-        return PyExpression {
+        return Ok(PyExpression {
             inner: instance.position,
-        };
+        });
     }
     if let Ok(x) = obj.extract::<PyBuffer<f32>>(py) {
-        // TODO optimize the case where the same PyBuffer has already
-        // been written to a wgpu Buffer, for instance by creating
-        // a cache
         let buffer = InstanceBuffer::<FloatData>::new(&application.device);
         let instance = buffer.instance();
         let point_data: Vec<FloatData> = x
-            .to_vec(py)
-            .expect("Cannot convert to vec")
+            .to_vec(py)?
             .iter()
             .copied()
             .map(|x| FloatData {
@@ -454,27 +457,32 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: Py<PyAny>) -> PyExpre
 
         buffer.update(&application.device, &application.queue, &point_data);
 
-        return PyExpression {
+        return Ok(PyExpression {
             inner: instance.position,
-        };
+        });
     }
     if let Ok(x) = obj.extract::<f32>(py) {
-        return PyExpression { inner: x.into() };
+        return Ok(PyExpression { inner: x.into() });
     }
     if let Ok(x) = obj.extract::<Vec<f32>>(py) {
         if x.len() == 3 {
-            return PyExpression {
+            return Ok(PyExpression {
                 inner: Vec3::new(x[0], x[1], x[2]).into(),
-            };
+            });
         }
         if x.len() == 4 {
-            return PyExpression {
+            return Ok(PyExpression {
                 inner: Vec4::new(x[0], x[1], x[2], x[3]).into(),
-            };
+            });
         }
-        unimplemented!("Vec of length {} are not supported", x.len());
+        return Err(PyRuntimeError::new_err(format!(
+            "Vec of length {} is not supported",
+            x.len()
+        )));
     }
-    unimplemented!("No support for obj: {obj}")
+    Err(PyRuntimeError::new_err(format!(
+        "No support for obj: {obj}"
+    )))
 }
 
 #[pyfunction]
@@ -488,43 +496,49 @@ fn show(
     {
         let mut py_application_mut = py_application.borrow_mut();
         let Some(ref application) = py_application_mut.application else {
-            panic!("Application not yet initialized");
+            return Err(PyRuntimeError::new_err("Application not yet initialized"));
         };
         application.window.request_redraw();
         let renderables: Vec<Box<dyn Renderable>> = py_renderables
             .iter()
-            .map(|renderable| -> Box<dyn Renderable> {
-                // TODO automate the conversion
+            .map(|renderable| -> PyResult<Box<dyn Renderable>> {
                 if let Ok(pysphere) = renderable.extract::<PySphereDelegate>(py) {
-                    return Box::new(
+                    return Ok(Box::new(
                         Spheres::new(
                             &application.rendering_descriptor(),
                             &SphereDelegate {
-                                position: convert(py, &py_application_mut, pysphere.position).inner,
-                                radius: convert(py, &py_application_mut, pysphere.radius).inner,
-                                color: convert(py, &py_application_mut, pysphere.color).inner,
+                                position: convert(py, &py_application_mut, pysphere.position)?
+                                    .inner,
+                                radius: convert(py, &py_application_mut, pysphere.radius)?.inner,
+                                color: convert(py, &py_application_mut, pysphere.color)?.inner,
                             },
                         )
-                        .expect("Failed to create spheres"),
-                    );
+                        .map_err(|e| {
+                            PyRuntimeError::new_err(format!("Failed to create spheres: {e}"))
+                        })?,
+                    ));
                 }
                 if let Ok(pylines) = renderable.extract::<PyLineDelegate>(py) {
-                    return Box::new(
+                    return Ok(Box::new(
                         Lines::new(
                             &application.rendering_descriptor(),
                             &LineDelegate {
-                                start: convert(py, &py_application_mut, pylines.start).inner,
-                                end: convert(py, &py_application_mut, pylines.end).inner,
-                                width: convert(py, &py_application_mut, pylines.width).inner,
-                                color: convert(py, &py_application_mut, pylines.color).inner,
+                                start: convert(py, &py_application_mut, pylines.start)?.inner,
+                                end: convert(py, &py_application_mut, pylines.end)?.inner,
+                                width: convert(py, &py_application_mut, pylines.width)?.inner,
+                                color: convert(py, &py_application_mut, pylines.color)?.inner,
                             },
                         )
-                        .expect("Failed to create spheres"),
-                    );
+                        .map_err(|e| {
+                            PyRuntimeError::new_err(format!("Failed to create lines: {e}"))
+                        })?,
+                    ));
                 }
-                unimplemented!("TODO")
+                Err(PyRuntimeError::new_err(format!(
+                    "Unsupported renderable type: {renderable}"
+                )))
             })
-            .collect_vec();
+            .collect::<PyResult<Vec<_>>>()?;
 
         py_application_mut.renderables = renderables;
         py_application_mut.update = Some(update);

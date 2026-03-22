@@ -94,7 +94,7 @@ impl EguiRenderer {
 }
 
 impl Application {
-    pub async fn new(window: Arc<Window>) -> Application {
+    pub async fn new(window: Arc<Window>) -> Result<Application, crate::error::Error> {
         let size = window.inner_size();
 
         #[cfg(target_arch = "wasm32")]
@@ -121,7 +121,7 @@ impl Application {
             flags: wgpu::InstanceFlags::from_build_config().with_env(),
             memory_budget_thresholds: wgpu::MemoryBudgetThresholds::default(),
         });
-        let surface = instance.create_surface(window.clone()).unwrap();
+        let surface = instance.create_surface(window.clone())?;
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
@@ -129,7 +129,7 @@ impl Application {
                 force_fallback_adapter: false,
             })
             .await
-            .expect("Failed to find an appropriate adapter");
+            .map_err(|_| crate::error::Error::NoAdapter)?;
 
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
@@ -143,12 +143,11 @@ impl Application {
                 experimental_features: Default::default(),
                 trace: Default::default(),
             })
-            .await
-            .unwrap();
+            .await?;
 
         let mut config = surface
             .get_default_config(&adapter, size.width.max(640), size.height.max(480))
-            .expect("Surface isn't supported by the adapter.");
+            .ok_or(crate::error::Error::NoSurfaceConfig)?;
         let surface_view_format = config.format.add_srgb_suffix();
         config.view_formats.push(surface_view_format);
         surface.configure(&device, &config);
@@ -182,7 +181,7 @@ impl Application {
         let egui_ctx = create_egui_context();
         let egui_renderer = EguiRenderer::new(&device, surface_view_format, &window);
 
-        Application {
+        Ok(Application {
             device,
             queue,
             config,
@@ -196,7 +195,7 @@ impl Application {
             egui_ctx,
             start_time,
             sample_count,
-        }
+        })
     }
 
     fn create_multisampled_framebuffer(
@@ -296,14 +295,12 @@ impl Application {
         self.camera.update(&camera_uniforms, &self.queue);
     }
 
-    pub fn next_frame(&self) -> SurfaceTexture {
+    pub fn next_frame(&self) -> Result<SurfaceTexture, crate::error::Error> {
         match self.surface.get_current_texture() {
-            Ok(frame) => frame,
+            Ok(frame) => Ok(frame),
             Err(_) => {
                 self.surface.configure(&self.device, &self.config);
-                self.surface
-                    .get_current_texture()
-                    .expect("Failed to acquire next surface texture!")
+                Ok(self.surface.get_current_texture()?)
             }
         }
     }
@@ -339,7 +336,13 @@ impl Application {
     }
 
     pub fn render(&mut self, simulation: &mut impl Simulation) {
-        let frame = self.next_frame();
+        let frame = match self.next_frame() {
+            Ok(frame) => frame,
+            Err(e) => {
+                log::error!("Failed to acquire frame: {e}");
+                return;
+            }
+        };
         let mut encoder = self.encoder();
 
         let view = frame.texture.create_view(&TextureViewDescriptor {
