@@ -1,3 +1,4 @@
+pub mod blit;
 pub mod circles;
 pub mod instanced;
 pub mod lines;
@@ -9,6 +10,7 @@ pub mod rects;
 pub mod renderable;
 pub mod spheres;
 
+pub use blit::*;
 pub use circles::*;
 pub use instanced::*;
 pub use lines::*;
