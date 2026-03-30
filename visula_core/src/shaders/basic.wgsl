@@ -13,7 +13,6 @@ var<uniform> u_globals: Globals;
 
 struct VertexOutput {
     @builtin(position) projected_position: vec4<f32>,
-    @location(0) color: vec3<f32>,
 };
 
 struct LineVertex {
@@ -23,7 +22,7 @@ struct LineVertex {
 };
 
 struct LineFragment {
-    color: vec4<f32>,
+    color: vec3<f32>,
 };
 
 fn offset(pos: vec3<f32>, direction: vec3<f32>, unit_offset: vec3<f32>) -> vec3<f32> {
@@ -81,5 +80,6 @@ fn vs_main(
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     var line_fragment: LineFragment;
+
     return vec4<f32>(line_fragment.color, 1.0);
 }

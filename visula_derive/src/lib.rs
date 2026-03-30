@@ -71,6 +71,13 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                         ];
                         ::visula_core::inject::inject(module, binding_builder, shader_variable_name, &fields)
                     }
+
+                    fn inject_before_return(&self, shader_variable_name: &str, module: &mut ::naga::Module, binding_builder: &mut ::visula_core::BindingBuilder) -> Result<(), ::visula_core::ShaderError> {
+                        let fields = vec![
+                            #(#field_insertions)*
+                        ];
+                        ::visula_core::inject::inject_before_return(module, binding_builder, shader_variable_name, &fields)
+                    }
                 }
             }
         }

@@ -11,8 +11,8 @@ use winit::event::{Event, KeyEvent, WindowEvent};
 
 use glam::Vec4;
 use visula::{
-    CustomEvent, DropEvent, InstanceBuffer, MeshGeometry, MeshPipeline, RenderData, SphereDelegate,
-    SpherePrimitive, Spheres, UniformBuffer,
+    CustomEvent, DropEvent, Expression, InstanceBuffer, MeshGeometry, MeshPipeline, RenderData,
+    SphereGeometry, SphereMaterial, SpherePrimitive, Spheres, UniformBuffer,
 };
 use visula_derive::Uniform;
 
@@ -98,10 +98,13 @@ impl Simulation {
         let settings = settings_buffer.uniform();
         let points = Spheres::new(
             &application.rendering_descriptor(),
-            &SphereDelegate {
+            &SphereGeometry {
                 position: sphere.position,
                 radius: settings.radius,
                 color: sphere.color,
+            },
+            &SphereMaterial {
+                color: Expression::InstanceColor.lit(),
             },
         )
         .unwrap();
@@ -113,7 +116,7 @@ impl Simulation {
                 scale: Vec3::ONE.into(),
             },
             &MeshMaterial {
-                color: Vec4::splat(1.0).into(),
+                color: Expression::from(Vec4::splat(1.0)).lit(),
             },
         )
         .unwrap();

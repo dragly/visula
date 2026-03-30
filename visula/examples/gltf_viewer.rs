@@ -7,7 +7,7 @@ use clap::Parser;
 use glam::Vec4;
 use visula::{
     io::gltf::{parse_gltf, GltfMesh},
-    MeshGeometry, MeshMaterial, MeshPipeline, RenderData,
+    Expression, MeshGeometry, MeshMaterial, MeshPipeline, RenderData,
 };
 
 #[derive(Parser)]
@@ -56,7 +56,7 @@ impl Simulation {
                         scale: Vec3::ONE.into(),
                     },
                     &MeshMaterial {
-                        color: Vec4::ONE.into(),
+                        color: Expression::from(Vec4::ONE).lit(),
                     },
                 )
                 .unwrap();

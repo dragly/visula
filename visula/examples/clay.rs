@@ -9,7 +9,8 @@ use clap::Parser;
 use itertools_num::linspace;
 
 use visula::{
-    InstanceBuffer, RenderData, Renderable, SphereDelegate, Spheres, UniformBuffer, Vector3,
+    Expression, InstanceBuffer, RenderData, Renderable, SphereGeometry, SphereMaterial, Spheres,
+    UniformBuffer, Vector3,
 };
 use visula_derive::{Instance, Uniform};
 
@@ -338,10 +339,13 @@ impl Simulation {
         let settings = settings_buffer.uniform();
         let spheres = Spheres::new(
             &application.rendering_descriptor(),
-            &SphereDelegate {
+            &SphereGeometry {
                 position: particle.position,
                 radius: settings.radius,
-                color: glam::Vec3::new(0.2, 0.8, 0.6).into(),
+                color: glam::Vec3::ZERO.into(),
+            },
+            &SphereMaterial {
+                color: Expression::from(glam::Vec3::new(0.2, 0.8, 0.6)).lit(),
             },
         )
         .unwrap();

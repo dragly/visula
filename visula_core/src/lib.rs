@@ -36,3 +36,5 @@ pub use glam;
 pub use naga;
 pub use uuid;
 pub use wgpu;
+
+pub const LIGHTING_WGSL: &str = include_str!("shaders/lighting.wgsl");

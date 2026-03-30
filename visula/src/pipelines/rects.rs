@@ -73,6 +73,7 @@ impl Rects {
                 label: "rects",
                 shader_source: include_str!("../shaders/rect.wgsl"),
                 shader_variable_name: "rect",
+                fragment_shader_variable_name: None,
                 vertex_data: bytemuck::cast_slice(&vertex_data),
                 vertex_stride: size_of::<Vertex>(),
                 vertex_format: wgpu::VertexFormat::Float32x2,
@@ -80,6 +81,7 @@ impl Rects {
                 index_format: wgpu::IndexFormat::Uint16,
             },
             delegate,
+            None,
         )?))
     }
 }

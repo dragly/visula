@@ -12,6 +12,7 @@ pub struct QuadPipelineDescriptor<'a> {
     pub label: &'a str,
     pub shader_source: &'a str,
     pub shader_variable_name: &'a str,
+    pub fragment_shader_variable_name: Option<&'a str>,
     pub vertex_data: &'a [u8],
     pub vertex_stride: usize,
     pub vertex_format: wgpu::VertexFormat,
@@ -26,14 +27,16 @@ pub struct QuadPipeline {
     index_count: usize,
     index_format: wgpu::IndexFormat,
     label: String,
-    binding_builder: BindingBuilder,
+    vertex_binding_builder: BindingBuilder,
+    fragment_binding_builder: Option<BindingBuilder>,
 }
 
 impl QuadPipeline {
     pub fn new(
         rendering_descriptor: &RenderingDescriptor,
         descriptor: &QuadPipelineDescriptor,
-        delegate: &dyn Delegate,
+        vertex_delegate: &dyn Delegate,
+        fragment_delegate: Option<&dyn Delegate>,
     ) -> Result<Self, visula_core::ShaderError> {
         let &RenderingDescriptor {
             device,
@@ -42,14 +45,31 @@ impl QuadPipeline {
             ..
         } = rendering_descriptor;
 
-        let mut module = naga::front::wgsl::parse_str(descriptor.shader_source)?;
-        let mut binding_builder = BindingBuilder::new(&module, "vs_main", 1)?;
+        let shader_with_lighting = format!(
+            "{}\n{}",
+            visula_core::LIGHTING_WGSL,
+            descriptor.shader_source,
+        );
+        let mut module = naga::front::wgsl::parse_str(&shader_with_lighting)?;
+        let mut vertex_binding_builder = BindingBuilder::new(&module, "vs_main", 1)?;
 
-        delegate.inject(
+        vertex_delegate.inject(
             descriptor.shader_variable_name,
             &mut module,
-            &mut binding_builder,
+            &mut vertex_binding_builder,
         )?;
+
+        let fragment_binding_builder = match (
+            &fragment_delegate,
+            &descriptor.fragment_shader_variable_name,
+        ) {
+            (Some(delegate), Some(variable_name)) => {
+                let mut builder = BindingBuilder::new(&module, "fs_main", 0)?;
+                delegate.inject_before_return(variable_name, &mut module, &mut builder)?;
+                Some(builder)
+            }
+            _ => None,
+        };
 
         let index_count = match descriptor.index_format {
             wgpu::IndexFormat::Uint16 => descriptor.index_data.len() / 2,
@@ -81,22 +101,49 @@ impl QuadPipeline {
             source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(&output_str)),
         });
 
-        let bind_group_layouts: Vec<&BindGroupLayout> = binding_builder
+        let vertex_uniform_layouts: Vec<&BindGroupLayout> = vertex_binding_builder
             .uniforms
             .values()
             .map(|binding| binding.bind_group_layout.as_ref())
             .collect();
 
-        let uniforms = {
-            let mut uniforms = vec![&camera.bind_group_layout];
-            for layout in &bind_group_layouts {
-                uniforms.push(layout);
+        let fragment_uniform_layouts: Vec<&BindGroupLayout> = fragment_binding_builder
+            .as_ref()
+            .map(|b| {
+                b.uniforms
+                    .values()
+                    .map(|binding| binding.bind_group_layout.as_ref())
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let fragment_texture_layouts: Vec<BindGroupLayout> = fragment_binding_builder
+            .as_ref()
+            .map(|b| {
+                b.textures
+                    .values()
+                    .map(|binding| binding.inner.borrow().bind_group_layout.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let bind_group_layouts = {
+            let mut layouts = vec![&camera.bind_group_layout];
+            for layout in &vertex_uniform_layouts {
+                layouts.push(layout);
             }
-            uniforms
+            for layout in &fragment_texture_layouts {
+                layouts.push(layout);
+            }
+            for layout in &fragment_uniform_layouts {
+                layouts.push(layout);
+            }
+            layouts
         };
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some(&format!("{} pipeline layout", descriptor.label)),
-            bind_group_layouts: &uniforms,
+            bind_group_layouts: &bind_group_layouts,
             push_constant_ranges: &[],
         });
 
@@ -109,7 +156,7 @@ impl QuadPipeline {
                 shader_location: 0,
             }],
         };
-        let sorted_bindings = binding_builder.sorted_bindings();
+        let sorted_bindings = vertex_binding_builder.sorted_bindings();
         let mut layouts = sorted_bindings
             .iter()
             .map(|binding| binding.layout.build())
@@ -168,7 +215,8 @@ impl QuadPipeline {
             index_count,
             index_format: descriptor.index_format,
             label: descriptor.label.to_string(),
-            binding_builder,
+            vertex_binding_builder,
+            fragment_binding_builder,
         })
     }
 }
@@ -190,7 +238,7 @@ impl Renderable for QuadPipeline {
             return;
         }
         let mut count = None;
-        for binding in self.binding_builder.instances.values() {
+        for binding in self.vertex_binding_builder.instances.values() {
             let other = binding.inner.borrow().count;
             if other == 0 {
                 count = None;
@@ -208,23 +256,43 @@ impl Renderable for QuadPipeline {
             }
         }
         log::trace!("{} count {count:#?}", self.label);
-        if count.is_none() && !self.binding_builder.instances.is_empty() {
+        if count.is_none() && !self.vertex_binding_builder.instances.is_empty() {
             log::debug!("Empty {} buffer detected. Aborting render.", self.label);
             return;
         }
 
         let bindings: Vec<(&InstanceBinding, Ref<wgpu::Buffer>)> = self
-            .binding_builder
+            .vertex_binding_builder
             .instances
             .values()
             .map(|v| (v, Ref::map(v.inner.borrow(), |v| &v.buffer)))
             .collect();
-        let uniforms: Vec<wgpu::BindGroup> = self
-            .binding_builder
+        let vertex_uniforms: Vec<wgpu::BindGroup> = self
+            .vertex_binding_builder
             .uniforms
             .values()
             .map(|v| v.inner.borrow().bind_group.clone())
             .collect();
+        let fragment_textures: Vec<wgpu::BindGroup> = self
+            .fragment_binding_builder
+            .as_ref()
+            .map(|b| {
+                b.textures
+                    .values()
+                    .map(|v| v.inner.borrow().bind_group.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let fragment_uniforms: Vec<wgpu::BindGroup> = self
+            .fragment_binding_builder
+            .as_ref()
+            .map(|b| {
+                b.uniforms
+                    .values()
+                    .map(|v| v.inner.borrow().bind_group.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
         {
             let default_render_pass = DefaultRenderPassDescriptor::new(
                 &self.label,
@@ -238,7 +306,7 @@ impl Renderable for QuadPipeline {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_index_buffer(self.index_buffer.slice(..), self.index_format);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            let mut instance_count = if self.binding_builder.instances.is_empty() {
+            let mut instance_count = if self.vertex_binding_builder.instances.is_empty() {
                 1
             } else {
                 0
@@ -249,9 +317,21 @@ impl Renderable for QuadPipeline {
                 render_pass.set_vertex_buffer(slot, buffer.slice(..));
                 instance_count = instance_count.max(binding.inner.borrow().count);
             }
-            for bind_group in uniforms.iter() {
-                log::trace!("Setting bind group {}", 1);
-                render_pass.set_bind_group(1, bind_group, &[]);
+            let mut current_slot = 1u32;
+            for bind_group in vertex_uniforms.iter() {
+                log::trace!("Setting vertex uniform bind group {current_slot}");
+                render_pass.set_bind_group(current_slot, bind_group, &[]);
+                current_slot += 1;
+            }
+            for bind_group in fragment_textures.iter() {
+                log::trace!("Setting fragment texture bind group {current_slot}");
+                render_pass.set_bind_group(current_slot, bind_group, &[]);
+                current_slot += 1;
+            }
+            for bind_group in fragment_uniforms.iter() {
+                log::trace!("Setting fragment uniform bind group {current_slot}");
+                render_pass.set_bind_group(current_slot, bind_group, &[]);
+                current_slot += 1;
             }
             render_pass.draw_indexed(0..self.index_count as u32, 0, 0..instance_count as u32);
         }

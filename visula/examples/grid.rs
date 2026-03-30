@@ -2,8 +2,8 @@ use bytemuck::{Pod, Zeroable};
 use glam::{Vec3, Vec4};
 use itertools::iproduct;
 use visula::{
-    CustomEvent, Expression, InstanceBuffer, LineDelegate, Lines, RenderData, Renderable,
-    UniformBuffer,
+    CustomEvent, Expression, InstanceBuffer, LineGeometry, LineMaterial, Lines, RenderData,
+    Renderable, UniformBuffer,
 };
 use visula_derive::{Instance, Uniform};
 use winit::event::{Event, WindowEvent};
@@ -78,11 +78,14 @@ impl Simulation {
         let offset_b = gaussian(&line.position_b, &uniforms.cursor_position);
         let lines = Lines::new(
             &application.rendering_descriptor(),
-            &LineDelegate {
+            &LineGeometry {
                 start: &line.position_a + &offset_a,
                 end: line.position_b + &offset_b,
                 width: 0.1.into(),
-                ..Default::default()
+                color: Vec3::ZERO.into(),
+            },
+            &LineMaterial {
+                color: Expression::InstanceColor.lit(),
             },
         )
         .unwrap();

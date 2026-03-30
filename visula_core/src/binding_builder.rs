@@ -65,6 +65,7 @@ pub struct BindingBuilder {
     pub current_slot: u32,
     pub current_bind_group: u32,
     pub shader_stage: ShaderStage,
+    pub pending_statements: Vec<naga::Statement>,
 }
 
 impl BindingBuilder {
@@ -85,7 +86,7 @@ impl BindingBuilder {
 
         let shader_stage = entry_point.stage;
 
-        let shader_location_offset = entry_point.function.arguments.len() as u32;
+        let shader_location_offset = Self::compute_shader_location_offset(module, entry_point);
         log::debug!("shader_location_offset: {shader_location_offset}");
 
         let current_bind_group = 1 + module
@@ -115,7 +116,29 @@ impl BindingBuilder {
             current_slot,
             current_bind_group,
             shader_stage,
+            pending_statements: Vec::new(),
         })
+    }
+
+    fn compute_shader_location_offset(module: &Module, entry_point: &naga::EntryPoint) -> u32 {
+        let mut max_location: Option<u32> = None;
+        for arg in &entry_point.function.arguments {
+            if let Some(naga::Binding::Location { location, .. }) = &arg.binding {
+                max_location = Some(max_location.map_or(*location, |m| m.max(*location)));
+            } else {
+                // Struct argument — check struct members for locations
+                let ty = &module.types[arg.ty];
+                if let naga::TypeInner::Struct { members, .. } = &ty.inner {
+                    for member in members {
+                        if let Some(naga::Binding::Location { location, .. }) = &member.binding {
+                            max_location =
+                                Some(max_location.map_or(*location, |m| m.max(*location)));
+                        }
+                    }
+                }
+            }
+        }
+        max_location.map_or(0, |m| m + 1)
     }
 
     pub fn sorted_bindings(&self) -> Vec<InstanceBinding> {

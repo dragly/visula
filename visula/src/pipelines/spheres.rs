@@ -38,16 +38,22 @@ fn create_vertices() -> (Vec<Vertex>, Vec<u16>) {
 pub struct Spheres(QuadPipeline);
 
 #[derive(Delegate)]
-pub struct SphereDelegate {
+pub struct SphereGeometry {
     pub position: Expression,
     pub radius: Expression,
+    pub color: Expression,
+}
+
+#[derive(Delegate)]
+pub struct SphereMaterial {
     pub color: Expression,
 }
 
 impl Spheres {
     pub fn new(
         rendering_descriptor: &RenderingDescriptor,
-        delegate: &SphereDelegate,
+        geometry: &SphereGeometry,
+        material: &SphereMaterial,
     ) -> Result<Self, visula_core::ShaderError> {
         let (vertex_data, index_data) = create_vertices();
         Ok(Spheres(QuadPipeline::new(
@@ -55,14 +61,16 @@ impl Spheres {
             &QuadPipelineDescriptor {
                 label: "spheres",
                 shader_source: include_str!("../shaders/sphere.wgsl"),
-                shader_variable_name: "sphere",
+                shader_variable_name: "sphere_geometry",
+                fragment_shader_variable_name: Some("sphere_material"),
                 vertex_data: bytemuck::cast_slice(&vertex_data),
                 vertex_stride: size_of::<Vertex>(),
                 vertex_format: wgpu::VertexFormat::Float32x4,
                 index_data: bytemuck::cast_slice(&index_data),
                 index_format: wgpu::IndexFormat::Uint16,
             },
-            delegate,
+            geometry,
+            Some(material),
         )?))
     }
 }

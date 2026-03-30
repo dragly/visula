@@ -6,8 +6,8 @@ use itertools::Itertools;
 use itertools_num::linspace;
 use visula::Renderable;
 use visula::{
-    InstanceBuffer, InstanceDeviceExt, LineDelegate, Lines, RenderData, SphereDelegate, Spheres,
-    UniformBuffer,
+    Expression, InstanceBuffer, InstanceDeviceExt, LineGeometry, LineMaterial, Lines, RenderData,
+    SphereGeometry, SphereMaterial, Spheres, UniformBuffer,
 };
 use visula_derive::{Instance, Uniform};
 
@@ -243,25 +243,31 @@ impl Simulation {
         color_buffer.update(&application.device, &application.queue, &color_data);
         let spheres = Spheres::new(
             &application.rendering_descriptor(),
-            &SphereDelegate {
+            &SphereGeometry {
                 position: particle.position,
                 radius: 1.0 + settings.radius,
                 color: color.value,
+            },
+            &SphereMaterial {
+                color: Expression::InstanceColor.lit(),
             },
         )
         .unwrap();
 
         let lines = Lines::new(
             &application.rendering_descriptor(),
-            &LineDelegate {
+            &LineGeometry {
                 start: bond.position_a,
                 end: bond.position_b,
                 width: settings.width,
-                color: visula::Expression::Vector3 {
+                color: Expression::Vector3 {
                     x: bond.strength.clone().into(),
                     y: 1.0.into(),
                     z: 0.8.into(),
                 },
+            },
+            &LineMaterial {
+                color: Expression::InstanceColor.lit(),
             },
         )
         .unwrap();

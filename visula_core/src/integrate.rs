@@ -48,7 +48,11 @@ pub fn integrate_instance(
                 ty: field_type,
                 binding: Some(naga::Binding::Location {
                     location: shader_location,
-                    interpolation: None,
+                    interpolation: if binding_builder.shader_stage == naga::ShaderStage::Fragment {
+                        Some(naga::Interpolation::Flat)
+                    } else {
+                        None
+                    },
                     sampling: None,
                     blend_src: None,
                 }),

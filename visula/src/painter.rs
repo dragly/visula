@@ -1,9 +1,10 @@
 use crate::InstanceDeviceExt;
 use crate::RenderData;
-use crate::{Application, InstanceBuffer, LineDelegate, Lines, Renderable};
-use crate::{SphereDelegate, Spheres};
+use crate::{Application, InstanceBuffer, LineGeometry, LineMaterial, Lines, Renderable};
+use crate::{SphereGeometry, SphereMaterial, Spheres};
 use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
+use visula_core::Expression;
 use visula_derive::Instance;
 
 #[repr(C, align(16))]
@@ -54,10 +55,13 @@ impl Painter {
         let spheres_instance = sphere_buffer.instance();
         let spheres = Spheres::new(
             &application.rendering_descriptor(),
-            &SphereDelegate {
+            &SphereGeometry {
                 position: spheres_instance.position,
                 radius: spheres_instance.radius,
                 color: spheres_instance.color,
+            },
+            &SphereMaterial {
+                color: Expression::InstanceColor.lit(),
             },
         )?;
 
@@ -66,11 +70,14 @@ impl Painter {
         let line_instance = line_buffer.instance();
         let lines = Lines::new(
             &application.rendering_descriptor(),
-            &LineDelegate {
+            &LineGeometry {
                 start: line_instance.start,
                 end: line_instance.end,
                 width: 2.0.into(),
                 color: line_instance.color.clone(),
+            },
+            &LineMaterial {
+                color: Expression::InstanceColor.lit(),
             },
         )?;
 

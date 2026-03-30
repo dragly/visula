@@ -17,8 +17,8 @@ use pyo3::types::PyFunction;
 use pyo3::{buffer::PyBuffer, prelude::*};
 
 use visula::{
-    Expression, InstanceBuffer, LineDelegate, Lines, PyLineDelegate, PySphereDelegate, Renderable,
-    SphereDelegate, Spheres,
+    Expression, InstanceBuffer, LineGeometry, LineMaterial, Lines, Renderable, SphereGeometry,
+    SphereMaterial, Spheres,
 };
 use visula_core::glam::{Vec3, Vec4};
 use visula_core::uuid::Uuid;
@@ -45,6 +45,48 @@ struct PointData {
 struct FloatData {
     position: f32,
     _padding: [f32; 3],
+}
+
+#[pyclass(name = "SphereDelegate", unsendable)]
+#[derive(Clone)]
+struct PySphereDelegate {
+    pub position: Py<PyAny>,
+    pub radius: Py<PyAny>,
+    pub color: Py<PyAny>,
+}
+
+#[pymethods]
+impl PySphereDelegate {
+    #[new]
+    fn new(position: Py<PyAny>, radius: Py<PyAny>, color: Py<PyAny>) -> Self {
+        Self {
+            position,
+            radius,
+            color,
+        }
+    }
+}
+
+#[pyclass(name = "LineDelegate", unsendable)]
+#[derive(Clone)]
+struct PyLineDelegate {
+    pub start: Py<PyAny>,
+    pub end: Py<PyAny>,
+    pub width: Py<PyAny>,
+    pub color: Py<PyAny>,
+}
+
+#[pymethods]
+impl PyLineDelegate {
+    #[new]
+    fn new(start: Py<PyAny>, end: Py<PyAny>, width: Py<PyAny>, color: Py<PyAny>) -> Self {
+        Self {
+            start,
+            end,
+            width,
+            color,
+        }
+    }
 }
 
 #[pyclass(name = "Expression", unsendable)]
@@ -506,11 +548,14 @@ fn show(
                     return Ok(Box::new(
                         Spheres::new(
                             &application.rendering_descriptor(),
-                            &SphereDelegate {
+                            &SphereGeometry {
                                 position: convert(py, &py_application_mut, pysphere.position)?
                                     .inner,
                                 radius: convert(py, &py_application_mut, pysphere.radius)?.inner,
                                 color: convert(py, &py_application_mut, pysphere.color)?.inner,
+                            },
+                            &SphereMaterial {
+                                color: Expression::InstanceColor,
                             },
                         )
                         .map_err(|e| {
@@ -522,11 +567,14 @@ fn show(
                     return Ok(Box::new(
                         Lines::new(
                             &application.rendering_descriptor(),
-                            &LineDelegate {
+                            &LineGeometry {
                                 start: convert(py, &py_application_mut, pylines.start)?.inner,
                                 end: convert(py, &py_application_mut, pylines.end)?.inner,
                                 width: convert(py, &py_application_mut, pylines.width)?.inner,
                                 color: convert(py, &py_application_mut, pylines.color)?.inner,
+                            },
+                            &LineMaterial {
+                                color: Expression::InstanceColor,
                             },
                         )
                         .map_err(|e| {
@@ -554,8 +602,8 @@ fn visula_pyo3(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(show, m)?)?;
     m.add_function(wrap_pyfunction!(convert, m)?)?;
     m.add_function(wrap_pyfunction!(vec3, m)?)?;
-    m.add_class::<PyLineDelegate>()?;
     m.add_class::<PySphereDelegate>()?;
+    m.add_class::<PyLineDelegate>()?;
     m.add_class::<PyExpression>()?;
     m.add_class::<PyApplication>()?;
     m.add_class::<PyEventLoop>()?;
