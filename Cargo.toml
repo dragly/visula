@@ -4,8 +4,8 @@ resolver = "2"
 
 
 [workspace.dependencies]
-wgpu = { version = "27", features = ["webgl"] }
-naga = { version = "27", features = ["wgsl-in", "wgsl-out"] }
+wgpu = { version = "29", features = ["webgl"] }
+naga = { version = "29", features = ["wgsl-in", "wgsl-out"] }
 glam = { version = "0.30", features = ["bytemuck"] }
 uuid = { version = "1.18.1", features = [
   "v4",
@@ -16,9 +16,9 @@ uuid = { version = "1.18.1", features = [
 bytemuck = { version = "1.24", features = ["derive"] }
 log = "0.4"
 winit = { version = "0.30" }
-egui = { version = "0.33" }
-egui-wgpu = { version = "0.33", features = ["winit"] }
-egui-winit = { version = "0.33", default-features = false }
+egui = { version = "0.34" }
+egui-wgpu = { version = "0.34", features = ["winit"] }
+egui-winit = { version = "0.34", default-features = false }
 pyo3 = { version = "0.27", features = ["py-clone", "extension-module"] }
 pyo3-build-config = { version = "0.27", features = ["resolve-config"] }
 numpy = { version = "0.27", features = ["nalgebra"] }

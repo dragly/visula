@@ -55,6 +55,7 @@ pub fn integrate_instance(
                     },
                     sampling: None,
                     blend_src: None,
+                    per_primitive: false,
                 }),
             });
 
@@ -158,6 +159,7 @@ pub fn integrate_uniform(
             space: naga::AddressSpace::Uniform,
             ty: uniform_type,
             init: None,
+            memory_decorations: naga::MemoryDecorations::empty(),
         },
         naga::Span::default(),
     );

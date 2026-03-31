@@ -92,12 +92,15 @@ impl MeshPipeline {
             .collect();
 
         let bind_group_layouts = {
-            let mut layouts = vec![&camera.bind_group_layout, &light.bind_group_layout];
+            let mut layouts: Vec<Option<&wgpu::BindGroupLayout>> = vec![
+                Some(&camera.bind_group_layout),
+                Some(&light.bind_group_layout),
+            ];
             for layout in &vertex_uniform_bind_group_layouts {
-                layouts.push(layout);
+                layouts.push(Some(layout));
             }
             for layout in &fragment_texture_bind_group_layouts {
-                layouts.push(layout);
+                layouts.push(Some(layout));
             }
             layouts
         };
@@ -105,7 +108,7 @@ impl MeshPipeline {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Mesh pipeline layout"),
             bind_group_layouts: &bind_group_layouts,
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         let vertex_buffer_layout = wgpu::VertexBufferLayout {
@@ -156,8 +159,8 @@ impl MeshPipeline {
             },
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(wgpu::CompareFunction::Less),
                 stencil: wgpu::StencilState::default(),
                 bias: wgpu::DepthBiasState::default(),
             }),
@@ -166,7 +169,7 @@ impl MeshPipeline {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
 

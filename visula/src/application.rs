@@ -14,8 +14,9 @@ use winit::window::WindowId;
 use std::fmt::Debug;
 use std::sync::Arc;
 use wgpu::{
-    BackendOptions, Color, CommandEncoder, Device, Dx12BackendOptions, GlBackendOptions,
-    InstanceDescriptor, SurfaceTexture, TextureFormat, TextureView, TextureViewDescriptor,
+    BackendOptions, Color, CommandEncoder, CurrentSurfaceTexture, Device, Dx12BackendOptions,
+    GlBackendOptions, InstanceDescriptor, SurfaceTexture, TextureFormat, TextureView,
+    TextureViewDescriptor,
 };
 use winit::{event::WindowEvent, window::Window};
 
@@ -108,12 +109,13 @@ impl Application {
         let dx12_shader_compiler = wgpu::Dx12Compiler::from_env().unwrap_or_default();
         let gles_minor_version = wgpu::Gles3MinorVersion::from_env().unwrap_or_default();
 
-        let instance = wgpu::Instance::new(&InstanceDescriptor {
+        let instance = wgpu::Instance::new(InstanceDescriptor {
             backends,
             backend_options: BackendOptions {
                 gl: GlBackendOptions {
                     gles_minor_version,
                     fence_behavior: wgpu::GlFenceBehavior::default(),
+                    debug_fns: wgpu::GlDebugFns::default(),
                 },
                 dx12: Dx12BackendOptions {
                     shader_compiler: dx12_shader_compiler,
@@ -123,6 +125,7 @@ impl Application {
             },
             flags: wgpu::InstanceFlags::from_build_config().with_env(),
             memory_budget_thresholds: wgpu::MemoryBudgetThresholds::default(),
+            display: None,
         });
         let surface = instance.create_surface(window.clone())?;
         let adapter = instance
@@ -303,11 +306,20 @@ impl Application {
 
     pub fn next_frame(&self) -> Result<SurfaceTexture, crate::error::Error> {
         match self.surface.get_current_texture() {
-            Ok(frame) => Ok(frame),
-            Err(_) => {
+            CurrentSurfaceTexture::Success(frame) => Ok(frame),
+            CurrentSurfaceTexture::Suboptimal(frame) => {
                 self.surface.configure(&self.device, &self.config);
-                Ok(self.surface.get_current_texture()?)
+                Ok(frame)
             }
+            CurrentSurfaceTexture::Outdated | CurrentSurfaceTexture::Lost => {
+                self.surface.configure(&self.device, &self.config);
+                match self.surface.get_current_texture() {
+                    CurrentSurfaceTexture::Success(frame)
+                    | CurrentSurfaceTexture::Suboptimal(frame) => Ok(frame),
+                    other => Err(crate::error::Error::SurfaceTexture(other)),
+                }
+            }
+            other => Err(crate::error::Error::SurfaceTexture(other)),
         }
     }
 
@@ -338,6 +350,7 @@ impl Application {
             }),
             occlusion_query_set: None,
             timestamp_writes: None,
+            multiview_mask: None,
         });
     }
 
@@ -370,6 +383,7 @@ impl Application {
                 }),
                 occlusion_query_set: None,
                 timestamp_writes: None,
+                multiview_mask: None,
             });
         }
         simulation.render_shadow(&mut ShadowRenderData {
@@ -388,6 +402,7 @@ impl Application {
             light: &self.light,
         });
         let raw_input = self.egui_renderer.state.take_egui_input(&self.window);
+        #[allow(deprecated)]
         let full_output = self.egui_renderer.state.egui_ctx().run(raw_input, |ui| {
             simulation.gui(self, ui);
         });
@@ -431,6 +446,7 @@ impl Application {
             depth_stencil_attachment: None,
             occlusion_query_set: None,
             timestamp_writes: None,
+            multiview_mask: None,
         });
         self.egui_renderer.renderer.render(
             &mut render_pass.forget_lifetime(),
