@@ -15,6 +15,7 @@ struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) normal: vec3<f32>,
     @location(1) uv: vec2<f32>,
+    @location(2) world_position: vec3<f32>,
 };
 
 struct MeshGeometry {
@@ -62,33 +63,23 @@ fn vs_main(
     @location(2) uv: vec2<f32>,
 ) -> VertexOutput {
     var geometry: MeshGeometry;
-    // modification happens here
     var out: VertexOutput;
     let transform_matrix = calculate_transform_matrix(geometry.rotation, geometry.position, geometry.scale);
     out.position = u_globals.model_view_projection_matrix * transform_matrix * vec4<f32>(position, 1.0);
-    let normal_matrix = mat3x3(transform_matrix[0].xyz, transform_matrix[1].xyz, transform_matrix[2].xyz); // TODO figure out how to get hold of inverse
+    let normal_matrix = mat3x3(transform_matrix[0].xyz, transform_matrix[1].xyz, transform_matrix[2].xyz);
     out.normal = normal_matrix * normal;
     out.uv = uv;
+    out.world_position = (transform_matrix * vec4<f32>(position, 1.0)).xyz;
     return out;
 }
 
 @fragment
 fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
-    let rayDirection: vec3<f32> = normalize(vertex.position.xyz - u_globals.camera_position.xyz);
-    let sun1 = vec3<f32>(-1.0, 1.0, -1.0);
-    let sun2 = vec3<f32>(1.0, 1.0, 1.0);
-    let normal: vec3<f32> = normalize(vertex.normal);
-    let normalDotCamera: f32 = dot(normal, normalize(rayDirection));
-    let normalDotSun1: f32 = dot(normal, normalize(sun1));
-    let normalDotSun2: f32 = dot(normal, normalize(sun2));
-    let intensity = (
-        0.5 * clamp(normalDotCamera, 0.0, 1.0) +
-        0.5 * clamp(normalDotSun1, 0.0, 1.0) +
-        0.5 * clamp(normalDotSun2, 0.0, 1.0)
-    );
+    var _visula_normal: vec3<f32> = normalize(vertex.normal);
+    var _visula_position: vec3<f32> = vertex.world_position;
+    var _visula_view_direction: vec3<f32> = normalize(u_globals.camera_position.xyz - vertex.world_position);
 
     var material: MeshMaterial;
 
-    // return vec4<f32>(material.color.xyz * clamp(intensity, 0.0, 1.0), 1.0);
     return vec4<f32>(material.color.xyz, 1.0);
 }

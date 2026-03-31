@@ -53,6 +53,11 @@ pub enum Expression {
     Sin(ExpressionInner),
     Tan(ExpressionInner),
     UV,
+    Normal,
+    Position,
+    InstanceColor,
+    DirectionalLit(ExpressionInner),
+    Lit(ExpressionInner),
 }
 
 impl Expression {
@@ -83,6 +88,14 @@ impl Expression {
     pub fn tan(&self) -> Expression {
         Expression::Tan(self.into())
     }
+
+    pub fn directional_lit(&self) -> Expression {
+        Expression::DirectionalLit(self.into())
+    }
+
+    pub fn lit(&self) -> Expression {
+        Expression::Lit(self.into())
+    }
 }
 
 impl ExpressionInner {
@@ -90,6 +103,10 @@ impl ExpressionInner {
         ExpressionInner {
             inner: Box::new(expression),
         }
+    }
+
+    fn is_vec4(&self) -> bool {
+        matches!(*self.inner, Expression::Vector4 { .. })
     }
 }
 
@@ -123,6 +140,42 @@ impl AsValue for UniformField {
     fn as_value(&self) -> Expression {
         Expression::UniformField(self.clone())
     }
+}
+
+fn load_local_variable(
+    name: &str,
+    module: &mut naga::Module,
+    binding_builder: &BindingBuilder,
+) -> naga::Handle<naga::Expression> {
+    let entry_point = &mut module.entry_points[binding_builder.entry_point_index];
+    let variable = entry_point
+        .function
+        .local_variables
+        .fetch_if(|variable| variable.name == Some(name.into()))
+        .unwrap_or_else(|| panic!("Local variable '{}' not found in shader", name));
+    let variable_expression = entry_point
+        .function
+        .expressions
+        .fetch_if(|expression| match expression {
+            naga::Expression::LocalVariable(v) => v == &variable,
+            _ => false,
+        })
+        .unwrap_or_else(|| panic!("Expression for local variable '{}' not found", name));
+    entry_point.function.expressions.append(
+        naga::Expression::Load {
+            pointer: variable_expression,
+        },
+        Span::default(),
+    )
+}
+
+fn find_function(module: &naga::Module, name: &str) -> naga::Handle<naga::Function> {
+    module
+        .functions
+        .iter()
+        .find(|(_, f)| f.name.as_deref() == Some(name))
+        .map(|(handle, _)| handle)
+        .unwrap_or_else(|| panic!("Function '{}' not found in shader", name))
 }
 
 impl Expression {
@@ -518,6 +571,65 @@ impl Expression {
                         Span::default(),
                     )
             }
+            Expression::Normal => load_local_variable("_visula_normal", module, binding_builder),
+            Expression::Position => {
+                load_local_variable("_visula_position", module, binding_builder)
+            }
+            Expression::InstanceColor => {
+                load_local_variable("_visula_instance_color", module, binding_builder)
+            }
+            Expression::Lit(color) => {
+                let is_vec4 = color.is_vec4();
+                let color_handle = color.setup(module, binding_builder);
+                let normal_handle = load_local_variable("_visula_normal", module, binding_builder);
+                let view_handle =
+                    load_local_variable("_visula_view_direction", module, binding_builder);
+
+                let fname = if is_vec4 {
+                    "visula_lit_vec4"
+                } else {
+                    "visula_lit_vec3"
+                };
+                let function = find_function(module, fname);
+                let ep = binding_builder.entry_point_index;
+                let result = module.entry_points[ep]
+                    .function
+                    .expressions
+                    .append(naga::Expression::CallResult(function), Span::default());
+                binding_builder
+                    .pending_statements
+                    .push(naga::Statement::Call {
+                        function,
+                        arguments: vec![color_handle, normal_handle, view_handle],
+                        result: Some(result),
+                    });
+                result
+            }
+            Expression::DirectionalLit(color) => {
+                let is_vec4 = color.is_vec4();
+                let color_handle = color.setup(module, binding_builder);
+                let normal_handle = load_local_variable("_visula_normal", module, binding_builder);
+
+                let fname = if is_vec4 {
+                    "visula_directional_lit_vec4"
+                } else {
+                    "visula_directional_lit_vec3"
+                };
+                let function = find_function(module, fname);
+                let ep = binding_builder.entry_point_index;
+                let result = module.entry_points[ep]
+                    .function
+                    .expressions
+                    .append(naga::Expression::CallResult(function), Span::default());
+                binding_builder
+                    .pending_statements
+                    .push(naga::Statement::Call {
+                        function,
+                        arguments: vec![color_handle, normal_handle],
+                        result: Some(result),
+                    });
+                result
+            }
         }
     }
 }
@@ -582,6 +694,21 @@ impl std::fmt::Debug for Expression {
             }
             Expression::UV => {
                 write!(fmt, "UV")?;
+            }
+            Expression::Normal => {
+                write!(fmt, "Normal")?;
+            }
+            Expression::Position => {
+                write!(fmt, "Position")?;
+            }
+            Expression::InstanceColor => {
+                write!(fmt, "InstanceColor")?;
+            }
+            Expression::DirectionalLit(_) => {
+                write!(fmt, "DirectionalLit")?;
+            }
+            Expression::Lit(_) => {
+                write!(fmt, "Lit")?;
             }
         }
         Ok(())

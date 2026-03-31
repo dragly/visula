@@ -13,13 +13,19 @@ var<uniform> u_globals: Globals;
 
 struct VertexOutput {
     @builtin(position) projected_position: vec4<f32>,
-    @location(0) color: vec3<f32>,
+    @location(0) instance_color: vec3<f32>,
+    @location(1) vertex_position: vec3<f32>,
+    @location(2) vertex_normal: vec3<f32>,
 };
 
-struct Line {
+struct LineGeometry {
     start: vec3<f32>,
     end: vec3<f32>,
     width: f32,
+    color: vec3<f32>,
+};
+
+struct LineMaterial {
     color: vec3<f32>,
 };
 
@@ -35,13 +41,12 @@ fn offset(pos: vec3<f32>, direction: vec3<f32>, unit_offset: vec3<f32>) -> vec3<
 
 fn linef(
     texture_coordinate: vec2<f32>,
-    line1: Line,
+    line1: LineGeometry,
 ) -> VertexOutput {
     let length_weight = texture_coordinate.x;
     let width_weight = texture_coordinate.y;
 
     var output: VertexOutput;
-    output.color = (1.0 - length_weight) * line1.color + length_weight * line1.color;
 
     let width_half = line1.width / 2.0;
     let left = vec3<f32>(-width_half, 0.0, 0.0);
@@ -64,7 +69,14 @@ fn linef(
 
     let vertexPosition = pos;
 
+    let view_dir = normalize(vertexPosition - u_globals.camera_position.xyz);
+    let line_right = normalize(cross(direction, view_dir));
+    let line_normal = normalize(cross(direction, line_right));
+
     output.projected_position = u_globals.transform * vec4<f32>(vertexPosition, 1.0);
+    output.instance_color = line1.color;
+    output.vertex_position = vertexPosition;
+    output.vertex_normal = line_normal;
 
     return output;
 }
@@ -73,11 +85,17 @@ fn linef(
 fn vs_main(
     @location(0) texture_coordinate: vec2<f32>,
 ) -> VertexOutput {
-    var line_input: Line;
-    return linef(texture_coordinate, line_input);
+    var line_geometry: LineGeometry;
+    return linef(texture_coordinate, line_geometry);
 }
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4<f32>(input.color, 1.0);
+    var _visula_instance_color: vec3<f32> = input.instance_color;
+    var _visula_normal: vec3<f32> = normalize(input.vertex_normal);
+    var _visula_position: vec3<f32> = input.vertex_position;
+    var _visula_view_direction: vec3<f32> = normalize(u_globals.camera_position.xyz - input.vertex_position);
+    var line_material: LineMaterial;
+
+    return vec4<f32>(line_material.color, 1.0);
 }

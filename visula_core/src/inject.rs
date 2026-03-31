@@ -56,7 +56,12 @@ pub fn inject(
             })
         })
         .collect::<Result<Vec<_>, ShaderError>>()?;
-    let mut new_body = ::naga::Block::from_vec(fields_setup);
+    let mut pending = Vec::new();
+    pending.append(&mut binding_builder.pending_statements);
+    let mut new_body = ::naga::Block::from_vec(pending);
+    for store in fields_setup {
+        new_body.push(store, naga::Span::default());
+    }
 
     for (statement, span) in entry_point!(module, binding_builder.shader_stage)
         .function
@@ -81,6 +86,172 @@ pub fn inject(
             .map_err(Box::new)?;
     let output_str = naga::back::wgsl::write_string(module, &info, WriterFlags::all())?;
     log::debug!("Resulting shader code:\n{output_str}");
+    Ok(())
+}
+
+pub fn inject_before_return(
+    module: &mut Module,
+    binding_builder: &mut BindingBuilder,
+    variable_name: &str,
+    fields: &[Expression],
+) -> Result<(), ShaderError> {
+    let variable = entry_point!(module, binding_builder.shader_stage)
+        .function
+        .local_variables
+        .fetch_if(|variable| variable.name == Some(variable_name.into()))
+        .ok_or_else(|| ShaderError::VariableNotFound(variable_name.to_string()))?;
+    let variable_expression = entry_point!(module, binding_builder.shader_stage)
+        .function
+        .expressions
+        .fetch_if(|expression| match expression {
+            naga::Expression::LocalVariable(v) => v == &variable,
+            _ => false,
+        })
+        .ok_or_else(|| ShaderError::VariableNotFound(variable_name.to_string()))?;
+
+    let fields_setup = fields
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            let expression = value.setup(module, binding_builder);
+            let access_index = entry_point!(module, binding_builder.shader_stage)
+                .function
+                .expressions
+                .append(
+                    naga::Expression::AccessIndex {
+                        index: index as u32,
+                        base: variable_expression,
+                    },
+                    naga::Span::default(),
+                );
+            Ok(::naga::Statement::Store {
+                pointer: access_index,
+                value: expression,
+            })
+        })
+        .collect::<Result<Vec<_>, ShaderError>>()?;
+
+    let original_body = &entry_point!(module, binding_builder.shader_stage)
+        .function
+        .body;
+
+    // Collect all non-return statements from the original body
+    let mut new_body = naga::Block::new();
+    for (statement, span) in original_body.span_iter() {
+        if !matches!(statement, naga::Statement::Return { .. }) {
+            new_body.push(statement.clone(), *span);
+        }
+    }
+
+    // Insert pending statements (e.g. function calls) then field stores
+    for stmt in binding_builder.pending_statements.drain(..) {
+        new_body.push(stmt, naga::Span::default());
+    }
+    for store in fields_setup {
+        new_body.push(store, naga::Span::default());
+    }
+
+    // Build a fresh return that re-loads from the variable AFTER the stores.
+    // The original Return's expressions were pre-computed in an earlier Emit,
+    // so they read zero. We need new Load expressions that execute after our stores.
+    {
+        let ep = &mut module.entry_points[binding_builder.entry_point_index];
+        let var_ty = ep.function.local_variables[variable].ty;
+        let struct_members = match &module.types[var_ty].inner {
+            naga::TypeInner::Struct { members, .. } => members.clone(),
+            _ => panic!("inject_before_return target must be a struct"),
+        };
+
+        // Re-load the first field (color) from the struct
+        let new_access = ep.function.expressions.append(
+            naga::Expression::AccessIndex {
+                base: variable_expression,
+                index: 0,
+            },
+            naga::Span::default(),
+        );
+        let new_load = ep.function.expressions.append(
+            naga::Expression::Load {
+                pointer: new_access,
+            },
+            naga::Span::default(),
+        );
+
+        // Emit the new load
+        new_body.push(
+            naga::Statement::Emit(naga::Range::new_from_bounds(new_access, new_load)),
+            naga::Span::default(),
+        );
+
+        // Determine the return type. Fragment shaders return vec4<f32>.
+        let field_ty = &module.types[struct_members[0].ty].inner;
+        let return_value = match field_ty {
+            naga::TypeInner::Vector {
+                size: naga::VectorSize::Tri,
+                ..
+            } => {
+                // vec3 field → compose vec4(field, 1.0)
+                let one = ep.function.expressions.append(
+                    naga::Expression::Literal(naga::Literal::F32(1.0)),
+                    naga::Span::default(),
+                );
+                let vec4_type = module.types.insert(
+                    naga::Type {
+                        name: None,
+                        inner: naga::TypeInner::Vector {
+                            scalar: naga::Scalar {
+                                kind: naga::ScalarKind::Float,
+                                width: 4,
+                            },
+                            size: naga::VectorSize::Quad,
+                        },
+                    },
+                    naga::Span::default(),
+                );
+                let compose = ep.function.expressions.append(
+                    naga::Expression::Compose {
+                        ty: vec4_type,
+                        components: vec![new_load, one],
+                    },
+                    naga::Span::default(),
+                );
+                new_body.push(
+                    naga::Statement::Emit(naga::Range::new_from_bounds(one, compose)),
+                    naga::Span::default(),
+                );
+                compose
+            }
+            naga::TypeInner::Vector {
+                size: naga::VectorSize::Quad,
+                ..
+            } => {
+                // vec4 field → use directly
+                new_load
+            }
+            _ => {
+                // Fallback: use the loaded value directly
+                new_load
+            }
+        };
+
+        new_body.push(
+            naga::Statement::Return {
+                value: Some(return_value),
+            },
+            naga::Span::default(),
+        );
+    }
+
+    entry_point!(module, binding_builder.shader_stage)
+        .function
+        .body = new_body;
+
+    let info =
+        naga::valid::Validator::new(ValidationFlags::empty(), naga::valid::Capabilities::all())
+            .validate(module)
+            .map_err(Box::new)?;
+    let output_str = naga::back::wgsl::write_string(module, &info, WriterFlags::all())?;
+    log::debug!("Resulting shader code (inject_before_return):\n{output_str}");
     Ok(())
 }
 

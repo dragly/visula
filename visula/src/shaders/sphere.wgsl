@@ -20,15 +20,19 @@ struct VertexOutput {
     @location(4) instance_color: vec3<f32>,
 };
 
-struct Sphere {
+struct SphereGeometry {
     position: vec3<f32>,
     radius: f32,
     color: vec3<f32>,
 };
 
+struct SphereMaterial {
+    color: vec3<f32>,
+};
+
 fn spheres(
     vertex_offset_pre_transform: vec4<f32>,
-    sphere: Sphere,
+    sphere: SphereGeometry,
 ) -> VertexOutput {
     var output: VertexOutput;
     let viewMatrix: mat3x3<f32> = mat3x3<f32>(
@@ -65,9 +69,8 @@ fn spheres(
 fn vs_main(
     @location(0) vertex_offset_pre_transform: vec4<f32>,
 ) -> VertexOutput {
-    var sphere: Sphere;
-    // modification happens here
-    return spheres(vertex_offset_pre_transform, sphere);
+    var sphere_geometry: SphereGeometry;
+    return spheres(vertex_offset_pre_transform, sphere_geometry);
 }
 
 @fragment
@@ -80,22 +83,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let E: vec3<f32> = rayOrigin;
     let D: vec3<f32> = rayDirection;
 
-    // Sphere equation
-    //     x^2 + y^2 + z^2 = r^2
-    // Ray equation is
-    //     P(t) = E + t*D
-    // We substitute ray into sphere equation to get
-    //     (Ex + Dx * t)^2 + (Ey + Dy * t)^2 + (Ez + Dz * t)^2 = r^2
-    // Collecting the elements gives
-    //     (Ex * Ex) + (2.0 * Ex * Dx) * t + (Dx * Dx) * t^2 + ... = r^2
-    // Resulting in a second order equation with the following terms:
-
     let r2: f32 = radius*radius;
     let a: f32 = dot(D, D);
     let b: f32 = 2.0 * dot(E, D);
     let c: f32 = dot(E, E) - r2;
 
-    // discriminant of sphere equation
     let d: f32 = b*b - 4.0 * a*c;
     if(d < 0.0) {
         discard;
@@ -109,23 +101,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     let sphereIntersection: vec3<f32> = rayOrigin + t * rayDirection;
 
-    let sun1 = vec3<f32>(1.0, 1.0, 1.0);
-    let sun2 = vec3<f32>(-1.0, -0.8, -0.4);
+    var _visula_normal: vec3<f32> = normalize(sphereIntersection);
+    var _visula_position: vec3<f32> = in.instance_position + sphereIntersection;
+    var _visula_view_direction: vec3<f32> = -rayDirection;
+    var _visula_instance_color: vec3<f32> = in.instance_color;
 
-    let normal: vec3<f32> = normalize(sphereIntersection);
-    let normalDotCamera: f32 = dot(normal, -normalize(rayDirection));
-    let normalDotSun1: f32 = dot(normal, normalize(sun1));
-    let normalDotSun2: f32 = dot(normal, normalize(sun2));
+    var sphere_material: SphereMaterial;
 
-    let intersection_position: vec3<f32> = in.instance_position + sphereIntersection;
-
-    let bound = 8.0;
-    let bounds_min = vec3<f32>(-bound, -bound, -bound);
-    let bounds_max = vec3<f32>(bound, bound, bound);
-    let projectedPoint: vec4<f32> = u_globals.transform * vec4<f32>(intersection_position, 1.0);
-
-    // TODO fix frag depth
-    // gl_FragDepth = projectedPoint.z / projectedPoint.w;
-
-    return vec4<f32>(in.instance_color * clamp(normalDotCamera + normalDotSun1 + normalDotSun2, 0.05, 1.0), 1.0);
+    return vec4<f32>(sphere_material.color, 1.0);
 }

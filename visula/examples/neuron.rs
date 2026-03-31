@@ -4,8 +4,8 @@ use visula::Renderable;
 
 use glam::{Vec3, Vec4};
 use visula::{
-    CustomEvent, Expression, InstanceBuffer, LineDelegate, Lines, RenderData, SphereDelegate,
-    Spheres, UniformBuffer,
+    CustomEvent, Expression, InstanceBuffer, LineGeometry, LineMaterial, Lines, RenderData,
+    SphereGeometry, SphereMaterial, Spheres, UniformBuffer,
 };
 use visula_derive::{Instance, Uniform};
 use winit::{
@@ -100,7 +100,7 @@ impl Simulation {
         let pos = &particle.position;
         let spheres = Spheres::new(
             &application.rendering_descriptor(),
-            &SphereDelegate {
+            &SphereGeometry {
                 position: pos.clone(),
                 radius: settings.radius,
                 color: Expression::Vector3 {
@@ -109,12 +109,15 @@ impl Simulation {
                     z: (0.3 + (particle.voltage.clone() + 10.0) / 120.0).into(),
                 },
             },
+            &SphereMaterial {
+                color: Expression::InstanceColor.lit(),
+            },
         )
         .unwrap();
 
         let lines = Lines::new(
             &application.rendering_descriptor(),
-            &LineDelegate {
+            &LineGeometry {
                 start: bond.position_a,
                 end: bond.position_b,
                 width: settings.width,
@@ -123,6 +126,9 @@ impl Simulation {
                     y: 0.8.into(),
                     z: 1.0.into(),
                 },
+            },
+            &LineMaterial {
+                color: Expression::InstanceColor.lit(),
             },
         )
         .unwrap();

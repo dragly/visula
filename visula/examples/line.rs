@@ -3,7 +3,8 @@ use wgpu::TextureViewDescriptor;
 use bytemuck::{Pod, Zeroable};
 use visula::{create_application, create_window, CustomEvent, Renderable};
 use visula::{
-    initialize_logger, Application, Expression, InstanceBuffer, LineDelegate, Lines, RenderData,
+    initialize_logger, Application, Expression, InstanceBuffer, LineGeometry, LineMaterial, Lines,
+    RenderData,
 };
 use visula_derive::Instance;
 use wgpu::Color;
@@ -36,7 +37,7 @@ impl Simulation {
 
         let lines = Lines::new(
             &application.rendering_descriptor(),
-            &LineDelegate {
+            &LineGeometry {
                 start: line.position_a,
                 end: line.position_b,
                 width: {
@@ -44,10 +45,13 @@ impl Simulation {
                     a + 1.0 + 2.0
                 },
                 color: Expression::Vector3 {
-                    x: 1.0.into(),
-                    y: 1.0.into(),
-                    z: 1.0.into(),
+                    x: 0.0.into(),
+                    y: 0.0.into(),
+                    z: 0.0.into(),
                 },
+            },
+            &LineMaterial {
+                color: Expression::InstanceColor.lit(),
             },
         )
         .unwrap();

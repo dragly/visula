@@ -47,7 +47,12 @@ impl MeshPipeline {
 
         let vertex_size = size_of::<MeshVertexAttributes>();
 
-        let mut module = naga::front::wgsl::parse_str(include_str!("../mesh.wgsl"))?;
+        let shader_with_lighting = format!(
+            "{}\n{}",
+            visula_core::LIGHTING_WGSL,
+            include_str!("../mesh.wgsl"),
+        );
+        let mut module = naga::front::wgsl::parse_str(&shader_with_lighting)?;
         let info =
             naga::valid::Validator::new(ValidationFlags::empty(), naga::valid::Capabilities::all())
                 .validate(&module)
@@ -58,7 +63,7 @@ impl MeshPipeline {
         let mut vertex_binding_builder = BindingBuilder::new(&module, "vs_main", 1)?;
         geometry.inject("geometry", &mut module, &mut vertex_binding_builder)?;
         let mut fragment_binding_builder = BindingBuilder::new(&module, "fs_main", 0)?;
-        material.inject("material", &mut module, &mut fragment_binding_builder)?;
+        material.inject_before_return("material", &mut module, &mut fragment_binding_builder)?;
 
         log::debug!("Validating generated mesh shader\n{module:#?}");
         let info =
@@ -198,6 +203,9 @@ impl MeshPipeline {
         }: &mut RenderData,
     ) {
         log::debug!("Rendering meshes");
+        if self.vertex_count == 0 {
+            return;
+        }
 
         let mut count = None;
         for binding in self.vertex_binding_builder.instances.values() {

@@ -8,4 +8,11 @@ pub trait Delegate {
         module: &mut naga::Module,
         binding_builder: &mut BindingBuilder,
     ) -> Result<(), ShaderError>;
+
+    fn inject_before_return(
+        &self,
+        shader_variable_name: &str,
+        module: &mut naga::Module,
+        binding_builder: &mut BindingBuilder,
+    ) -> Result<(), ShaderError>;
 }

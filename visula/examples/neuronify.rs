@@ -14,8 +14,8 @@ use strum::EnumIter;
 use strum::IntoEnumIterator;
 use visula::io::gltf::{parse_gltf, GltfMesh};
 use visula::{
-    CustomEvent, InstanceBuffer, LineDelegate, Lines, MeshGeometry, MeshPipeline, RenderData,
-    SphereDelegate, Spheres,
+    CustomEvent, Expression, InstanceBuffer, LineGeometry, LineMaterial, Lines, MeshGeometry,
+    MeshPipeline, RenderData, SphereGeometry, SphereMaterial, Spheres,
 };
 use visula_derive::Instance;
 use winit::{
@@ -272,20 +272,26 @@ impl Simulation {
         let mesh_instance = mesh_instance_buffer.instance();
         let spheres = Spheres::new(
             &application.rendering_descriptor(),
-            &SphereDelegate {
+            &SphereGeometry {
                 position: sphere.position.clone(),
                 radius: NODE_RADIUS.into(),
                 color: sphere.color,
+            },
+            &SphereMaterial {
+                color: Expression::InstanceColor.lit(),
             },
         )
         .unwrap();
         let lines = Lines::new(
             &application.rendering_descriptor(),
-            &LineDelegate {
+            &LineGeometry {
                 start: line.position_a.clone(),
                 end: line.position_b,
                 width: 0.2.into(),
-                color: glam::Vec3::new(1.0, 0.8, 1.0).into(),
+                color: glam::Vec3::ZERO.into(),
+            },
+            &LineMaterial {
+                color: Expression::from(glam::Vec3::new(1.0, 0.8, 1.0)).lit(),
             },
         )
         .unwrap();
@@ -294,11 +300,14 @@ impl Simulation {
         let boundary = boundary_buffer.instance();
         let boundaries = Lines::new(
             &application.rendering_descriptor(),
-            &LineDelegate {
+            &LineGeometry {
                 start: boundary.start,
                 end: boundary.end,
                 width: 0.3.into(),
-                color: glam::Vec3::new(1.0, 0.8, 1.0).into(),
+                color: glam::Vec3::ZERO.into(),
+            },
+            &LineMaterial {
+                color: Expression::from(glam::Vec3::new(1.0, 0.8, 1.0)).lit(),
             },
         )
         .unwrap();
@@ -339,7 +348,7 @@ impl Simulation {
                 scale: Vec3::ONE.into(),
             },
             &MeshMaterial {
-                color: Vec4::new(1.0, 1.0, 1.0, 1.0).into(),
+                color: Expression::from(Vec4::new(1.0, 1.0, 1.0, 1.0)).lit(),
             },
         )
         .unwrap();
