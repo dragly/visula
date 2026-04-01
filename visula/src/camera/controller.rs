@@ -386,10 +386,12 @@ impl CameraController {
         self.state != State::Released
     }
 
-    pub fn uniforms(&self, aspect_ratio: f32) -> CameraUniforms {
+    pub fn uniforms(&self, width: f32, height: f32) -> CameraUniforms {
+        let aspect_ratio = width / height;
         let view_matrix = self.view_matrix();
-
-        let model_view_projection_matrix = self.projection_matrix(aspect_ratio) * view_matrix;
+        let projection_matrix = self.projection_matrix(aspect_ratio);
+        let model_view_projection_matrix = projection_matrix * view_matrix;
+        let inverse_view_projection_matrix = model_view_projection_matrix.inverse();
 
         CameraUniforms {
             view_matrix,
@@ -402,6 +404,11 @@ impl CameraController {
             dummy2: 0.0,
             up: self.current_transform.up,
             dummy3: 0.0,
+            inverse_view_projection_matrix,
+            screen_size: [width, height],
+            dummy4: [0.0; 2],
+            projection_matrix,
+            inverse_projection_matrix: projection_matrix.inverse(),
         }
     }
 }

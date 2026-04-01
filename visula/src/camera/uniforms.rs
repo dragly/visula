@@ -15,6 +15,11 @@ pub struct CameraUniforms {
     pub dummy2: f32,
     pub up: Vec3,
     pub dummy3: f32,
+    pub inverse_view_projection_matrix: Mat4,
+    pub screen_size: [f32; 2],
+    pub dummy4: [f32; 2],
+    pub projection_matrix: Mat4,
+    pub inverse_projection_matrix: Mat4,
 }
 
 unsafe impl Pod for CameraUniforms {}

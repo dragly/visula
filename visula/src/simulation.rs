@@ -12,6 +12,8 @@ pub struct RenderData<'a> {
     pub view: &'a wgpu::TextureView,
     pub multisampled_framebuffer: &'a wgpu::TextureView,
     pub depth_texture: &'a wgpu::TextureView,
+    pub normal_msaa: &'a wgpu::TextureView,
+    pub normal_resolve: &'a wgpu::TextureView,
     pub encoder: &'a mut wgpu::CommandEncoder,
     pub camera: &'a Camera,
     pub light: &'a DirectionalLight,

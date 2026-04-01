@@ -8,9 +8,10 @@ use cgmath::InnerSpace;
 use clap::Parser;
 use itertools_num::linspace;
 
+use visula::egui;
 use visula::{
-    Expression, InstanceBuffer, RenderData, Renderable, ShadowRenderData, SphereGeometry,
-    SphereMaterial, Spheres, UniformBuffer, Vector3,
+    Expression, InstanceBuffer, RenderData, Renderable, RenderingControls, ShadowRenderData,
+    SphereGeometry, SphereMaterial, Spheres, UniformBuffer, Vector3,
 };
 use visula_derive::{Instance, Uniform};
 
@@ -321,6 +322,7 @@ struct Simulation {
     particles: Vec<Particle>,
     spheres: Spheres,
     particle_buffer: InstanceBuffer<ParticleData>,
+    rendering_controls: RenderingControls,
 }
 
 impl Simulation {
@@ -354,6 +356,7 @@ impl Simulation {
             particles,
             spheres,
             particle_buffer,
+            rendering_controls: RenderingControls::new(),
         })
     }
 }
@@ -361,6 +364,7 @@ impl Simulation {
 impl visula::Simulation for Simulation {
     type Error = Error;
     fn update(&mut self, application: &mut visula::Application) {
+        self.rendering_controls.update(application);
         let previous_particles = self.particles.clone();
         integrate(
             &mut self.particles,
@@ -386,6 +390,12 @@ impl visula::Simulation for Simulation {
 
     fn render_shadow(&mut self, data: &mut ShadowRenderData) {
         self.spheres.render_shadow(data);
+    }
+
+    fn gui(&mut self, application: &visula::Application, context: &egui::Context) {
+        egui::Window::new("Rendering").show(context, |ui| {
+            self.rendering_controls.gui(application, ui);
+        });
     }
 }
 

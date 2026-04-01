@@ -46,8 +46,10 @@ pub mod io;
 pub mod light;
 pub mod painter;
 pub mod pipelines;
+pub mod post_process;
 pub mod primitives;
 pub mod render_pass;
+pub mod rendering_controls;
 pub mod rendering_descriptor;
 pub mod simulation;
 pub mod text;
@@ -62,6 +64,7 @@ pub use light::DirectionalLight;
 pub use pipelines::*;
 pub use primitives::*;
 pub use render_pass::*;
+pub use rendering_controls::RenderingControls;
 pub use rendering_descriptor::RenderingDescriptor;
 pub use simulation::*;
 
