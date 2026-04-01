@@ -58,6 +58,7 @@ pub enum Expression {
     InstanceColor,
     DirectionalLit(ExpressionInner),
     Lit(ExpressionInner),
+    ViewDirection,
 }
 
 impl Expression {
@@ -577,6 +578,9 @@ impl Expression {
             Expression::Position => {
                 load_local_variable("_visula_position", module, binding_builder)
             }
+            Expression::ViewDirection => {
+                load_local_variable("_visula_view_direction", module, binding_builder)
+            }
             Expression::InstanceColor => {
                 load_local_variable("_visula_instance_color", module, binding_builder)
             }
@@ -715,6 +719,9 @@ impl std::fmt::Debug for Expression {
             }
             Expression::Lit(_) => {
                 write!(fmt, "Lit")?;
+            }
+            Expression::ViewDirection => {
+                write!(fmt, "ViewDirection")?;
             }
         }
         Ok(())

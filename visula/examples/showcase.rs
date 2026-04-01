@@ -4,8 +4,8 @@ use glam::{Quat, Vec3, Vec4};
 use visula::{
     primitives::mesh_primitive::MeshVertexAttributes, Expression, InstanceBuffer,
     InstanceDeviceExt, LineGeometry, LineMaterial, Lines, MeshGeometry, MeshMaterial, MeshPipeline,
-    RenderData, Renderable, ShadowRenderData, SphereGeometry, SphereMaterial, SpherePrimitive,
-    Spheres,
+    RenderData, Renderable, RenderingControls, ShadowRenderData, SphereGeometry, SphereMaterial,
+    SpherePrimitive, Spheres,
 };
 use visula_derive::Instance;
 use wgpu::util::DeviceExt;
@@ -63,6 +63,7 @@ struct Simulation {
     _line_buffer: InstanceBuffer<LineData>,
     mesh: MeshPipeline,
     ground: MeshPipeline,
+    rendering_controls: RenderingControls,
 }
 
 #[derive(Debug)]
@@ -269,6 +270,7 @@ impl Simulation {
             _line_buffer: line_buffer,
             mesh,
             ground,
+            rendering_controls: RenderingControls::new(),
         })
     }
 }
@@ -276,7 +278,9 @@ impl Simulation {
 impl visula::Simulation for Simulation {
     type Error = Error;
 
-    fn update(&mut self, _application: &mut visula::Application) {}
+    fn update(&mut self, application: &mut visula::Application) {
+        self.rendering_controls.update(application);
+    }
 
     fn render(&mut self, data: &mut RenderData) {
         match self.color_mode {
@@ -302,7 +306,7 @@ impl visula::Simulation for Simulation {
         self.line_variants.flat.render_shadow(data);
     }
 
-    fn gui(&mut self, _application: &visula::Application, context: &egui::Context) {
+    fn gui(&mut self, application: &visula::Application, context: &egui::Context) {
         egui::Window::new("Showcase").show(context, |ui| {
             ui.label("Shading mode");
             for mode in [
@@ -319,6 +323,9 @@ impl visula::Simulation for Simulation {
                     self.color_mode = mode;
                 }
             }
+
+            ui.separator();
+            self.rendering_controls.gui(application, ui);
         });
     }
 }

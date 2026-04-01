@@ -1,5 +1,6 @@
 use crate::camera::Camera;
 use crate::light::DirectionalLight;
+use crate::post_process::PostProcessor;
 use crate::rendering_descriptor::RenderingDescriptor;
 use crate::simulation::ShadowRenderData;
 use crate::{camera::controller::CameraController, simulation::RenderData};
@@ -34,6 +35,7 @@ pub struct Application {
     pub egui_ctx: egui::Context,
     pub camera: Camera,
     pub light: DirectionalLight,
+    pub post_processor: PostProcessor,
     pub start_time: DateTime<Utc>,
     pub sample_count: u32,
 }
@@ -154,6 +156,7 @@ impl Application {
         let mut config = surface
             .get_default_config(&adapter, size.width.max(640), size.height.max(480))
             .ok_or(crate::error::Error::NoSurfaceConfig)?;
+        config.present_mode = wgpu::PresentMode::Fifo;
         let surface_view_format = config.format.add_srgb_suffix();
         config.view_formats.push(surface_view_format);
         surface.configure(&device, &config);
@@ -171,19 +174,33 @@ impl Application {
             sample_count,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Depth32Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             label: None,
             view_formats: &[],
         });
         let depth_texture = depth_texture_in.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let multisampled_framebuffer =
-            Self::create_multisampled_framebuffer(&device, &config, sample_count);
+        let multisampled_framebuffer = Self::create_multisampled_framebuffer(
+            &device,
+            config.width,
+            config.height,
+            sample_count,
+        );
 
         let start_time = Utc::now();
 
         let camera = Camera::new(&device);
         let light = DirectionalLight::new(&device);
+        let post_processor = PostProcessor::new(
+            &device,
+            &queue,
+            config.width,
+            config.height,
+            surface_view_format,
+            &camera,
+            &depth_texture,
+            sample_count,
+        );
 
         let egui_ctx = create_egui_context();
         let egui_renderer = EguiRenderer::new(&device, surface_view_format, &window);
@@ -199,6 +216,7 @@ impl Application {
             multisampled_framebuffer,
             camera,
             light,
+            post_processor,
             egui_renderer,
             egui_ctx,
             start_time,
@@ -208,12 +226,13 @@ impl Application {
 
     fn create_multisampled_framebuffer(
         device: &wgpu::Device,
-        config: &wgpu::SurfaceConfiguration,
+        width: u32,
+        height: u32,
         sample_count: u32,
     ) -> wgpu::TextureView {
         let multisampled_texture_extent = wgpu::Extent3d {
-            width: config.width,
-            height: config.height,
+            width,
+            height,
             depth_or_array_layers: 1,
         };
         let multisampled_frame_descriptor = &wgpu::TextureDescriptor {
@@ -221,10 +240,10 @@ impl Application {
             mip_level_count: 1,
             sample_count,
             dimension: wgpu::TextureDimension::D2,
-            format: config.view_formats[0],
+            format: wgpu::TextureFormat::Rgba16Float,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             label: None,
-            view_formats: &config.view_formats,
+            view_formats: &[],
         };
 
         device
@@ -266,7 +285,8 @@ impl Application {
                     sample_count: self.sample_count,
                     dimension: wgpu::TextureDimension::D2,
                     format: wgpu::TextureFormat::Depth32Float,
-                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                        | wgpu::TextureUsages::TEXTURE_BINDING,
                     label: None,
                     view_formats: &[],
                 });
@@ -276,10 +296,18 @@ impl Application {
                 self.config.height = size.height;
                 self.multisampled_framebuffer = Self::create_multisampled_framebuffer(
                     &self.device,
-                    &self.config,
+                    size.width,
+                    size.height,
                     self.sample_count,
                 );
                 self.surface.configure(&self.device, &self.config);
+                self.post_processor.resize(
+                    &self.device,
+                    size.width,
+                    size.height,
+                    &self.depth_texture,
+                    &self.camera,
+                );
             }
             _ => {}
         }
@@ -299,7 +327,7 @@ impl Application {
         self.camera_controller.update();
         let camera_uniforms = self
             .camera_controller
-            .uniforms(self.config.width as f32 / self.config.height as f32);
+            .uniforms(self.config.width as f32, self.config.height as f32);
         self.camera.update(&camera_uniforms, &self.queue);
         self.light.update(&self.queue);
     }
@@ -392,15 +420,72 @@ impl Application {
             light: &self.light,
         });
 
-        self.clear(&view, &mut encoder, simulation.clear_color());
+        {
+            let hdr_view = &self.post_processor.hdr_view;
+            let normal_msaa_view = &self.post_processor.normal_msaa_view;
+            let normal_resolve_view = &self.post_processor.normal_resolve_view;
+            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("clear"),
+                color_attachments: &[
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &self.multisampled_framebuffer,
+                        resolve_target: Some(hdr_view),
+                        depth_slice: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(simulation.clear_color()),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: normal_msaa_view,
+                        resolve_target: Some(normal_resolve_view),
+                        depth_slice: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(Color::TRANSPARENT),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                ],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_texture,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                occlusion_query_set: None,
+                timestamp_writes: None,
+                multiview_mask: None,
+            });
+        }
+
+        self.post_processor.render_sky(
+            &mut encoder,
+            &self.queue,
+            &self.multisampled_framebuffer,
+            &self.depth_texture,
+            &self.camera,
+        );
+
         simulation.render(&mut RenderData {
-            view: &view,
+            view: &self.post_processor.hdr_view,
             multisampled_framebuffer: &self.multisampled_framebuffer,
             depth_texture: &self.depth_texture,
+            normal_msaa: &self.post_processor.normal_msaa_view,
+            normal_resolve: &self.post_processor.normal_resolve_view,
             encoder: &mut encoder,
             camera: &self.camera,
             light: &self.light,
         });
+
+        self.post_processor.render_ssao(&mut encoder, &self.queue);
+
+        self.post_processor.render_bloom(&mut encoder, &self.queue);
+
+        self.post_processor
+            .render_tonemap(&mut encoder, &self.queue, &view);
+
         let raw_input = self.egui_renderer.state.take_egui_input(&self.window);
         #[allow(deprecated)]
         let full_output = self.egui_renderer.state.egui_ctx().run(raw_input, |ui| {
@@ -464,7 +549,7 @@ impl Application {
     pub fn rendering_descriptor(&self) -> RenderingDescriptor<'_> {
         RenderingDescriptor {
             device: &self.device,
-            format: &self.config.format,
+            format: wgpu::TextureFormat::Rgba16Float,
             camera: &self.camera,
             light: &self.light,
             sample_count: self.sample_count,

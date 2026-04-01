@@ -92,6 +92,8 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
                             view: &view,
                             multisampled_framebuffer: &application.multisampled_framebuffer,
                             depth_texture: &application.depth_texture,
+                            normal_msaa: &application.post_processor.normal_msaa_view,
+                            normal_resolve: &application.post_processor.normal_resolve_view,
                             encoder: &mut encoder,
                             camera: &application.camera,
                             light: &application.light,

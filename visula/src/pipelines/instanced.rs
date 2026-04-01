@@ -16,6 +16,8 @@ impl Pipeline for InstancedPipeline {
             view,
             multisampled_framebuffer,
             depth_texture,
+            normal_msaa,
+            normal_resolve,
             ..
         } = data;
         let default_render_pass = DefaultRenderPassDescriptor::new(
@@ -23,6 +25,8 @@ impl Pipeline for InstancedPipeline {
             view,
             multisampled_framebuffer,
             depth_texture,
+            normal_msaa,
+            normal_resolve,
         );
         let mut render_pass = encoder.begin_render_pass(&default_render_pass.build());
         render_pass.set_pipeline(&self.render_pipeline);

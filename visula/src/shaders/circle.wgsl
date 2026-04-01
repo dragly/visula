@@ -5,6 +5,10 @@ struct Globals {
     camera_view_vector: vec4<f32>,
     camera_position: vec4<f32>,
     camera_up: vec4<f32>,
+    inverse_view_proj: mat4x4<f32>,
+    screen_size: vec4<f32>,
+    projection_matrix: mat4x4<f32>,
+    inverse_projection_matrix: mat4x4<f32>,
 };
 
 @group(0)
@@ -53,8 +57,13 @@ fn vs_main(
     return circle_vertex(quad_coord, circle);
 }
 
+struct FragmentOutput {
+    @location(0) color: vec4<f32>,
+    @location(1) normal: vec4<f32>,
+};
+
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main(in: VertexOutput) -> FragmentOutput {
     let dist = length(in.local_coord);
     let sdf = dist - in.radius;
     let aa = fwidth(dist);
@@ -76,5 +85,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     if color.a < 0.01 {
         discard;
     }
-    return color;
+
+    var output: FragmentOutput;
+    output.color = color;
+    output.normal = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+    return output;
 }

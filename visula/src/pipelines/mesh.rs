@@ -145,11 +145,18 @@ impl MeshPipeline {
             fragment: Some(wgpu::FragmentState {
                 module: &shader_module,
                 entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: *format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
+                targets: &[
+                    Some(wgpu::ColorTargetState {
+                        format,
+                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }),
+                    Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }),
+                ],
                 compilation_options: PipelineCompilationOptions::default(),
             }),
             primitive: wgpu::PrimitiveState {
@@ -202,6 +209,8 @@ impl MeshPipeline {
             view,
             multisampled_framebuffer,
             depth_texture,
+            normal_msaa,
+            normal_resolve,
             camera,
             light,
             ..
@@ -259,6 +268,8 @@ impl MeshPipeline {
                 view,
                 multisampled_framebuffer,
                 depth_texture,
+                normal_msaa,
+                normal_resolve,
             )
             .build(),
         );

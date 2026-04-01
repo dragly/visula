@@ -5,6 +5,10 @@ struct Globals {
     camera_view_vector: vec4<f32>,
     camera_position: vec4<f32>,
     camera_up: vec4<f32>,
+    inverse_view_proj: mat4x4<f32>,
+    screen_size: vec4<f32>,
+    projection_matrix: mat4x4<f32>,
+    inverse_projection_matrix: mat4x4<f32>,
 };
 
 @group(0)
@@ -89,13 +93,21 @@ fn vs_main(
     return linef(texture_coordinate, line_geometry);
 }
 
+struct FragmentOutput {
+    @location(0) color: vec4<f32>,
+    @location(1) normal: vec4<f32>,
+};
+
 @fragment
-fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main(input: VertexOutput) -> FragmentOutput {
     var _visula_instance_color: vec3<f32> = input.instance_color;
     var _visula_normal: vec3<f32> = normalize(input.vertex_normal);
     var _visula_position: vec3<f32> = input.vertex_position;
     var _visula_view_direction: vec3<f32> = normalize(u_globals.camera_position.xyz - input.vertex_position);
     var line_material: LineMaterial;
 
-    return vec4<f32>(line_material.color, 1.0);
+    var output: FragmentOutput;
+    output.color = vec4<f32>(line_material.color, 1.0);
+    output.normal = vec4<f32>(_visula_normal, 0.0);
+    return output;
 }
