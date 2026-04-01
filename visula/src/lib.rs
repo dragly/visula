@@ -43,6 +43,7 @@ pub mod custom_event;
 pub mod drop_event;
 pub mod error;
 pub mod io;
+pub mod light;
 pub mod painter;
 pub mod pipelines;
 pub mod primitives;
@@ -57,6 +58,7 @@ pub use camera::controller::{CameraController, CameraControllerResponse, CameraT
 pub use camera::Camera;
 pub use custom_event::CustomEvent;
 pub use drop_event::DropEvent;
+pub use light::DirectionalLight;
 pub use pipelines::*;
 pub use primitives::*;
 pub use render_pass::*;

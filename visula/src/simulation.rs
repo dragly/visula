@@ -5,6 +5,7 @@ use winit::event::Event;
 
 use crate::application::Application;
 use crate::camera::Camera;
+use crate::light::DirectionalLight;
 use crate::CustomEvent;
 
 pub struct RenderData<'a> {
@@ -13,6 +14,13 @@ pub struct RenderData<'a> {
     pub depth_texture: &'a wgpu::TextureView,
     pub encoder: &'a mut wgpu::CommandEncoder,
     pub camera: &'a Camera,
+    pub light: &'a DirectionalLight,
+}
+
+pub struct ShadowRenderData<'a> {
+    pub encoder: &'a mut wgpu::CommandEncoder,
+    pub shadow_texture: &'a wgpu::TextureView,
+    pub light: &'a DirectionalLight,
 }
 
 pub trait Simulation {
@@ -20,6 +28,7 @@ pub trait Simulation {
     fn handle_event(&mut self, _application: &mut Application, _event: &Event<CustomEvent>) {}
     fn update(&mut self, _application: &mut Application) {}
     fn render(&mut self, _data: &mut RenderData) {}
+    fn render_shadow(&mut self, _data: &mut ShadowRenderData) {}
     fn gui(&mut self, _application: &Application, _context: &Context) {}
     fn clear_color(&self) -> wgpu::Color {
         wgpu::Color {
@@ -44,6 +53,9 @@ where
     }
     fn render(&mut self, data: &mut RenderData) {
         self.as_mut().render(data)
+    }
+    fn render_shadow(&mut self, data: &mut ShadowRenderData) {
+        self.as_mut().render_shadow(data)
     }
     fn gui(&mut self, application: &Application, context: &Context) {
         self.as_mut().gui(application, context)

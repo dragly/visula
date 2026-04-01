@@ -41,6 +41,7 @@ impl MeshPipeline {
         let &RenderingDescriptor {
             device,
             camera,
+            light,
             format,
             ..
         } = rendering_descriptor;
@@ -91,7 +92,7 @@ impl MeshPipeline {
             .collect();
 
         let bind_group_layouts = {
-            let mut layouts = vec![&camera.bind_group_layout];
+            let mut layouts = vec![&camera.bind_group_layout, &light.bind_group_layout];
             for layout in &vertex_uniform_bind_group_layouts {
                 layouts.push(layout);
             }
@@ -199,6 +200,7 @@ impl MeshPipeline {
             multisampled_framebuffer,
             depth_texture,
             camera,
+            light,
             ..
         }: &mut RenderData,
     ) {
@@ -259,6 +261,7 @@ impl MeshPipeline {
         );
 
         render_pass.set_bind_group(0, &camera.bind_group, &[]);
+        render_pass.set_bind_group(1, &light.bind_group, &[]);
 
         render_pass.set_pipeline(&self.render_pipeline);
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
@@ -272,7 +275,7 @@ impl MeshPipeline {
             instance_count = instance_count.max(binding.inner.borrow().count);
         }
 
-        let mut current_slot = 1;
+        let mut current_slot = 2;
 
         for bind_group in textures.iter() {
             log::debug!("Setting texture bind group at slot {}", current_slot);

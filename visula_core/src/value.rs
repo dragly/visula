@@ -584,6 +584,8 @@ impl Expression {
                 let normal_handle = load_local_variable("_visula_normal", module, binding_builder);
                 let view_handle =
                     load_local_variable("_visula_view_direction", module, binding_builder);
+                let position_handle =
+                    load_local_variable("_visula_position", module, binding_builder);
 
                 let fname = if is_vec4 {
                     "visula_lit_vec4"
@@ -600,7 +602,7 @@ impl Expression {
                     .pending_statements
                     .push(naga::Statement::Call {
                         function,
-                        arguments: vec![color_handle, normal_handle, view_handle],
+                        arguments: vec![color_handle, normal_handle, view_handle, position_handle],
                         result: Some(result),
                     });
                 result
@@ -609,6 +611,8 @@ impl Expression {
                 let is_vec4 = color.is_vec4();
                 let color_handle = color.setup(module, binding_builder);
                 let normal_handle = load_local_variable("_visula_normal", module, binding_builder);
+                let position_handle =
+                    load_local_variable("_visula_position", module, binding_builder);
 
                 let fname = if is_vec4 {
                     "visula_directional_lit_vec4"
@@ -625,7 +629,7 @@ impl Expression {
                     .pending_statements
                     .push(naga::Statement::Call {
                         function,
-                        arguments: vec![color_handle, normal_handle],
+                        arguments: vec![color_handle, normal_handle, position_handle],
                         result: Some(result),
                     });
                 result

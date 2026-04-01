@@ -45,6 +45,7 @@ impl Polygons {
                 shader_source: include_str!("../shaders/polygon.wgsl"),
                 shader_variable_name: "polygon",
                 fragment_shader_variable_name: None,
+                shadow_shader_source: None,
                 vertex_data: bytemuck::cast_slice(vertices),
                 vertex_stride: size_of::<PolygonVertex>(),
                 vertex_format: wgpu::VertexFormat::Float32x2,

@@ -1,6 +1,6 @@
 use crate::pipelines::quad::{QuadPipeline, QuadPipelineDescriptor};
 use crate::rendering_descriptor::RenderingDescriptor;
-use crate::simulation::RenderData;
+use crate::simulation::{RenderData, ShadowRenderData};
 use crate::Renderable;
 use bytemuck::{Pod, Zeroable};
 use glam::Vec2;
@@ -83,6 +83,7 @@ impl Lines {
                 shader_source: include_str!("../shaders/line.wgsl"),
                 shader_variable_name: "line_geometry",
                 fragment_shader_variable_name: Some("line_material"),
+                shadow_shader_source: Some(include_str!("../shaders/line_shadow.wgsl")),
                 vertex_data: bytemuck::cast_slice(&vertex_data),
                 vertex_stride: size_of::<Vertex>(),
                 vertex_format: wgpu::VertexFormat::Float32x2,
@@ -98,5 +99,8 @@ impl Lines {
 impl Renderable for Lines {
     fn render(&self, render_data: &mut RenderData) {
         self.0.render(render_data);
+    }
+    fn render_shadow(&self, shadow_data: &mut ShadowRenderData) {
+        self.0.render_shadow(shadow_data);
     }
 }

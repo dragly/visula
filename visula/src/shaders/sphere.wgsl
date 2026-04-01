@@ -73,8 +73,13 @@ fn vs_main(
     return spheres(vertex_offset_pre_transform, sphere_geometry);
 }
 
+struct FragmentOutput {
+    @location(0) color: vec4<f32>,
+    @builtin(frag_depth) depth: f32,
+};
+
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main(in: VertexOutput) -> FragmentOutput {
     let rayDirection: vec3<f32> = normalize(in.vertex_position - u_globals.camera_position.xyz);
     let rayOrigin: vec3<f32> = in.vertex_position - in.instance_position;
 
@@ -106,7 +111,13 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var _visula_view_direction: vec3<f32> = -rayDirection;
     var _visula_instance_color: vec3<f32> = in.instance_color;
 
+    let clip_position: vec4<f32> = u_globals.transform * vec4<f32>(_visula_position, 1.0);
+    let frag_depth: f32 = clip_position.z / clip_position.w;
+
     var sphere_material: SphereMaterial;
 
-    return vec4<f32>(sphere_material.color, 1.0);
+    var output: FragmentOutput;
+    output.color = vec4<f32>(sphere_material.color, 1.0);
+    output.depth = frag_depth;
+    return output;
 }
