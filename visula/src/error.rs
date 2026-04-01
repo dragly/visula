@@ -12,8 +12,8 @@ pub enum Error {
     RequestDevice(#[from] wgpu::RequestDeviceError),
     #[error("surface not supported by adapter")]
     NoSurfaceConfig,
-    #[error("failed to acquire surface texture: {0}")]
-    SurfaceTexture(#[from] wgpu::SurfaceError),
+    #[error("failed to acquire surface texture: {0:?}")]
+    SurfaceTexture(wgpu::CurrentSurfaceTexture),
     #[error("failed to parse font")]
     FontParse,
     #[error("tessellation failed: {0}")]

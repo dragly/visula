@@ -463,6 +463,7 @@ impl Expression {
                         }),
                         ty: sampler_type,
                         init: None,
+                        memory_decorations: naga::MemoryDecorations::empty(),
                     },
                     Span::default(),
                 );
@@ -490,6 +491,7 @@ impl Expression {
                         }),
                         ty: texture_type,
                         init: None,
+                        memory_decorations: naga::MemoryDecorations::empty(),
                     },
                     Span::default(),
                 );

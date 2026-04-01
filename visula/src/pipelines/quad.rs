@@ -131,15 +131,18 @@ impl QuadPipeline {
             .unwrap_or_default();
 
         let bind_group_layouts = {
-            let mut layouts = vec![&camera.bind_group_layout, &light.bind_group_layout];
+            let mut layouts: Vec<Option<&wgpu::BindGroupLayout>> = vec![
+                Some(&camera.bind_group_layout),
+                Some(&light.bind_group_layout),
+            ];
             for layout in &vertex_uniform_layouts {
-                layouts.push(layout);
+                layouts.push(Some(layout));
             }
             for layout in &fragment_texture_layouts {
-                layouts.push(layout);
+                layouts.push(Some(layout));
             }
             for layout in &fragment_uniform_layouts {
-                layouts.push(layout);
+                layouts.push(Some(layout));
             }
             layouts
         };
@@ -147,7 +150,7 @@ impl QuadPipeline {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some(&format!("{} pipeline layout", descriptor.label)),
             bind_group_layouts: &bind_group_layouts,
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         let vertex_buffer_layout = wgpu::VertexBufferLayout {
@@ -197,8 +200,8 @@ impl QuadPipeline {
             },
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(wgpu::CompareFunction::Less),
                 stencil: wgpu::StencilState::default(),
                 bias: wgpu::DepthBiasState::default(),
             }),
@@ -207,7 +210,7 @@ impl QuadPipeline {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
 
@@ -265,9 +268,10 @@ impl QuadPipeline {
                 .collect();
 
             let shadow_bind_group_layouts = {
-                let mut layouts: Vec<&BindGroupLayout> = vec![&light.shadow_bind_group_layout];
+                let mut layouts: Vec<Option<&wgpu::BindGroupLayout>> =
+                    vec![Some(&light.shadow_bind_group_layout)];
                 for layout in &shadow_uniform_layouts {
-                    layouts.push(layout);
+                    layouts.push(Some(layout));
                 }
                 layouts
             };
@@ -276,7 +280,7 @@ impl QuadPipeline {
                 device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some(&format!("{} shadow pipeline layout", descriptor.label)),
                     bind_group_layouts: &shadow_bind_group_layouts,
-                    push_constant_ranges: &[],
+                    immediate_size: 0,
                 });
 
             let has_fs_main = shadow_module
@@ -313,8 +317,8 @@ impl QuadPipeline {
                     },
                     depth_stencil: Some(wgpu::DepthStencilState {
                         format: wgpu::TextureFormat::Depth32Float,
-                        depth_write_enabled: true,
-                        depth_compare: wgpu::CompareFunction::Less,
+                        depth_write_enabled: Some(true),
+                        depth_compare: Some(wgpu::CompareFunction::Less),
                         stencil: wgpu::StencilState::default(),
                         bias: wgpu::DepthBiasState {
                             constant: 2,
@@ -323,7 +327,7 @@ impl QuadPipeline {
                         },
                     }),
                     multisample: wgpu::MultisampleState::default(),
-                    multiview: None,
+                    multiview_mask: None,
                     cache: None,
                 }),
             )
@@ -517,6 +521,7 @@ impl Renderable for QuadPipeline {
                         }),
                         occlusion_query_set: None,
                         timestamp_writes: None,
+                        multiview_mask: None,
                     });
 
             render_pass.set_bind_group(0, &shadow_data.light.shadow_bind_group, &[]);

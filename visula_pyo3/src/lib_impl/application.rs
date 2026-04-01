@@ -105,6 +105,7 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
                             .egui_renderer
                             .state
                             .take_egui_input(&application.window);
+                        #[allow(deprecated)]
                         let full_output =
                             application
                                 .egui_renderer
@@ -169,6 +170,7 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
                             depth_stencil_attachment: None,
                             occlusion_query_set: None,
                             timestamp_writes: None,
+                            multiview_mask: None,
                         });
                         application.egui_renderer.renderer.render(
                             &mut render_pass.forget_lifetime(),
