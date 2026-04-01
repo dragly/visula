@@ -138,6 +138,7 @@ impl ApplicationHandler<CustomEvent> for App {
                         depth_texture: &application.depth_texture,
                         encoder: &mut encoder,
                         camera: &application.camera,
+                        light: &application.light,
                     });
                 }
 

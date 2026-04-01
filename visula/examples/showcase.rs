@@ -2,11 +2,13 @@ use bytemuck::{Pod, Zeroable};
 use glam::{Quat, Vec3, Vec4};
 
 use visula::{
-    Expression, InstanceBuffer, InstanceDeviceExt, LineGeometry, LineMaterial, Lines, MeshGeometry,
-    MeshMaterial, MeshPipeline, RenderData, Renderable, SphereGeometry, SphereMaterial,
-    SpherePrimitive, Spheres,
+    primitives::mesh_primitive::MeshVertexAttributes, Expression, InstanceBuffer,
+    InstanceDeviceExt, LineGeometry, LineMaterial, Lines, MeshGeometry, MeshMaterial, MeshPipeline,
+    RenderData, Renderable, ShadowRenderData, SphereGeometry, SphereMaterial, SpherePrimitive,
+    Spheres,
 };
 use visula_derive::Instance;
+use wgpu::util::DeviceExt;
 
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
@@ -60,6 +62,7 @@ struct Simulation {
     line_variants: LineVariants,
     _line_buffer: InstanceBuffer<LineData>,
     mesh: MeshPipeline,
+    ground: MeshPipeline,
 }
 
 #[derive(Debug)]
@@ -181,6 +184,65 @@ impl Simulation {
         )
         .unwrap();
 
+        let mut ground = MeshPipeline::new(
+            &application.rendering_descriptor(),
+            &MeshGeometry {
+                position: Vec3::new(0.0, -2.0, 0.0).into(),
+                rotation: Quat::IDENTITY.into(),
+                scale: Vec3::ONE.into(),
+            },
+            &MeshMaterial {
+                color: Expression::from(Vec4::new(0.9, 0.9, 0.9, 1.0)).lit(),
+            },
+        )
+        .unwrap();
+
+        let half = 15.0f32;
+        let ground_vertices: Vec<MeshVertexAttributes> = vec![
+            MeshVertexAttributes {
+                position: [-half, 0.0, -half],
+                normal: [0.0, 1.0, 0.0],
+                uv: [0.0, 0.0],
+                color: [255, 255, 255, 255],
+            },
+            MeshVertexAttributes {
+                position: [half, 0.0, -half],
+                normal: [0.0, 1.0, 0.0],
+                uv: [1.0, 0.0],
+                color: [255, 255, 255, 255],
+            },
+            MeshVertexAttributes {
+                position: [half, 0.0, half],
+                normal: [0.0, 1.0, 0.0],
+                uv: [1.0, 1.0],
+                color: [255, 255, 255, 255],
+            },
+            MeshVertexAttributes {
+                position: [-half, 0.0, half],
+                normal: [0.0, 1.0, 0.0],
+                uv: [0.0, 1.0],
+                color: [255, 255, 255, 255],
+            },
+        ];
+        let ground_indices: Vec<u32> = vec![0, 1, 2, 0, 2, 3];
+        ground.vertex_buffer =
+            application
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Ground vertex buffer"),
+                    contents: bytemuck::cast_slice(&ground_vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+        ground.index_buffer =
+            application
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Ground index buffer"),
+                    contents: bytemuck::cast_slice(&ground_indices),
+                    usage: wgpu::BufferUsages::INDEX,
+                });
+        ground.vertex_count = ground_indices.len();
+
         let sphere_data: Vec<SpherePrimitive> = sphere_positions
             .iter()
             .zip(&[
@@ -206,6 +268,7 @@ impl Simulation {
             line_variants,
             _line_buffer: line_buffer,
             mesh,
+            ground,
         })
     }
 }
@@ -231,6 +294,12 @@ impl visula::Simulation for Simulation {
             ColorMode::Lit => self.line_variants.lit.render(data),
         }
         self.mesh.render(data);
+        self.ground.render(data);
+    }
+
+    fn render_shadow(&mut self, data: &mut ShadowRenderData) {
+        self.sphere_variants.flat.render_shadow(data);
+        self.line_variants.flat.render_shadow(data);
     }
 
     fn gui(&mut self, _application: &visula::Application, context: &egui::Context) {

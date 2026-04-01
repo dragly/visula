@@ -74,6 +74,7 @@ impl Rects {
                 shader_source: include_str!("../shaders/rect.wgsl"),
                 shader_variable_name: "rect",
                 fragment_shader_variable_name: None,
+                shadow_shader_source: None,
                 vertex_data: bytemuck::cast_slice(&vertex_data),
                 vertex_stride: size_of::<Vertex>(),
                 vertex_format: wgpu::VertexFormat::Float32x2,

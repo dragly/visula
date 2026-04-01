@@ -234,9 +234,86 @@ pub fn inject_before_return(
             }
         };
 
+        // If the function returns a struct (e.g. FragmentOutput with frag_depth),
+        // store the computed color into the output struct and return it.
+        // Otherwise return the color value directly (existing behavior).
+        let final_value = if let Some(ref result) = ep.function.result {
+            if let naga::TypeInner::Struct {
+                members: return_members,
+                ..
+            } = &module.types[result.ty].inner
+            {
+                let return_ty = result.ty;
+                let color_idx = return_members
+                    .iter()
+                    .position(|m| {
+                        matches!(
+                            &m.binding,
+                            Some(naga::Binding::Location { location: 0, .. })
+                        )
+                    })
+                    .unwrap_or(0);
+
+                let output_var_handle = ep
+                    .function
+                    .local_variables
+                    .iter()
+                    .find(|(_, v)| v.ty == return_ty)
+                    .map(|(h, _)| h);
+
+                if let Some(output_var_handle) = output_var_handle {
+                    let output_var_expr = ep
+                            .function
+                            .expressions
+                            .iter()
+                            .find(|(_, e)| {
+                                matches!(e, naga::Expression::LocalVariable(v) if *v == output_var_handle)
+                            })
+                            .map(|(h, _)| h)
+                            .expect("must have expression for output variable");
+
+                    let store_access = ep.function.expressions.append(
+                        naga::Expression::AccessIndex {
+                            base: output_var_expr,
+                            index: color_idx as u32,
+                        },
+                        naga::Span::default(),
+                    );
+                    new_body.push(
+                        naga::Statement::Store {
+                            pointer: store_access,
+                            value: return_value,
+                        },
+                        naga::Span::default(),
+                    );
+
+                    let output_load = ep.function.expressions.append(
+                        naga::Expression::Load {
+                            pointer: output_var_expr,
+                        },
+                        naga::Span::default(),
+                    );
+                    new_body.push(
+                        naga::Statement::Emit(naga::Range::new_from_bounds(
+                            output_load,
+                            output_load,
+                        )),
+                        naga::Span::default(),
+                    );
+                    output_load
+                } else {
+                    return_value
+                }
+            } else {
+                return_value
+            }
+        } else {
+            return_value
+        };
+
         new_body.push(
             naga::Statement::Return {
-                value: Some(return_value),
+                value: Some(final_value),
             },
             naga::Span::default(),
         );

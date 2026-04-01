@@ -94,6 +94,7 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
                             depth_texture: &application.depth_texture,
                             encoder: &mut encoder,
                             camera: &application.camera,
+                            light: &application.light,
                         };
                         for spheres in &self.renderables {
                             spheres.render(&mut render_data);

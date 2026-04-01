@@ -1,5 +1,5 @@
 use crate::rendering_descriptor::RenderingDescriptor;
-use crate::simulation::RenderData;
+use crate::simulation::{RenderData, ShadowRenderData};
 use crate::{DefaultRenderPassDescriptor, Renderable};
 use itertools::Itertools;
 use naga::{back::wgsl::WriterFlags, valid::ValidationFlags};
@@ -13,6 +13,7 @@ pub struct QuadPipelineDescriptor<'a> {
     pub shader_source: &'a str,
     pub shader_variable_name: &'a str,
     pub fragment_shader_variable_name: Option<&'a str>,
+    pub shadow_shader_source: Option<&'a str>,
     pub vertex_data: &'a [u8],
     pub vertex_stride: usize,
     pub vertex_format: wgpu::VertexFormat,
@@ -22,6 +23,7 @@ pub struct QuadPipelineDescriptor<'a> {
 
 pub struct QuadPipeline {
     render_pipeline: wgpu::RenderPipeline,
+    shadow_render_pipeline: Option<wgpu::RenderPipeline>,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     index_count: usize,
@@ -41,6 +43,7 @@ impl QuadPipeline {
         let &RenderingDescriptor {
             device,
             camera,
+            light,
             format,
             ..
         } = rendering_descriptor;
@@ -128,7 +131,7 @@ impl QuadPipeline {
             .unwrap_or_default();
 
         let bind_group_layouts = {
-            let mut layouts = vec![&camera.bind_group_layout];
+            let mut layouts = vec![&camera.bind_group_layout, &light.bind_group_layout];
             for layout in &vertex_uniform_layouts {
                 layouts.push(layout);
             }
@@ -208,8 +211,129 @@ impl QuadPipeline {
             cache: None,
         });
 
+        let shadow_render_pipeline = if let Some(shadow_source) = descriptor.shadow_shader_source {
+            let mut shadow_module = naga::front::wgsl::parse_str(shadow_source)?;
+            let mut shadow_builder = BindingBuilder::new(&shadow_module, "vs_main", 1)?;
+            vertex_delegate.inject(
+                descriptor.shader_variable_name,
+                &mut shadow_module,
+                &mut shadow_builder,
+            )?;
+
+            let shadow_info = naga::valid::Validator::new(
+                ValidationFlags::empty(),
+                naga::valid::Capabilities::all(),
+            )
+            .validate(&shadow_module)
+            .map_err(Box::new)?;
+            let shadow_str =
+                naga::back::wgsl::write_string(&shadow_module, &shadow_info, WriterFlags::all())?;
+            log::debug!(
+                "Resulting {} shadow shader code:\n{shadow_str}",
+                descriptor.label
+            );
+
+            let shadow_shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some(&format!("{} shadow shader", descriptor.label)),
+                source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(&shadow_str)),
+            });
+
+            let shadow_vertex_buffer_layout = wgpu::VertexBufferLayout {
+                array_stride: descriptor.vertex_stride as wgpu::BufferAddress,
+                step_mode: wgpu::VertexStepMode::Vertex,
+                attributes: &[wgpu::VertexAttribute {
+                    format: descriptor.vertex_format,
+                    offset: 0,
+                    shader_location: 0,
+                }],
+            };
+            let shadow_sorted_bindings = shadow_builder.sorted_bindings();
+            let mut shadow_layouts = shadow_sorted_bindings
+                .iter()
+                .map(|binding| binding.layout.build())
+                .collect_vec();
+            let shadow_buffers = {
+                let mut buffers = vec![shadow_vertex_buffer_layout];
+                buffers.append(&mut shadow_layouts);
+                buffers
+            };
+
+            let shadow_uniform_layouts: Vec<&BindGroupLayout> = shadow_builder
+                .uniforms
+                .values()
+                .map(|binding| binding.bind_group_layout.as_ref())
+                .collect();
+
+            let shadow_bind_group_layouts = {
+                let mut layouts: Vec<&BindGroupLayout> = vec![&light.shadow_bind_group_layout];
+                for layout in &shadow_uniform_layouts {
+                    layouts.push(layout);
+                }
+                layouts
+            };
+
+            let shadow_pipeline_layout =
+                device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some(&format!("{} shadow pipeline layout", descriptor.label)),
+                    bind_group_layouts: &shadow_bind_group_layouts,
+                    push_constant_ranges: &[],
+                });
+
+            let has_fs_main = shadow_module
+                .entry_points
+                .iter()
+                .any(|ep| ep.name == "fs_main");
+
+            let fragment_state = if has_fs_main {
+                Some(wgpu::FragmentState {
+                    module: &shadow_shader_module,
+                    entry_point: Some("fs_main"),
+                    targets: &[],
+                    compilation_options: PipelineCompilationOptions::default(),
+                })
+            } else {
+                None
+            };
+
+            Some(
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some(&format!("{} shadow render pipeline", descriptor.label)),
+                    layout: Some(&shadow_pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &shadow_shader_module,
+                        entry_point: Some("vs_main"),
+                        buffers: &shadow_buffers,
+                        compilation_options: PipelineCompilationOptions::default(),
+                    },
+                    fragment: fragment_state,
+                    primitive: wgpu::PrimitiveState {
+                        front_face: wgpu::FrontFace::Ccw,
+                        cull_mode: None,
+                        ..Default::default()
+                    },
+                    depth_stencil: Some(wgpu::DepthStencilState {
+                        format: wgpu::TextureFormat::Depth32Float,
+                        depth_write_enabled: true,
+                        depth_compare: wgpu::CompareFunction::Less,
+                        stencil: wgpu::StencilState::default(),
+                        bias: wgpu::DepthBiasState {
+                            constant: 2,
+                            slope_scale: 2.0,
+                            clamp: 0.0,
+                        },
+                    }),
+                    multisample: wgpu::MultisampleState::default(),
+                    multiview: None,
+                    cache: None,
+                }),
+            )
+        } else {
+            None
+        };
+
         Ok(QuadPipeline {
             render_pipeline,
+            shadow_render_pipeline,
             vertex_buffer,
             index_buffer,
             index_count,
@@ -230,6 +354,7 @@ impl Renderable for QuadPipeline {
             multisampled_framebuffer,
             depth_texture,
             camera,
+            light,
             ..
         }: &mut RenderData,
     ) {
@@ -302,6 +427,7 @@ impl Renderable for QuadPipeline {
             );
             let mut render_pass = encoder.begin_render_pass(&default_render_pass.build());
             render_pass.set_bind_group(0, &camera.bind_group, &[]);
+            render_pass.set_bind_group(1, &light.bind_group, &[]);
 
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_index_buffer(self.index_buffer.slice(..), self.index_format);
@@ -317,7 +443,7 @@ impl Renderable for QuadPipeline {
                 render_pass.set_vertex_buffer(slot, buffer.slice(..));
                 instance_count = instance_count.max(binding.inner.borrow().count);
             }
-            let mut current_slot = 1u32;
+            let mut current_slot = 2u32;
             for bind_group in vertex_uniforms.iter() {
                 log::trace!("Setting vertex uniform bind group {current_slot}");
                 render_pass.set_bind_group(current_slot, bind_group, &[]);
@@ -333,6 +459,94 @@ impl Renderable for QuadPipeline {
                 render_pass.set_bind_group(current_slot, bind_group, &[]);
                 current_slot += 1;
             }
+            render_pass.draw_indexed(0..self.index_count as u32, 0, 0..instance_count as u32);
+        }
+    }
+
+    fn render_shadow(&self, shadow_data: &mut ShadowRenderData) {
+        let Some(ref shadow_pipeline) = self.shadow_render_pipeline else {
+            return;
+        };
+        if self.index_count == 0 {
+            return;
+        }
+
+        let mut count = None;
+        for binding in self.vertex_binding_builder.instances.values() {
+            let other = binding.inner.borrow().count;
+            if other == 0 {
+                count = None;
+                break;
+            }
+            count = match count {
+                None => Some(other),
+                Some(old) => {
+                    if other != old {
+                        None
+                    } else {
+                        Some(old)
+                    }
+                }
+            }
+        }
+        if count.is_none() && !self.vertex_binding_builder.instances.is_empty() {
+            return;
+        }
+
+        let bindings: Vec<(&InstanceBinding, Ref<wgpu::Buffer>)> = self
+            .vertex_binding_builder
+            .instances
+            .values()
+            .map(|v| (v, Ref::map(v.inner.borrow(), |v| &v.buffer)))
+            .collect();
+
+        {
+            let mut render_pass =
+                shadow_data
+                    .encoder
+                    .begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some(&format!("{} shadow pass", self.label)),
+                        color_attachments: &[],
+                        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                            view: shadow_data.shadow_texture,
+                            depth_ops: Some(wgpu::Operations {
+                                load: wgpu::LoadOp::Load,
+                                store: wgpu::StoreOp::Store,
+                            }),
+                            stencil_ops: None,
+                        }),
+                        occlusion_query_set: None,
+                        timestamp_writes: None,
+                    });
+
+            render_pass.set_bind_group(0, &shadow_data.light.shadow_bind_group, &[]);
+            render_pass.set_pipeline(shadow_pipeline);
+            render_pass.set_index_buffer(self.index_buffer.slice(..), self.index_format);
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+
+            let mut instance_count = if self.vertex_binding_builder.instances.is_empty() {
+                1
+            } else {
+                0
+            };
+            for (binding, buffer) in bindings.iter() {
+                let slot = binding.slot;
+                render_pass.set_vertex_buffer(slot, buffer.slice(..));
+                instance_count = instance_count.max(binding.inner.borrow().count);
+            }
+
+            let vertex_uniforms: Vec<wgpu::BindGroup> = self
+                .vertex_binding_builder
+                .uniforms
+                .values()
+                .map(|v| v.inner.borrow().bind_group.clone())
+                .collect();
+            let mut current_slot = 1u32;
+            for bind_group in vertex_uniforms.iter() {
+                render_pass.set_bind_group(current_slot, bind_group, &[]);
+                current_slot += 1;
+            }
+
             render_pass.draw_indexed(0..self.index_count as u32, 0, 0..instance_count as u32);
         }
     }

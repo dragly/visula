@@ -9,8 +9,8 @@ use clap::Parser;
 use itertools_num::linspace;
 
 use visula::{
-    Expression, InstanceBuffer, RenderData, Renderable, SphereGeometry, SphereMaterial, Spheres,
-    UniformBuffer, Vector3,
+    Expression, InstanceBuffer, RenderData, Renderable, ShadowRenderData, SphereGeometry,
+    SphereMaterial, Spheres, UniformBuffer, Vector3,
 };
 use visula_derive::{Instance, Uniform};
 
@@ -382,6 +382,10 @@ impl visula::Simulation for Simulation {
 
     fn render(&mut self, data: &mut RenderData) {
         self.spheres.render(data);
+    }
+
+    fn render_shadow(&mut self, data: &mut ShadowRenderData) {
+        self.spheres.render_shadow(data);
     }
 }
 

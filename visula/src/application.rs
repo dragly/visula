@@ -1,5 +1,7 @@
 use crate::camera::Camera;
+use crate::light::DirectionalLight;
 use crate::rendering_descriptor::RenderingDescriptor;
+use crate::simulation::ShadowRenderData;
 use crate::{camera::controller::CameraController, simulation::RenderData};
 use crate::{CameraControllerResponse, Simulation};
 use chrono::{DateTime, Utc};
@@ -30,6 +32,7 @@ pub struct Application {
     pub egui_renderer: EguiRenderer,
     pub egui_ctx: egui::Context,
     pub camera: Camera,
+    pub light: DirectionalLight,
     pub start_time: DateTime<Utc>,
     pub sample_count: u32,
 }
@@ -177,6 +180,7 @@ impl Application {
         let start_time = Utc::now();
 
         let camera = Camera::new(&device);
+        let light = DirectionalLight::new(&device);
 
         let egui_ctx = create_egui_context();
         let egui_renderer = EguiRenderer::new(&device, surface_view_format, &window);
@@ -191,6 +195,7 @@ impl Application {
             depth_texture,
             multisampled_framebuffer,
             camera,
+            light,
             egui_renderer,
             egui_ctx,
             start_time,
@@ -293,6 +298,7 @@ impl Application {
             .camera_controller
             .uniforms(self.config.width as f32 / self.config.height as f32);
         self.camera.update(&camera_uniforms, &self.queue);
+        self.light.update(&self.queue);
     }
 
     pub fn next_frame(&self) -> Result<SurfaceTexture, crate::error::Error> {
@@ -350,6 +356,28 @@ impl Application {
             ..wgpu::TextureViewDescriptor::default()
         });
 
+        {
+            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("shadow clear"),
+                color_attachments: &[],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.light.shadow_texture_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                occlusion_query_set: None,
+                timestamp_writes: None,
+            });
+        }
+        simulation.render_shadow(&mut ShadowRenderData {
+            encoder: &mut encoder,
+            shadow_texture: &self.light.shadow_texture_view,
+            light: &self.light,
+        });
+
         self.clear(&view, &mut encoder, simulation.clear_color());
         simulation.render(&mut RenderData {
             view: &view,
@@ -357,6 +385,7 @@ impl Application {
             depth_texture: &self.depth_texture,
             encoder: &mut encoder,
             camera: &self.camera,
+            light: &self.light,
         });
         let raw_input = self.egui_renderer.state.take_egui_input(&self.window);
         let full_output = self.egui_renderer.state.egui_ctx().run(raw_input, |ui| {
@@ -421,6 +450,7 @@ impl Application {
             device: &self.device,
             format: &self.config.format,
             camera: &self.camera,
+            light: &self.light,
             sample_count: self.sample_count,
         }
     }
