@@ -17,7 +17,7 @@ var<uniform> u_globals: Globals;
 
 struct VertexOutput {
     @builtin(position) projected_position: vec4<f32>,
-    @location(0) instance_color: vec3<f32>,
+    @location(0) input_color: vec3<f32>,
     @location(1) vertex_position: vec3<f32>,
     @location(2) vertex_normal: vec3<f32>,
 };
@@ -78,7 +78,7 @@ fn linef(
     let line_normal = normalize(cross(direction, line_right));
 
     output.projected_position = u_globals.transform * vec4<f32>(vertexPosition, 1.0);
-    output.instance_color = line1.color;
+    output.input_color = line1.color;
     output.vertex_position = vertexPosition;
     output.vertex_normal = line_normal;
 
@@ -100,7 +100,7 @@ struct FragmentOutput {
 
 @fragment
 fn fs_main(input: VertexOutput) -> FragmentOutput {
-    var _visula_instance_color: vec3<f32> = input.instance_color;
+    var _visula_input_color: vec3<f32> = input.input_color;
     var _visula_normal: vec3<f32> = normalize(input.vertex_normal);
     var _visula_position: vec3<f32> = input.vertex_position;
     var _visula_view_direction: vec3<f32> = normalize(u_globals.camera_position.xyz - input.vertex_position);

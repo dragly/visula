@@ -3729,6 +3729,7 @@ dependencies = [
  "glam",
  "gltf",
  "hecs",
+ "image",
  "itertools 0.10.5",
  "itertools-num",
  "js-sys",

@@ -278,7 +278,7 @@ impl Simulation {
                 color: sphere.color,
             },
             &SphereMaterial {
-                color: Expression::InstanceColor.lit(),
+                color: Expression::InputColor.lit(),
             },
         )
         .unwrap();
@@ -356,6 +356,7 @@ impl Simulation {
             vertex_buffer,
             index_buffer,
             index_count,
+            ..
         } = gltf_file
             .scenes
             .into_iter()

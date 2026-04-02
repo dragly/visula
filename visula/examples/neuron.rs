@@ -110,7 +110,7 @@ impl Simulation {
                 },
             },
             &SphereMaterial {
-                color: Expression::InstanceColor.lit(),
+                color: Expression::InputColor.lit(),
             },
         )
         .unwrap();
@@ -128,7 +128,7 @@ impl Simulation {
                 },
             },
             &LineMaterial {
-                color: Expression::InstanceColor.lit(),
+                color: Expression::InputColor.lit(),
             },
         )
         .unwrap();

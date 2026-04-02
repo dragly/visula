@@ -61,7 +61,7 @@ impl Painter {
                 color: spheres_instance.color,
             },
             &SphereMaterial {
-                color: Expression::InstanceColor.lit(),
+                color: Expression::InputColor.lit(),
             },
         )?;
 
@@ -77,7 +77,7 @@ impl Painter {
                 color: line_instance.color.clone(),
             },
             &LineMaterial {
-                color: Expression::InstanceColor.lit(),
+                color: Expression::InputColor.lit(),
             },
         )?;
 

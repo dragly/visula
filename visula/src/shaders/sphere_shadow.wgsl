@@ -15,7 +15,7 @@ struct VertexOutput {
     @location(1) radius: f32,
     @location(2) vertex_position: vec3<f32>,
     @location(3) instance_position: vec3<f32>,
-    @location(4) instance_color: vec3<f32>,
+    @location(4) input_color: vec3<f32>,
 };
 
 struct SphereGeometry {
@@ -48,7 +48,7 @@ fn spheres_shadow(
     output.radius = sphere.radius;
     output.vertex_position = vertex_position;
     output.instance_position = sphere.position;
-    output.instance_color = sphere.color;
+    output.input_color = sphere.color;
 
     return output;
 }

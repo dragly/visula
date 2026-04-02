@@ -118,6 +118,7 @@ impl MeshPipeline {
                 0 => Float32x3, // position
                 1 => Float32x3, // normal
                 2 => Float32x2, // uv
+                3 => Unorm8x4,  // color
             ],
         };
 

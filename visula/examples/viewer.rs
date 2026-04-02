@@ -104,7 +104,7 @@ impl Simulation {
                 color: sphere.color,
             },
             &SphereMaterial {
-                color: Expression::InstanceColor.lit(),
+                color: Expression::InputColor.lit(),
             },
         )
         .unwrap();

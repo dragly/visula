@@ -55,7 +55,7 @@ pub enum Expression {
     UV,
     Normal,
     Position,
-    InstanceColor,
+    InputColor,
     DirectionalLit(ExpressionInner),
     Lit(ExpressionInner),
     ViewDirection,
@@ -104,10 +104,6 @@ impl ExpressionInner {
         ExpressionInner {
             inner: Box::new(expression),
         }
-    }
-
-    fn is_vec4(&self) -> bool {
-        matches!(*self.inner, Expression::Vector4 { .. })
     }
 }
 
@@ -168,6 +164,57 @@ fn load_local_variable(
         },
         Span::default(),
     )
+}
+
+fn is_expression_vec4(
+    handle: naga::Handle<naga::Expression>,
+    module: &naga::Module,
+    entry_point_index: usize,
+) -> bool {
+    let function = &module.entry_points[entry_point_index].function;
+    let expr = &function.expressions[handle];
+    match expr {
+        naga::Expression::Load { pointer } => {
+            let pointed = &function.expressions[*pointer];
+            if let naga::Expression::LocalVariable(local_handle) = pointed {
+                let local_var = &function.local_variables[*local_handle];
+                matches!(
+                    module.types[local_var.ty].inner,
+                    naga::TypeInner::Vector {
+                        size: naga::VectorSize::Quad,
+                        ..
+                    }
+                )
+            } else {
+                false
+            }
+        }
+        naga::Expression::ImageSample { image, .. } => {
+            if let naga::Expression::GlobalVariable(gv) = function.expressions[*image] {
+                let ty = module.global_variables[gv].ty;
+                matches!(
+                    module.types[ty].inner,
+                    naga::TypeInner::Image {
+                        class: naga::ImageClass::Sampled {
+                            kind: naga::ScalarKind::Float,
+                            ..
+                        },
+                        ..
+                    }
+                )
+            } else {
+                false
+            }
+        }
+        naga::Expression::Compose { ty, .. } => matches!(
+            module.types[*ty].inner,
+            naga::TypeInner::Vector {
+                size: naga::VectorSize::Quad,
+                ..
+            }
+        ),
+        _ => false,
+    }
 }
 
 fn find_function(module: &naga::Module, name: &str) -> naga::Handle<naga::Function> {
@@ -454,12 +501,14 @@ impl Expression {
                     },
                     naga::Span::default(),
                 );
+                let texture_group = binding_builder.current_bind_group;
+                binding_builder.current_bind_group += 1;
                 let sampler_variable = module.global_variables.append(
                     GlobalVariable {
                         name: Some("u_sampler".to_string()),
                         space: naga::AddressSpace::Handle,
                         binding: Some(ResourceBinding {
-                            group: 1,
+                            group: texture_group,
                             binding: 0,
                         }),
                         ty: sampler_type,
@@ -487,7 +536,7 @@ impl Expression {
                         name: Some("u_texture".to_string()),
                         space: naga::AddressSpace::Handle,
                         binding: Some(ResourceBinding {
-                            group: 1,
+                            group: texture_group,
                             binding: 1,
                         }),
                         ty: texture_type,
@@ -581,12 +630,13 @@ impl Expression {
             Expression::ViewDirection => {
                 load_local_variable("_visula_view_direction", module, binding_builder)
             }
-            Expression::InstanceColor => {
-                load_local_variable("_visula_instance_color", module, binding_builder)
+            Expression::InputColor => {
+                load_local_variable("_visula_input_color", module, binding_builder)
             }
             Expression::Lit(color) => {
-                let is_vec4 = color.is_vec4();
                 let color_handle = color.setup(module, binding_builder);
+                let is_vec4 =
+                    is_expression_vec4(color_handle, module, binding_builder.entry_point_index);
                 let normal_handle = load_local_variable("_visula_normal", module, binding_builder);
                 let view_handle =
                     load_local_variable("_visula_view_direction", module, binding_builder);
@@ -614,8 +664,9 @@ impl Expression {
                 result
             }
             Expression::DirectionalLit(color) => {
-                let is_vec4 = color.is_vec4();
                 let color_handle = color.setup(module, binding_builder);
+                let is_vec4 =
+                    is_expression_vec4(color_handle, module, binding_builder.entry_point_index);
                 let normal_handle = load_local_variable("_visula_normal", module, binding_builder);
                 let position_handle =
                     load_local_variable("_visula_position", module, binding_builder);
@@ -711,8 +762,8 @@ impl std::fmt::Debug for Expression {
             Expression::Position => {
                 write!(fmt, "Position")?;
             }
-            Expression::InstanceColor => {
-                write!(fmt, "InstanceColor")?;
+            Expression::InputColor => {
+                write!(fmt, "InputColor")?;
             }
             Expression::DirectionalLit(_) => {
                 write!(fmt, "DirectionalLit")?;

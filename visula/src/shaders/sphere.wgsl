@@ -21,7 +21,7 @@ struct VertexOutput {
     @location(1) radius: f32,
     @location(2) vertex_position: vec3<f32>,
     @location(3) instance_position: vec3<f32>,
-    @location(4) instance_color: vec3<f32>,
+    @location(4) input_color: vec3<f32>,
 };
 
 struct SphereGeometry {
@@ -64,7 +64,7 @@ fn spheres(
     output.radius = sphere.radius;
     output.vertex_position = vertexPosition;
     output.instance_position = sphere.position;
-    output.instance_color = sphere.color;
+    output.input_color = sphere.color;
 
     return output;
 }
@@ -114,7 +114,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     var _visula_normal: vec3<f32> = normalize(sphereIntersection);
     var _visula_position: vec3<f32> = in.instance_position + sphereIntersection;
     var _visula_view_direction: vec3<f32> = -rayDirection;
-    var _visula_instance_color: vec3<f32> = in.instance_color;
+    var _visula_input_color: vec3<f32> = in.input_color;
 
     let clip_position: vec4<f32> = u_globals.transform * vec4<f32>(_visula_position, 1.0);
     let frag_depth: f32 = clip_position.z / clip_position.w;
