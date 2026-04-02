@@ -379,7 +379,7 @@ impl CameraController {
     }
 
     pub fn projection_matrix(&self, aspect_ratio: f32) -> Mat4 {
-        Mat4::perspective_rh(40f32 / 180.0 * PI, aspect_ratio, 10.0, 10000.0)
+        Mat4::perspective_rh(40f32 / 180.0 * PI, aspect_ratio, 0.1, 1000.0)
     }
 
     pub fn active(&self) -> bool {

@@ -4,7 +4,6 @@ use glam::{Quat, Vec3};
 use std::io::BufReader;
 
 use clap::Parser;
-use glam::Vec4;
 use visula::{
     io::gltf::{parse_gltf, GltfMesh},
     Expression, MeshGeometry, MeshMaterial, MeshPipeline, RenderData,
@@ -48,6 +47,10 @@ impl Simulation {
             .into_iter()
             .flat_map(|scene| scene.meshes.into_iter())
             .map(|mesh| {
+                let color_expression = match &mesh.texture {
+                    Some(texture) => texture.sample(&Expression::UV).lit(),
+                    None => Expression::InputColor.lit(),
+                };
                 let mut mesh_pipeline = MeshPipeline::new(
                     &application.rendering_descriptor(),
                     &MeshGeometry {
@@ -56,7 +59,7 @@ impl Simulation {
                         scale: Vec3::ONE.into(),
                     },
                     &MeshMaterial {
-                        color: Expression::from(Vec4::ONE).lit(),
+                        color: color_expression,
                     },
                 )
                 .unwrap();
@@ -64,6 +67,7 @@ impl Simulation {
                     vertex_buffer,
                     index_buffer,
                     index_count,
+                    ..
                 } = mesh;
 
                 mesh_pipeline.vertex_count = index_count;

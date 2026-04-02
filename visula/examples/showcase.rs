@@ -92,7 +92,7 @@ impl Simulation {
             application.device.create_instance_buffer();
 
         let sphere_variants = SphereVariants {
-            flat: create_sphere_variant(application, &sphere_buffer, Expression::InstanceColor)
+            flat: create_sphere_variant(application, &sphere_buffer, Expression::InputColor)
                 .unwrap(),
             normal: create_sphere_variant(
                 application,
@@ -109,15 +109,11 @@ impl Simulation {
             directional_lit: create_sphere_variant(
                 application,
                 &sphere_buffer,
-                Expression::InstanceColor.directional_lit(),
+                Expression::InputColor.directional_lit(),
             )
             .unwrap(),
-            lit: create_sphere_variant(
-                application,
-                &sphere_buffer,
-                Expression::InstanceColor.lit(),
-            )
-            .unwrap(),
+            lit: create_sphere_variant(application, &sphere_buffer, Expression::InputColor.lit())
+                .unwrap(),
         };
 
         let line_buffer: InstanceBuffer<LineData> = application.device.create_instance_buffer();
@@ -141,7 +137,7 @@ impl Simulation {
         };
 
         let line_variants = LineVariants {
-            flat: create_line_variant(application, &line_buffer, Expression::InstanceColor),
+            flat: create_line_variant(application, &line_buffer, Expression::InputColor),
             normal: create_line_variant(application, &line_buffer, Expression::Normal * 0.5 + 0.5),
             position: create_line_variant(
                 application,
@@ -151,9 +147,9 @@ impl Simulation {
             directional_lit: create_line_variant(
                 application,
                 &line_buffer,
-                Expression::InstanceColor.directional_lit(),
+                Expression::InputColor.directional_lit(),
             ),
-            lit: create_line_variant(application, &line_buffer, Expression::InstanceColor.lit()),
+            lit: create_line_variant(application, &line_buffer, Expression::InputColor.lit()),
         };
 
         let sphere_positions: Vec<[f32; 3]> = vec![

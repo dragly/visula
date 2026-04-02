@@ -555,7 +555,7 @@ fn show(
                                 color: convert(py, &py_application_mut, pysphere.color)?.inner,
                             },
                             &SphereMaterial {
-                                color: Expression::InstanceColor,
+                                color: Expression::InputColor,
                             },
                         )
                         .map_err(|e| {
@@ -574,7 +574,7 @@ fn show(
                                 color: convert(py, &py_application_mut, pylines.color)?.inner,
                             },
                             &LineMaterial {
-                                color: Expression::InstanceColor,
+                                color: Expression::InputColor,
                             },
                         )
                         .map_err(|e| {

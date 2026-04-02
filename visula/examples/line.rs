@@ -51,7 +51,7 @@ impl Simulation {
                 },
             },
             &LineMaterial {
-                color: Expression::InstanceColor.lit(),
+                color: Expression::InputColor.lit(),
             },
         )
         .unwrap();

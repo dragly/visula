@@ -85,7 +85,7 @@ impl Simulation {
                 color: Vec3::ZERO.into(),
             },
             &LineMaterial {
-                color: Expression::InstanceColor.lit(),
+                color: Expression::InputColor.lit(),
             },
         )
         .unwrap();

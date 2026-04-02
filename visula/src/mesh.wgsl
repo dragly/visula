@@ -20,6 +20,7 @@ struct VertexOutput {
     @location(0) normal: vec3<f32>,
     @location(1) uv: vec2<f32>,
     @location(2) world_position: vec3<f32>,
+    @location(3) vertex_color: vec4<f32>,
 };
 
 struct MeshGeometry {
@@ -65,6 +66,7 @@ fn vs_main(
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) uv: vec2<f32>,
+    @location(3) color: vec4<f32>,
 ) -> VertexOutput {
     var geometry: MeshGeometry;
     var out: VertexOutput;
@@ -74,6 +76,7 @@ fn vs_main(
     out.normal = normal_matrix * normal;
     out.uv = uv;
     out.world_position = (transform_matrix * vec4<f32>(position, 1.0)).xyz;
+    out.vertex_color = color;
     return out;
 }
 
@@ -87,6 +90,7 @@ fn fs_main(vertex: VertexOutput) -> FragmentOutput {
     var _visula_normal: vec3<f32> = normalize(vertex.normal);
     var _visula_position: vec3<f32> = vertex.world_position;
     var _visula_view_direction: vec3<f32> = normalize(u_globals.camera_position.xyz - vertex.world_position);
+    var _visula_input_color: vec4<f32> = vertex.vertex_color;
 
     var material: MeshMaterial;
 
