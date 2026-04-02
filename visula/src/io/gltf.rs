@@ -51,74 +51,82 @@ pub fn parse_gltf(
     let blob = file.blob;
     let buffers = import_buffer_data(&document, blob)?;
 
+    fn collect_meshes(
+        node: gltf::Node,
+        buffers: &[Vec<u8>],
+        application: &Application,
+        meshes: &mut Vec<GltfMesh>,
+    ) {
+        if let Some(mesh) = node.mesh() {
+            let mut indices = vec![];
+            let mut vertices = vec![];
+            for primitive in mesh.primitives() {
+                let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
+                if let Some(positions) = reader.read_positions() {
+                    if let Some(normals) = reader.read_normals() {
+                        for (position, normal) in positions.zip(normals) {
+                            let color = [230, 100, 230, 255];
+                            vertices.push(MeshVertexAttributes {
+                                position,
+                                normal,
+                                uv: [0.0, 0.0],
+                                color,
+                            });
+                        }
+                    }
+                }
+                if let Some(indexes) = reader.read_indices() {
+                    match indexes {
+                        gltf::mesh::util::ReadIndices::U8(iter) => {
+                            for index in iter {
+                                indices.push(index as u32);
+                            }
+                        }
+                        gltf::mesh::util::ReadIndices::U16(iter) => {
+                            for index in iter {
+                                indices.push(index as u32);
+                            }
+                        }
+                        gltf::mesh::util::ReadIndices::U32(iter) => {
+                            for index in iter {
+                                indices.push(index);
+                            }
+                        }
+                    }
+                }
+            }
+            let index_buffer =
+                application
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Index buffer"),
+                        contents: bytemuck::cast_slice(&indices),
+                        usage: wgpu::BufferUsages::INDEX,
+                    });
+            let vertex_buffer =
+                application
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Mesh buffer"),
+                        contents: bytemuck::cast_slice(&vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
+            meshes.push(GltfMesh {
+                index_buffer,
+                vertex_buffer,
+                index_count: indices.len(),
+            });
+        }
+        for child in node.children() {
+            collect_meshes(child, buffers, application, meshes);
+        }
+    }
+
     let mut scenes = vec![];
     for scene in document.scenes() {
         let mut meshes = vec![];
         for node in scene.nodes() {
-            // TODO visit node.children() and collect meshes
-            match node.mesh() {
-                None => {}
-                Some(mesh) => {
-                    let mut indices = vec![];
-                    let mut vertices = vec![];
-                    for primitive in mesh.primitives() {
-                        let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
-                        if let Some(positions) = reader.read_positions() {
-                            if let Some(normals) = reader.read_normals() {
-                                for (position, normal) in positions.zip(normals) {
-                                    let color = [230, 100, 230, 255];
-                                    vertices.push(MeshVertexAttributes {
-                                        position,
-                                        normal,
-                                        uv: [0.0, 0.0],
-                                        color,
-                                    });
-                                }
-                            }
-                        }
-                        if let Some(indexes) = reader.read_indices() {
-                            match indexes {
-                                gltf::mesh::util::ReadIndices::U8(iter) => {
-                                    for index in iter {
-                                        indices.push(index as u32);
-                                    }
-                                }
-                                gltf::mesh::util::ReadIndices::U16(iter) => {
-                                    for index in iter {
-                                        indices.push(index as u32);
-                                    }
-                                }
-                                gltf::mesh::util::ReadIndices::U32(iter) => {
-                                    for index in iter {
-                                        indices.push(index);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    let index_buffer =
-                        application
-                            .device
-                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                label: Some("Index buffer"),
-                                contents: bytemuck::cast_slice(&indices),
-                                usage: wgpu::BufferUsages::INDEX,
-                            });
-                    let vertex_buffer =
-                        application
-                            .device
-                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                label: Some("Mesh buffer"),
-                                contents: bytemuck::cast_slice(&vertices),
-                                usage: wgpu::BufferUsages::VERTEX,
-                            });
-                    meshes.push(GltfMesh {
-                        index_buffer,
-                        vertex_buffer,
-                        index_count: indices.len(),
-                    });
-                }
-            }
+            collect_meshes(node, &buffers, application, &mut meshes);
         }
         scenes.push(GltfScene { meshes });
     }
