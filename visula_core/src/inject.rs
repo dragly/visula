@@ -270,7 +270,7 @@ pub fn inject_before_return(
                                 matches!(e, naga::Expression::LocalVariable(v) if *v == output_var_handle)
                             })
                             .map(|(h, _)| h)
-                            .expect("must have expression for output variable");
+                            .ok_or_else(|| ShaderError::VariableNotFound("output variable expression".into()))?;
 
                     let store_access = ep.function.expressions.append(
                         naga::Expression::AccessIndex {

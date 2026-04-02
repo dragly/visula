@@ -28,33 +28,30 @@ pub struct PyApplication {
 #[pymethods]
 impl PyApplication {
     #[new]
-    fn new(event_loop: &mut PyEventLoop) -> Self {
+    fn new(event_loop: &mut PyEventLoop) -> PyResult<Self> {
+        let proxy = event_loop
+            .event_loop
+            .as_ref()
+            .ok_or_else(|| {
+                pyo3::exceptions::PyRuntimeError::new_err("Event loop already consumed")
+            })?
+            .create_proxy();
         let mut application = Self {
             application: None,
             renderables: Vec::new(),
             controls: Vec::new(),
             update: None,
-            event_loop_proxy: event_loop
-                .event_loop
-                .as_ref()
-                .expect("Event loop already consumed")
-                .create_proxy(),
+            event_loop_proxy: proxy,
         };
         if let Some(inner_loop) = event_loop.event_loop.as_mut() {
             inner_loop.pump_app_events(Some(Duration::from_secs(0)), &mut application);
         }
-        application
+        Ok(application)
     }
 }
 impl ApplicationHandler<CustomEvent> for PyApplication {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        let window = match create_window(event_loop) {
-            Ok(w) => w,
-            Err(e) => {
-                log::error!("Failed to create window: {e}");
-                return;
-            }
-        };
+        let window = create_window(event_loop).expect("Failed to create window");
         create_application(window, &self.event_loop_proxy);
     }
 
@@ -193,7 +190,11 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
                     let result = update.call(py, (), None);
                     if let Err(err) = result {
                         println!("Could not call update: {err:?}");
-                        println!("{}", err.traceback(py).unwrap().format().unwrap());
+                        if let Some(tb) = err.traceback(py) {
+                            if let Ok(formatted) = tb.format() {
+                                println!("{formatted}");
+                            }
+                        }
                     }
                 });
             }

@@ -40,10 +40,16 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                 _ => unimplemented!(),
             };
             let pyclass_struct_name = format_ident!("Py{}", struct_ident);
-            let pyclass_attribute: TokenStream2 =
-                format!("#[::pyo3::pyclass(name = \"{struct_ident}\", unsendable)]")
-                    .parse()
-                    .unwrap();
+            let pyclass_attribute: TokenStream2 = syn::parse_str(&format!(
+                "#[::pyo3::pyclass(name = \"{struct_ident}\", unsendable)]"
+            ))
+            .unwrap_or_else(|e| {
+                syn::Error::new(
+                    struct_ident.span(),
+                    format!("failed to parse pyclass attribute: {e}"),
+                )
+                .to_compile_error()
+            });
             quote! {
                 #[cfg(not(target_arch = "wasm32"))]
                 #pyclass_attribute

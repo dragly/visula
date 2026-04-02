@@ -247,9 +247,9 @@ impl visula::Simulation for Simulation {
     }
 }
 
-fn main() {
+fn main() -> Result<(), visula::error::Error> {
     #[cfg(target_arch = "wasm32")]
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-    visula::run(|app| Simulation::new(app).expect("Initializing simulation failed"));
+    visula::run(Simulation::new)
 }

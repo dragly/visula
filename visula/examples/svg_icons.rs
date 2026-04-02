@@ -272,10 +272,8 @@ impl visula::Simulation for Simulation {
     }
 }
 
-fn main() {
+fn main() -> Result<(), visula::error::Error> {
     let args = Args::parse();
     let svg_path = args.svg_path.clone();
-    visula::run(move |app| {
-        Simulation::new(app, &svg_path).expect("Failed to initialize SVG viewer")
-    });
+    visula::run(move |app| Simulation::new(app, &svg_path))
 }

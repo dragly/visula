@@ -107,6 +107,6 @@ impl visula::Simulation for PlaneExample {
     }
 }
 
-fn main() {
-    visula::run(PlaneExample::new);
+fn main() -> Result<(), visula::error::Error> {
+    visula::run(|app| Ok::<_, visula::error::Error>(PlaneExample::new(app)))
 }

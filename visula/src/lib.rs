@@ -92,10 +92,11 @@ struct App<F, S> {
     init_simulation: F,
 }
 
-impl<F, S> ApplicationHandler<CustomEvent> for App<F, S>
+impl<F, S, E> ApplicationHandler<CustomEvent> for App<F, S>
 where
-    F: FnMut(&mut Application) -> S + 'static,
+    F: FnMut(&mut Application) -> Result<S, E> + 'static,
     S: Simulation + 'static,
+    E: std::fmt::Debug + 'static,
 {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         let window =
@@ -114,11 +115,12 @@ where
             return;
         };
         if self.simulation.is_none() {
-            let simulation = (self.init_simulation)(application);
+            let simulation =
+                (self.init_simulation)(application).expect("Failed to initialize simulation");
             self.simulation = Some(simulation);
         };
         let Some(ref mut simulation) = self.simulation else {
-            panic!("Simulation must be set at this point!");
+            panic!("Simulation must be set at this point");
         };
         if !application.window_event(window_id, &event) {
             simulation.handle_event(
@@ -167,10 +169,11 @@ where
     }
 }
 
-pub fn run<F, S>(init: F)
+pub fn run<F, S, E>(init: F) -> Result<(), error::Error>
 where
-    F: FnMut(&mut Application) -> S + 'static,
+    F: FnMut(&mut Application) -> Result<S, E> + 'static,
     S: Simulation + 'static,
+    E: std::fmt::Debug + 'static,
 {
     run_with_config(
         RunConfig {
@@ -221,14 +224,12 @@ pub fn create_window_with_config(
     #[cfg(target_arch = "wasm32")]
     {
         let mut canvas_existed = false;
-        let web_window = web_sys::window().expect("no global `window` exists");
-        let document = web_window
-            .document()
-            .expect("should have a document on window");
+        let web_window = web_sys::window().ok_or(error::Error::WebWindow)?;
+        let document = web_window.document().ok_or(error::Error::WebDocument)?;
         if let Some(canvas) = document.get_element_by_id(&config.canvas_name) {
-            let canvas = canvas
-                .dyn_into::<HtmlCanvasElement>()
-                .expect("could not cast to HtmlCanvasElement");
+            let canvas = canvas.dyn_into::<HtmlCanvasElement>().map_err(|_| {
+                error::Error::WebCanvas("could not cast to HtmlCanvasElement".into())
+            })?;
 
             builder = builder.with_inner_size(LogicalSize::new(
                 canvas.client_width(),
@@ -240,18 +241,20 @@ pub fn create_window_with_config(
         builder = builder.with_active(false);
         let window = event_loop.create_window(builder)?;
         if !canvas_existed {
-            let window_canvas = window.canvas().expect("should have made canvas");
+            let window_canvas = window
+                .canvas()
+                .ok_or(error::Error::WebCanvas("window has no canvas".into()))?;
             window_canvas
                 .set_attribute("style", "width: 100%; height: 100%")
-                .expect("could not set canvas style");
-            web_sys::window()
-                .expect("no global `window` exists")
+                .map_err(|_| error::Error::WebCanvas("could not set canvas style".into()))?;
+            let body = web_sys::window()
+                .ok_or(error::Error::WebWindow)?
                 .document()
-                .expect("should have a document on window")
+                .ok_or(error::Error::WebDocument)?
                 .body()
-                .expect("should have a body on document")
-                .append_child(&web_sys::Element::from(window_canvas))
-                .expect("couldn't append canvas to document body");
+                .ok_or(error::Error::WebDom("no body on document".into()))?;
+            body.append_child(&web_sys::Element::from(window_canvas))
+                .map_err(|_| error::Error::WebDom("could not append canvas to body".into()))?;
         }
         Ok(Arc::new(window))
     }
@@ -271,11 +274,8 @@ pub fn create_application(window: Arc<Window>, event_loop_proxy: &EventLoopProxy
     let window_handle = window.clone();
     #[cfg(not(target_arch = "wasm32"))]
     {
-        let application = pollster::block_on(async move {
-            Application::new(window_handle)
-                .await
-                .expect("Failed to create application")
-        });
+        let application = pollster::block_on(async move { Application::new(window_handle).await })
+            .expect("Failed to create application");
         let _ = proxy.send_event(CustomEvent::Application(Box::new(application)));
     }
 
@@ -305,14 +305,15 @@ where
     }
 }
 
-pub fn run_with_config<F, S>(config: RunConfig, init: F)
+pub fn run_with_config<F, S, E>(config: RunConfig, init: F) -> Result<(), error::Error>
 where
-    F: FnMut(&mut Application) -> S + 'static,
+    F: FnMut(&mut Application) -> Result<S, E> + 'static,
     S: Simulation + 'static,
+    E: std::fmt::Debug + 'static,
 {
     initialize_logger();
     initialize_panic_hook();
-    let event_loop = create_event_loop().expect("Failed to create event loop");
+    let event_loop = create_event_loop()?;
     let mut app = App {
         config,
         application: None,
@@ -322,7 +323,6 @@ where
         main_window_id: None,
     };
 
-    event_loop
-        .run_app(&mut app)
-        .expect("Failed to run event loop")
+    event_loop.run_app(&mut app)?;
+    Ok(())
 }

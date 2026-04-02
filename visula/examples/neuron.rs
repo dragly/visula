@@ -430,6 +430,6 @@ impl visula::Simulation for Simulation {
     }
 }
 
-fn main() {
-    visula::run(|app| Simulation::new(app).expect("Initializing simulation failed"));
+fn main() -> Result<(), visula::error::Error> {
+    visula::run(Simulation::new)
 }

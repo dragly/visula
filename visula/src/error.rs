@@ -30,4 +30,12 @@ pub enum Error {
     EventLoop(#[from] winit::error::EventLoopError),
     #[error("missing binary data in glTF buffer")]
     GltfMissingBlobData,
+    #[error("no global browser window available")]
+    WebWindow,
+    #[error("no document on browser window")]
+    WebDocument,
+    #[error("canvas error: {0}")]
+    WebCanvas(String),
+    #[error("DOM manipulation failed: {0}")]
+    WebDom(String),
 }
