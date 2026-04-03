@@ -259,7 +259,31 @@ impl Application {
             .egui_renderer
             .state
             .on_window_event(&self.window, event);
-        if response.consumed {
+        // Always forward file drop events to the simulation, even if egui consumed them.
+        let is_file_drop = matches!(
+            event,
+            WindowEvent::DroppedFile(_)
+                | WindowEvent::HoveredFile(_)
+                | WindowEvent::HoveredFileCancelled
+        );
+        if response.consumed && !is_file_drop {
+            return true;
+        }
+        let egui_ctx = self.egui_renderer.state.egui_ctx().clone();
+        let is_pointer_event = matches!(
+            event,
+            WindowEvent::MouseInput { .. }
+                | WindowEvent::MouseWheel { .. }
+                | WindowEvent::CursorMoved { .. }
+                | WindowEvent::Touch(_)
+        );
+        let is_keyboard_event = matches!(
+            event,
+            WindowEvent::KeyboardInput { .. } | WindowEvent::Ime(_)
+        );
+        if (is_pointer_event && egui_ctx.egui_wants_pointer_input())
+            || (is_keyboard_event && egui_ctx.egui_wants_keyboard_input())
+        {
             return true;
         }
         let CameraControllerResponse {
