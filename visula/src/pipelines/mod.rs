@@ -1,4 +1,5 @@
 pub mod circles;
+pub mod cylinders;
 pub mod instanced;
 pub mod lines;
 pub mod mesh;
@@ -8,8 +9,10 @@ pub mod quad;
 pub mod rects;
 pub mod renderable;
 pub mod spheres;
+pub mod torus;
 
 pub use circles::*;
+pub use cylinders::*;
 pub use instanced::*;
 pub use lines::*;
 pub use mesh::*;
@@ -19,3 +22,4 @@ pub use quad::*;
 pub use rects::*;
 pub use renderable::*;
 pub use spheres::*;
+pub use torus::*;

@@ -1,5 +1,6 @@
 pub mod bloom;
 pub mod config;
+pub mod outline;
 pub mod sky;
 pub mod ssao;
 pub mod tonemap;
@@ -7,6 +8,7 @@ pub mod tonemap;
 use crate::camera::Camera;
 use bloom::BloomPass;
 use config::PostProcessConfig;
+use outline::OutlinePass;
 use sky::SkyPass;
 use ssao::SsaoPass;
 use tonemap::TonemapPass;
@@ -21,6 +23,7 @@ pub struct PostProcessor {
     pub normal_resolve_texture: wgpu::Texture,
     pub normal_resolve_view: wgpu::TextureView,
     tonemap: TonemapPass,
+    outline: OutlinePass,
     sky: SkyPass,
     ssao: Option<SsaoPass>,
     bloom: Option<BloomPass>,
@@ -90,6 +93,13 @@ impl PostProcessor {
             sample_count,
         );
 
+        let outline = OutlinePass::new(
+            device,
+            wgpu::TextureFormat::Rgba16Float,
+            &normal_resolve_view,
+            depth_texture_view,
+        );
+
         Self {
             config,
             hdr_texture,
@@ -100,6 +110,7 @@ impl PostProcessor {
             normal_resolve_texture,
             normal_resolve_view,
             tonemap,
+            outline,
             sky,
             ssao,
             bloom,
@@ -224,6 +235,8 @@ impl PostProcessor {
             bloom.resize(device, width, height, &self.hdr_view, &config);
         }
 
+        self.outline
+            .rebuild_bind_group(device, &self.normal_resolve_view, depth_texture_view);
         self.rebuild_tonemap(device);
     }
 
@@ -306,6 +319,13 @@ impl PostProcessor {
                 ssao.update_params(queue, config);
             }
             ssao.render(encoder);
+        }
+    }
+
+    pub fn render_outline(&self, encoder: &mut wgpu::CommandEncoder, queue: &wgpu::Queue) {
+        if self.config.outline.enabled {
+            self.outline.update_params(queue, &self.config.outline);
+            self.outline.render(encoder, &self.hdr_view);
         }
     }
 

@@ -505,6 +505,9 @@ impl Application {
 
         self.post_processor.render_ssao(&mut encoder, &self.queue);
 
+        self.post_processor
+            .render_outline(&mut encoder, &self.queue);
+
         self.post_processor.render_bloom(&mut encoder, &self.queue);
 
         self.post_processor
