@@ -4,6 +4,7 @@ pub struct PostProcessConfig {
     pub bloom: Option<BloomConfig>,
     pub tonemapping: Tonemapping,
     pub sky: SkyConfig,
+    pub outline: OutlineConfig,
 }
 
 impl Default for PostProcessConfig {
@@ -13,6 +14,26 @@ impl Default for PostProcessConfig {
             bloom: None,
             tonemapping: Tonemapping::AcesFilmic,
             sky: SkyConfig::default(),
+            outline: OutlineConfig::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct OutlineConfig {
+    pub enabled: bool,
+    pub color: [f32; 3],
+    pub thickness: f32,
+    pub depth_threshold: f32,
+}
+
+impl Default for OutlineConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            color: [0.067, 0.102, 0.055],
+            thickness: 3.0,
+            depth_threshold: 0.1,
         }
     }
 }

@@ -1,5 +1,7 @@
 use crate::application::Application;
-use crate::post_process::config::{BloomConfig, SkyConfig, SkyMode, SsaoConfig, Tonemapping};
+use crate::post_process::config::{
+    BloomConfig, OutlineConfig, SkyConfig, SkyMode, SsaoConfig, Tonemapping,
+};
 
 pub struct RenderingControls {
     ssao_toggle_requested: Option<bool>,
@@ -8,6 +10,8 @@ pub struct RenderingControls {
     bloom_config: BloomConfig,
     sky_config_update: Option<SkyConfig>,
     tonemapping_update: Option<Tonemapping>,
+    outline_config: OutlineConfig,
+    initialized: bool,
 }
 
 impl RenderingControls {
@@ -19,6 +23,8 @@ impl RenderingControls {
             bloom_config: BloomConfig::default(),
             sky_config_update: None,
             tonemapping_update: None,
+            outline_config: OutlineConfig::default(),
+            initialized: false,
         }
     }
 
@@ -79,9 +85,28 @@ impl RenderingControls {
                 egui::Slider::new(&mut self.bloom_config.intensity, 0.0..=2.0).text("Intensity"),
             );
         });
+
+        ui.collapsing("Outline", |ui| {
+            ui.checkbox(&mut self.outline_config.enabled, "Enabled");
+            ui.add(
+                egui::Slider::new(&mut self.outline_config.thickness, 1.0..=10.0).text("Thickness"),
+            );
+            ui.add(
+                egui::Slider::new(&mut self.outline_config.depth_threshold, 0.01..=2.0)
+                    .text("Depth threshold"),
+            );
+            ui.horizontal(|ui| {
+                ui.label("Color");
+                ui.color_edit_button_rgb(&mut self.outline_config.color);
+            });
+        });
     }
 
     pub fn update(&mut self, application: &mut Application) {
+        if !self.initialized {
+            self.outline_config = application.post_processor.config.outline.clone();
+            self.initialized = true;
+        }
         if let Some(config) = self.sky_config_update.take() {
             application.post_processor.config.sky = config;
         }
@@ -125,6 +150,7 @@ impl RenderingControls {
         if application.post_processor.config.bloom.is_some() {
             application.post_processor.config.bloom = Some(self.bloom_config.clone());
         }
+        application.post_processor.config.outline = self.outline_config.clone();
     }
 }
 

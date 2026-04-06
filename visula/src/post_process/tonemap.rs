@@ -9,7 +9,7 @@ struct TonemapParams {
     mode: u32,
     ssao_enabled: u32,
     bloom_enabled: u32,
-    _pad: f32,
+    _pad0: u32,
 }
 
 pub struct TonemapPass {
@@ -21,6 +21,7 @@ pub struct TonemapPass {
     dummy_rgba_view: wgpu::TextureView,
 }
 
+#[allow(clippy::too_many_arguments)]
 impl TonemapPass {
     pub fn new(
         device: &wgpu::Device,
@@ -86,7 +87,7 @@ impl TonemapPass {
             mode: 2,
             ssao_enabled: if ssao_view.is_some() { 1 } else { 0 },
             bloom_enabled: if bloom_view.is_some() { 1 } else { 0 },
-            _pad: 0.0,
+            _pad0: 0,
         };
 
         let params_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -253,7 +254,7 @@ impl TonemapPass {
             mode,
             ssao_enabled: if ssao_enabled { 1 } else { 0 },
             bloom_enabled: if bloom_enabled { 1 } else { 0 },
-            _pad: 0.0,
+            _pad0: 0,
         };
         queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
     }

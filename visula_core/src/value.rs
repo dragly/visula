@@ -58,6 +58,7 @@ pub enum Expression {
     InputColor,
     DirectionalLit(ExpressionInner),
     Lit(ExpressionInner),
+    ToonLit(ExpressionInner),
     ViewDirection,
 }
 
@@ -96,6 +97,10 @@ impl Expression {
 
     pub fn lit(&self) -> Expression {
         Expression::Lit(self.into())
+    }
+
+    pub fn toon_lit(&self) -> Expression {
+        Expression::ToonLit(self.into())
     }
 }
 
@@ -663,6 +668,36 @@ impl Expression {
                     });
                 result
             }
+            Expression::ToonLit(color) => {
+                let color_handle = color.setup(module, binding_builder);
+                let is_vec4 =
+                    is_expression_vec4(color_handle, module, binding_builder.entry_point_index);
+                let normal_handle = load_local_variable("_visula_normal", module, binding_builder);
+                let view_handle =
+                    load_local_variable("_visula_view_direction", module, binding_builder);
+                let position_handle =
+                    load_local_variable("_visula_position", module, binding_builder);
+
+                let fname = if is_vec4 {
+                    "visula_toon_lit_vec4"
+                } else {
+                    "visula_toon_lit_vec3"
+                };
+                let function = find_function(module, fname);
+                let ep = binding_builder.entry_point_index;
+                let result = module.entry_points[ep]
+                    .function
+                    .expressions
+                    .append(naga::Expression::CallResult(function), Span::default());
+                binding_builder
+                    .pending_statements
+                    .push(naga::Statement::Call {
+                        function,
+                        arguments: vec![color_handle, normal_handle, view_handle, position_handle],
+                        result: Some(result),
+                    });
+                result
+            }
             Expression::DirectionalLit(color) => {
                 let color_handle = color.setup(module, binding_builder);
                 let is_vec4 =
@@ -770,6 +805,9 @@ impl std::fmt::Debug for Expression {
             }
             Expression::Lit(_) => {
                 write!(fmt, "Lit")?;
+            }
+            Expression::ToonLit(_) => {
+                write!(fmt, "ToonLit")?;
             }
             Expression::ViewDirection => {
                 write!(fmt, "ViewDirection")?;

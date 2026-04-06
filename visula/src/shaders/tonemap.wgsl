@@ -23,7 +23,7 @@ struct TonemapParams {
     mode: u32,
     ssao_enabled: u32,
     bloom_enabled: u32,
-    _pad: f32,
+    _pad0: u32,
 };
 
 @group(0) @binding(2)
@@ -51,9 +51,9 @@ fn reinhard(x: vec3<f32>) -> vec3<f32> {
 @fragment
 fn fs_main(in: FullscreenOutput) -> @location(0) vec4<f32> {
     var color = textureSample(hdr_texture, hdr_sampler, in.uv).rgb;
+    let coord = vec2<i32>(in.position.xy);
 
     if params.ssao_enabled == 1u {
-        let coord = vec2<i32>(in.position.xy);
         let ao = textureLoad(ssao_texture, coord, 0).r;
         color = color * ao;
     }

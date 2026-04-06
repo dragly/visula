@@ -78,3 +78,27 @@ fn visula_directional_lit_vec3(color: vec3<f32>, normal: vec3<f32>, world_positi
 fn visula_directional_lit_vec4(color: vec4<f32>, normal: vec3<f32>, world_position: vec3<f32>) -> vec4<f32> {
     return vec4<f32>(visula_directional_lit_vec3(color.xyz, normal, world_position), color.w);
 }
+
+fn visula_toon_lit_vec3(color: vec3<f32>, normal: vec3<f32>, view_direction: vec3<f32>, world_position: vec3<f32>) -> vec3<f32> {
+    let shadow = compute_shadow(world_position);
+
+    let light_dir = normalize(-u_light.direction);
+    let n_dot_l = dot(normal, light_dir);
+    let shade = smoothstep(-0.05, 0.05, n_dot_l) * shadow;
+    let shadow_color = color * 0.5;
+    var col = mix(shadow_color, color, shade);
+
+    let half_dir = normalize(light_dir + normalize(view_direction));
+    let spec = pow(max(dot(normal, half_dir), 0.0), 10.0);
+    let highlight = mix(color, vec3<f32>(1.0, 1.0, 1.0), 0.5);
+    col = mix(col, highlight, smoothstep(0.42, 0.48, spec) * 0.65);
+
+    let fresnel = pow(1.0 - max(dot(normalize(view_direction), normal), 0.0), 2.5);
+    col = col + color * fresnel * 0.6;
+
+    return col;
+}
+
+fn visula_toon_lit_vec4(color: vec4<f32>, normal: vec3<f32>, view_direction: vec3<f32>, world_position: vec3<f32>) -> vec4<f32> {
+    return vec4<f32>(visula_toon_lit_vec3(color.xyz, normal, view_direction, world_position), color.w);
+}
