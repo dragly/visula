@@ -26,12 +26,19 @@ fn compute_shadow(world_position: vec3<f32>) -> f32 {
 
     let depth = light_ndc.z;
 
-    let texel_size = 1.0 / 2048.0;
+    // Slope-scaled bias: steeper surfaces need more bias to avoid acne.
+    let light_dir = normalize(-u_light.direction);
+    let dx = dpdx(depth);
+    let dy = dpdy(depth);
+    let slope = sqrt(dx * dx + dy * dy);
+    let bias = max(0.0005, 0.002 * slope);
+
+    let texel_size = 3.0 / 4096.0;
     var shadow = 0.0;
     for (var y = -2; y <= 2; y++) {
         for (var x = -2; x <= 2; x++) {
             let offset = vec2<f32>(f32(x), f32(y)) * texel_size;
-            shadow += textureSampleCompare(shadow_map, shadow_sampler, shadow_uv + offset, depth - 0.005);
+            shadow += textureSampleCompare(shadow_map, shadow_sampler, shadow_uv + offset, depth - bias);
         }
     }
     return shadow / 25.0;

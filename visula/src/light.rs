@@ -27,7 +27,7 @@ impl AsRef<[f32; size_of::<LightUniforms>() / size_of::<f32>()]> for LightUnifor
     }
 }
 
-pub const SHADOW_MAP_SIZE: u32 = 2048;
+pub const SHADOW_MAP_SIZE: u32 = 4096;
 
 #[derive(Debug)]
 pub struct DirectionalLight {
@@ -42,6 +42,14 @@ pub struct DirectionalLight {
     pub direction: Vec3,
     pub color: Vec3,
     pub intensity: f32,
+    /// Center of the shadow frustum in world space.
+    /// Set this to the camera look-at point each frame.
+    pub shadow_center: Vec3,
+    /// Half-extent of the orthographic shadow frustum.
+    /// Controls how large an area the shadow map covers.
+    pub shadow_extent: f32,
+    /// Distance from shadow_center to the light source position.
+    pub shadow_distance: f32,
 }
 
 impl DirectionalLight {
@@ -170,13 +178,17 @@ impl DirectionalLight {
             direction,
             color,
             intensity,
+            shadow_center: Vec3::ZERO,
+            shadow_extent: 50.0,
+            shadow_distance: 200.0,
         }
     }
 
     pub fn compute_light_view_proj(&self) -> Mat4 {
-        let light_pos = -self.direction * 50.0;
-        let view = Mat4::look_at_rh(light_pos, Vec3::ZERO, Vec3::Y);
-        let proj = Mat4::orthographic_rh(-50.0, 50.0, -50.0, 50.0, 0.1, 200.0);
+        let light_pos = self.shadow_center - self.direction * self.shadow_distance;
+        let view = Mat4::look_at_rh(light_pos, self.shadow_center, Vec3::Y);
+        let e = self.shadow_extent;
+        let proj = Mat4::orthographic_rh(-e, e, -e, e, 1.0, self.shadow_distance * 2.0);
         proj * view
     }
 
