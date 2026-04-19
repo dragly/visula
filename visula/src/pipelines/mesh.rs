@@ -154,7 +154,7 @@ impl MeshPipeline {
                     }),
                     Some(wgpu::ColorTargetState {
                         format: wgpu::TextureFormat::Rgba16Float,
-                        blend: None,
+                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
                 ],
