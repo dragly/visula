@@ -144,7 +144,7 @@ impl BindingBuilder {
     pub fn sorted_bindings(&self) -> Vec<InstanceBinding> {
         let mut sorted_bindings = self.instances.values().cloned().collect_vec();
 
-        sorted_bindings.sort_by(|a, b| a.slot.cmp(&b.slot));
+        sorted_bindings.sort_by_key(|a| a.slot);
         sorted_bindings
     }
 }

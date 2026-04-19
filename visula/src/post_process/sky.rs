@@ -145,13 +145,15 @@ impl SkyPass {
         normal_msaa: &wgpu::TextureView,
         normal_resolve: &wgpu::TextureView,
         camera: &Camera,
+        sample_count: u32,
     ) {
+        let msaa = sample_count > 1;
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("sky pass"),
             color_attachments: &[
                 Some(wgpu::RenderPassColorAttachment {
-                    view: color_view,
-                    resolve_target: Some(resolve_target),
+                    view: if msaa { color_view } else { resolve_target },
+                    resolve_target: if msaa { Some(resolve_target) } else { None },
                     depth_slice: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
@@ -159,8 +161,8 @@ impl SkyPass {
                     },
                 }),
                 Some(wgpu::RenderPassColorAttachment {
-                    view: normal_msaa,
-                    resolve_target: Some(normal_resolve),
+                    view: if msaa { normal_msaa } else { normal_resolve },
+                    resolve_target: if msaa { Some(normal_resolve) } else { None },
                     depth_slice: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,

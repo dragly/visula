@@ -104,7 +104,7 @@ impl Application {
         let size = window.inner_size();
 
         #[cfg(target_arch = "wasm32")]
-        let backends = wgpu::Backends::GL;
+        let backends = wgpu::Backends::BROWSER_WEBGPU | wgpu::Backends::GL;
         #[cfg(not(target_arch = "wasm32"))]
         let backends = wgpu::Backends::from_env().unwrap_or_else(wgpu::Backends::all);
 
@@ -143,10 +143,7 @@ impl Application {
             .request_device(&wgpu::DeviceDescriptor {
                 label: None,
                 required_features: wgpu::Features::empty(),
-                #[cfg(target_arch = "wasm32")]
-                required_limits: wgpu::Limits::downlevel_webgl2_defaults(),
-                #[cfg(not(target_arch = "wasm32"))]
-                required_limits: wgpu::Limits::default(),
+                required_limits: adapter.limits(),
                 memory_hints: wgpu::MemoryHints::Performance,
                 experimental_features: Default::default(),
                 trace: Default::default(),
@@ -163,6 +160,9 @@ impl Application {
 
         let camera_controller = CameraController::new(&window);
 
+        #[cfg(target_arch = "wasm32")]
+        let sample_count = 1;
+        #[cfg(not(target_arch = "wasm32"))]
         let sample_count = 4;
         let depth_texture_in = device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
@@ -444,6 +444,7 @@ impl Application {
             light: &self.light,
         });
 
+        let msaa = self.sample_count > 1;
         {
             let hdr_view = &self.post_processor.hdr_view;
             let normal_msaa_view = &self.post_processor.normal_msaa_view;
@@ -452,8 +453,12 @@ impl Application {
                 label: Some("clear"),
                 color_attachments: &[
                     Some(wgpu::RenderPassColorAttachment {
-                        view: &self.multisampled_framebuffer,
-                        resolve_target: Some(hdr_view),
+                        view: if msaa {
+                            &self.multisampled_framebuffer
+                        } else {
+                            hdr_view
+                        },
+                        resolve_target: if msaa { Some(hdr_view) } else { None },
                         depth_slice: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(simulation.clear_color()),
@@ -461,8 +466,16 @@ impl Application {
                         },
                     }),
                     Some(wgpu::RenderPassColorAttachment {
-                        view: normal_msaa_view,
-                        resolve_target: Some(normal_resolve_view),
+                        view: if msaa {
+                            normal_msaa_view
+                        } else {
+                            normal_resolve_view
+                        },
+                        resolve_target: if msaa {
+                            Some(normal_resolve_view)
+                        } else {
+                            None
+                        },
                         depth_slice: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(Color::TRANSPARENT),
@@ -487,16 +500,28 @@ impl Application {
         self.post_processor.render_sky(
             &mut encoder,
             &self.queue,
-            &self.multisampled_framebuffer,
+            if msaa {
+                &self.multisampled_framebuffer
+            } else {
+                &self.post_processor.hdr_view
+            },
             &self.depth_texture,
             &self.camera,
         );
 
         simulation.render(&mut RenderData {
             view: &self.post_processor.hdr_view,
-            multisampled_framebuffer: &self.multisampled_framebuffer,
+            multisampled_framebuffer: if msaa {
+                &self.multisampled_framebuffer
+            } else {
+                &self.post_processor.hdr_view
+            },
             depth_texture: &self.depth_texture,
-            normal_msaa: &self.post_processor.normal_msaa_view,
+            normal_msaa: if msaa {
+                &self.post_processor.normal_msaa_view
+            } else {
+                &self.post_processor.normal_resolve_view
+            },
             normal_resolve: &self.post_processor.normal_resolve_view,
             encoder: &mut encoder,
             camera: &self.camera,

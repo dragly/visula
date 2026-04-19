@@ -251,43 +251,43 @@ impl CameraController {
                 response.needs_redraw = true;
                 response.captured_event = true;
             }
-            WindowEvent::CursorMoved { position, .. } => {
-                if self.right_pressed || (self.left_pressed && self.shift_pressed) {
-                    let ndc_ray = Vec4::new(
-                        2.0 * position.x as f32 / self.window_size.width as f32 - 1.0,
-                        1.0 - 2.0 * position.y as f32 / self.window_size.height as f32,
-                        0.0,
-                        1.0,
-                    );
-                    let mut camera_ray = self
-                        .projection_matrix(
-                            self.window_size.width as f32 / self.window_size.height as f32,
-                        )
-                        .inverse()
-                        * ndc_ray;
-                    camera_ray.w = 0.0;
-                    let world_ray = (self.view_matrix().inverse() * camera_ray)
-                        .xyz()
-                        .normalize();
-                    let camera_position = self.target_transform.position();
-                    let camera_center = self.target_transform.center;
-                    let camera_forward = self.target_transform.forward;
-                    let t = match self.drag_plane {
-                        DragPlane::Z => -camera_position.y / world_ray.y,
-                        DragPlane::Camera => {
-                            (camera_center - camera_position).dot(camera_forward)
-                                / camera_forward.dot(world_ray)
-                        }
-                    };
-                    let intersection = camera_position + t * world_ray;
-                    match self.first_intersection {
-                        None => {
-                            self.first_intersection = Some(intersection);
-                        }
-                        Some(first_intersection) => {
-                            self.target_transform.center =
-                                first_intersection - intersection + self.target_transform.center;
-                        }
+            WindowEvent::CursorMoved { position, .. }
+                if (self.right_pressed || (self.left_pressed && self.shift_pressed)) =>
+            {
+                let ndc_ray = Vec4::new(
+                    2.0 * position.x as f32 / self.window_size.width as f32 - 1.0,
+                    1.0 - 2.0 * position.y as f32 / self.window_size.height as f32,
+                    0.0,
+                    1.0,
+                );
+                let mut camera_ray = self
+                    .projection_matrix(
+                        self.window_size.width as f32 / self.window_size.height as f32,
+                    )
+                    .inverse()
+                    * ndc_ray;
+                camera_ray.w = 0.0;
+                let world_ray = (self.view_matrix().inverse() * camera_ray)
+                    .xyz()
+                    .normalize();
+                let camera_position = self.target_transform.position();
+                let camera_center = self.target_transform.center;
+                let camera_forward = self.target_transform.forward;
+                let t = match self.drag_plane {
+                    DragPlane::Z => -camera_position.y / world_ray.y,
+                    DragPlane::Camera => {
+                        (camera_center - camera_position).dot(camera_forward)
+                            / camera_forward.dot(world_ray)
+                    }
+                };
+                let intersection = camera_position + t * world_ray;
+                match self.first_intersection {
+                    None => {
+                        self.first_intersection = Some(intersection);
+                    }
+                    Some(first_intersection) => {
+                        self.target_transform.center =
+                            first_intersection - intersection + self.target_transform.center;
                     }
                 }
             }
@@ -379,7 +379,10 @@ impl CameraController {
     }
 
     pub fn projection_matrix(&self, aspect_ratio: f32) -> Mat4 {
-        Mat4::perspective_rh(40f32 / 180.0 * PI, aspect_ratio, 0.1, 1000.0)
+        let dist = self.current_transform.distance.max(1.0);
+        let near = (dist * 0.001).max(0.001);
+        let far = (dist * 1000.0).max(100.0);
+        Mat4::perspective_rh(40f32 / 180.0 * PI, aspect_ratio, near, far)
     }
 
     pub fn active(&self) -> bool {
@@ -387,7 +390,7 @@ impl CameraController {
     }
 
     pub fn uniforms(&self, width: f32, height: f32) -> CameraUniforms {
-        let aspect_ratio = width / height;
+        let aspect_ratio = if height > 0.0 { width / height } else { 1.0 };
         let view_matrix = self.view_matrix();
         let projection_matrix = self.projection_matrix(aspect_ratio);
         let model_view_projection_matrix = projection_matrix * view_matrix;

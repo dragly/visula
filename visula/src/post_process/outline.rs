@@ -27,7 +27,9 @@ impl OutlinePass {
         hdr_format: wgpu::TextureFormat,
         normal_view: &wgpu::TextureView,
         depth_view: &wgpu::TextureView,
+        sample_count: u32,
     ) -> Self {
+        let multisampled = sample_count > 1;
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("outline bind group layout"),
             entries: &[
@@ -47,7 +49,7 @@ impl OutlinePass {
                     ty: wgpu::BindingType::Texture {
                         sample_type: wgpu::TextureSampleType::Depth,
                         view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: true,
+                        multisampled,
                     },
                     count: None,
                 },

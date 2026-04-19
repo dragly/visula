@@ -18,7 +18,6 @@ use winit::platform::web::WindowExtWebSys;
 use wasm_bindgen::prelude::*;
 use winit::window::WindowId;
 
-use std::borrow::BorrowMut;
 use std::future::Future;
 use std::sync::Arc;
 use winit::window::Window;
@@ -137,7 +136,7 @@ where
                 application.update();
                 simulation.update(application);
                 application.render(simulation);
-                application.window.borrow_mut().request_redraw();
+                application.window.request_redraw();
             }
             WindowEvent::CloseRequested => event_loop.exit(),
             _ => {}
