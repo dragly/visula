@@ -379,7 +379,10 @@ impl CameraController {
     }
 
     pub fn projection_matrix(&self, aspect_ratio: f32) -> Mat4 {
-        Mat4::perspective_rh(40f32 / 180.0 * PI, aspect_ratio, 0.1, 1000.0)
+        let dist = self.current_transform.distance.max(1.0);
+        let near = (dist * 0.001).max(0.001);
+        let far = (dist * 1000.0).max(100.0);
+        Mat4::perspective_rh(40f32 / 180.0 * PI, aspect_ratio, near, far)
     }
 
     pub fn active(&self) -> bool {
@@ -387,7 +390,7 @@ impl CameraController {
     }
 
     pub fn uniforms(&self, width: f32, height: f32) -> CameraUniforms {
-        let aspect_ratio = width / height;
+        let aspect_ratio = if height > 0.0 { width / height } else { 1.0 };
         let view_matrix = self.view_matrix();
         let projection_matrix = self.projection_matrix(aspect_ratio);
         let model_view_projection_matrix = projection_matrix * view_matrix;
