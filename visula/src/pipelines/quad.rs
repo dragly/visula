@@ -557,10 +557,8 @@ impl Renderable for QuadPipeline {
                 .values()
                 .map(|v| v.inner.borrow().bind_group.clone())
                 .collect();
-            let mut current_slot = 1u32;
-            for bind_group in vertex_uniforms.iter() {
+            for (current_slot, bind_group) in (1u32..).zip(vertex_uniforms.iter()) {
                 render_pass.set_bind_group(current_slot, bind_group, &[]);
-                current_slot += 1;
             }
 
             render_pass.draw_indexed(0..self.index_count as u32, 0, 0..instance_count as u32);
