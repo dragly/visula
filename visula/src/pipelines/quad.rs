@@ -368,7 +368,7 @@ impl Renderable for QuadPipeline {
             normal_resolve,
             camera,
             light,
-            ..
+            sample_count,
         }: &mut RenderData,
     ) {
         log::trace!("Rendering {}", self.label);
@@ -439,6 +439,7 @@ impl Renderable for QuadPipeline {
                 depth_texture,
                 normal_msaa,
                 normal_resolve,
+                *sample_count,
             );
             let mut render_pass = encoder.begin_render_pass(&default_render_pass.build());
             render_pass.set_bind_group(0, &camera.bind_group, &[]);

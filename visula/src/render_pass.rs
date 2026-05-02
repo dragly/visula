@@ -14,11 +14,13 @@ impl DefaultRenderPassDescriptor<'_> {
         depth_texture: &'a wgpu::TextureView,
         normal_msaa: &'a wgpu::TextureView,
         normal_resolve: &'a wgpu::TextureView,
+        sample_count: u32,
     ) -> DefaultRenderPassDescriptor<'a> {
+        let msaa = sample_count > 1;
         let color_attachments = [
             Some(wgpu::RenderPassColorAttachment {
                 view: multisampled_framebuffer,
-                resolve_target: Some(view),
+                resolve_target: if msaa { Some(view) } else { None },
                 depth_slice: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Load,
@@ -26,8 +28,8 @@ impl DefaultRenderPassDescriptor<'_> {
                 },
             }),
             Some(wgpu::RenderPassColorAttachment {
-                view: normal_msaa,
-                resolve_target: Some(normal_resolve),
+                view: if msaa { normal_msaa } else { normal_resolve },
+                resolve_target: if msaa { Some(normal_resolve) } else { None },
                 depth_slice: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Load,

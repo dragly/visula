@@ -252,7 +252,7 @@ impl MeshPipeline {
             normal_resolve,
             camera,
             light,
-            ..
+            sample_count,
         }: &mut RenderData,
     ) {
         log::debug!("Rendering meshes");
@@ -309,6 +309,7 @@ impl MeshPipeline {
                 depth_texture,
                 normal_msaa,
                 normal_resolve,
+                *sample_count,
             )
             .build(),
         );

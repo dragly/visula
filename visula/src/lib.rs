@@ -291,7 +291,7 @@ pub fn create_window_with_config(
 pub fn create_window(event_loop: &ActiveEventLoop) -> Result<Arc<Window>, error::Error> {
     create_window_with_config(
         &RunConfig {
-            canvas_name: "canvas".to_owned(),
+            canvas_name: "glcanvas".to_owned(),
         },
         event_loop,
     )

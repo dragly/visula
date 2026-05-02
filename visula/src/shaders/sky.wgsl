@@ -50,7 +50,7 @@ fn fs_main(in: FullscreenOutput) -> FragmentOutput {
         (in.position.x / u_globals.screen_size.x) * 2.0 - 1.0,
         1.0 - (in.position.y / u_globals.screen_size.y) * 2.0,
     );
-    let clip = vec4<f32>(ndc, 1.0, 1.0);
+    let clip = vec4<f32>(ndc, 0.0, 1.0);
     let world_pos = u_globals.inverse_view_proj * clip;
     let world_dir = normalize(world_pos.xyz / world_pos.w - u_globals.camera_position.xyz);
 
