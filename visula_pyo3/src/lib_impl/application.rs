@@ -1,6 +1,6 @@
 use egui::Slider;
 
-use egui_wgpu::ScreenDescriptor;
+use std::path::PathBuf;
 use std::time::Duration;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
@@ -9,12 +9,77 @@ use winit::event_loop::EventLoopProxy;
 use pyo3::prelude::*;
 use pyo3::types::PyFunction;
 
-use visula::{create_application, create_window, Application, CustomEvent, RenderData, Renderable};
-use wgpu::Color;
+use visula::{
+    create_application, create_window, Application, CustomEvent, RenderData, Renderable, Simulation,
+};
 
 use winit::platform::pump_events::EventLoopExtPumpEvents;
 
 use super::{PyEventLoop, PySlider};
+
+struct AutoScreenshot {
+    path: PathBuf,
+    capture_after_frames: u32,
+    frames_rendered: u32,
+    captured: bool,
+}
+
+impl AutoScreenshot {
+    fn from_env() -> Option<Self> {
+        let path = std::env::var_os("VISULA_SCREENSHOT")?;
+        let capture_after_frames = std::env::var("VISULA_SCREENSHOT_FRAMES")
+            .ok()
+            .and_then(|s| s.parse::<u32>().ok())
+            .unwrap_or(30);
+        Some(AutoScreenshot {
+            path: PathBuf::from(path),
+            capture_after_frames,
+            frames_rendered: 0,
+            captured: false,
+        })
+    }
+}
+
+struct PySimulation<'a> {
+    renderables: &'a [Box<dyn Renderable>],
+    controls: &'a mut Vec<Py<PySlider>>,
+}
+
+#[derive(Debug)]
+pub struct PySimulationError;
+
+impl Simulation for PySimulation<'_> {
+    type Error = PySimulationError;
+
+    fn render(&mut self, data: &mut RenderData) {
+        for renderable in self.renderables {
+            renderable.render(data);
+        }
+    }
+
+    fn render_shadow(&mut self, data: &mut visula::ShadowRenderData) {
+        for renderable in self.renderables {
+            renderable.render_shadow(data);
+        }
+    }
+
+    fn gui(&mut self, _application: &Application, context: &egui::Context) {
+        if self.controls.is_empty() {
+            return;
+        }
+        egui::Window::new("Settings").show(context, |ui| {
+            Python::attach(|py| {
+                for slider in self.controls.iter_mut() {
+                    let mut slider_mut = slider.borrow_mut(py);
+                    let minimum = slider_mut.minimum;
+                    let maximum = slider_mut.maximum;
+                    ui.label(&slider_mut.name);
+                    ui.add(Slider::new(&mut slider_mut.value, minimum..=maximum));
+                }
+            });
+        });
+    }
+}
 
 #[pyclass(unsendable)]
 pub struct PyApplication {
@@ -23,6 +88,7 @@ pub struct PyApplication {
     pub renderables: Vec<Box<dyn Renderable>>,
     pub controls: Vec<Py<PySlider>>,
     pub update: Option<Py<PyFunction>>,
+    auto_screenshot: Option<AutoScreenshot>,
 }
 
 #[pymethods]
@@ -39,6 +105,7 @@ impl PyApplication {
                 .as_ref()
                 .expect("Event loop already consumed")
                 .create_proxy(),
+            auto_screenshot: AutoScreenshot::from_env(),
         };
         if let Some(inner_loop) = event_loop.event_loop.as_mut() {
             inner_loop.pump_app_events(Some(Duration::from_secs(0)), &mut application);
@@ -73,121 +140,25 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
         application.window_event(window_id, &event);
         match event {
             WindowEvent::RedrawRequested => {
-                {
-                    let frame = match application.next_frame() {
-                        Ok(f) => f,
-                        Err(e) => {
-                            log::error!("Failed to get next frame: {e}");
-                            return;
-                        }
-                    };
-                    let mut encoder = application.encoder();
-                    let view = frame
-                        .texture
-                        .create_view(&wgpu::TextureViewDescriptor::default());
-
-                    {
-                        application.clear(&view, &mut encoder, Color::BLACK);
-                        let mut render_data = RenderData {
-                            view: &view,
-                            multisampled_framebuffer: &application.multisampled_framebuffer,
-                            depth_texture: &application.depth_texture,
-                            normal_msaa: &application.post_processor.normal_msaa_view,
-                            normal_resolve: &application.post_processor.normal_resolve_view,
-                            encoder: &mut encoder,
-                            camera: &application.camera,
-                            light: &application.light,
-                        };
-                        for spheres in &self.renderables {
-                            spheres.render(&mut render_data);
-                        }
+                if let Some(auto) = self.auto_screenshot.as_mut() {
+                    if !auto.captured && auto.frames_rendered >= auto.capture_after_frames {
+                        application.request_screenshot(auto.path.clone());
+                        auto.captured = true;
                     }
-                    if !self.controls.is_empty() {
-                        let raw_input = application
-                            .egui_renderer
-                            .state
-                            .take_egui_input(&application.window);
-                        #[allow(deprecated)]
-                        let full_output =
-                            application
-                                .egui_renderer
-                                .state
-                                .egui_ctx()
-                                .run(raw_input, |ctx| {
-                                    egui::Window::new("Settings").show(ctx, |ui| {
-                                        Python::attach(|py| {
-                                            for slider in &mut self.controls {
-                                                let mut slider_mut = slider.borrow_mut(py);
-                                                let minimum = slider_mut.minimum;
-                                                let maximum = slider_mut.maximum;
-                                                ui.label(&slider_mut.name);
-                                                ui.add(Slider::new(
-                                                    &mut slider_mut.value,
-                                                    minimum..=maximum,
-                                                ));
-                                            }
-                                        });
-                                    });
-                                });
-
-                        application.egui_renderer.state.handle_platform_output(
-                            &application.window,
-                            full_output.platform_output,
-                        );
-
-                        let tris = application.egui_renderer.state.egui_ctx().tessellate(
-                            full_output.shapes,
-                            application.window.scale_factor() as f32,
-                        );
-                        for (id, image_delta) in &full_output.textures_delta.set {
-                            application.egui_renderer.renderer.update_texture(
-                                &application.device,
-                                &application.queue,
-                                *id,
-                                image_delta,
-                            );
-                        }
-                        let screen_descriptor = ScreenDescriptor {
-                            size_in_pixels: [application.config.width, application.config.height],
-                            pixels_per_point: application.window.scale_factor() as f32,
-                        };
-                        application.egui_renderer.renderer.update_buffers(
-                            &application.device,
-                            &application.queue,
-                            &mut encoder,
-                            &tris,
-                            &screen_descriptor,
-                        );
-                        let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                            label: Some("egui"),
-                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                                view: &view,
-                                resolve_target: None,
-                                ops: wgpu::Operations {
-                                    load: wgpu::LoadOp::Load,
-                                    store: wgpu::StoreOp::Store,
-                                },
-                                depth_slice: None,
-                            })],
-                            depth_stencil_attachment: None,
-                            occlusion_query_set: None,
-                            timestamp_writes: None,
-                            multiview_mask: None,
-                        });
-                        application.egui_renderer.renderer.render(
-                            &mut render_pass.forget_lifetime(),
-                            &tris,
-                            &screen_descriptor,
-                        );
-                        for x in &full_output.textures_delta.free {
-                            application.egui_renderer.renderer.free_texture(x)
-                        }
+                }
+                application.update();
+                let mut sim = PySimulation {
+                    renderables: &self.renderables,
+                    controls: &mut self.controls,
+                };
+                application.render(&mut sim);
+                application.window.request_redraw();
+                if let Some(auto) = self.auto_screenshot.as_mut() {
+                    auto.frames_rendered = auto.frames_rendered.saturating_add(1);
+                    if auto.captured {
+                        event_loop.exit();
+                        return;
                     }
-
-                    application.queue.submit(Some(encoder.finish()));
-                    frame.present();
-                    application.update();
-                    application.window.request_redraw();
                 }
                 Python::attach(|py| {
                     let result = update.call(py, (), None);
