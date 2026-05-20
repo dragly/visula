@@ -11,7 +11,7 @@ VISULA_SCREENSHOT_FRAMES=300 \
     cargo run --release --example molecular_dynamics -- --count 6
 
 VISULA_SCREENSHOT=screenshots/python_spheres.png \
-    ./run-python.sh visula_pyo3/examples/simple.py
+    uv run visula_pyo3/examples/simple.py
 ```
 
 The process exits automatically after the screenshot is written.

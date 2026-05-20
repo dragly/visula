@@ -2,17 +2,21 @@
 
 Turn data streams from simulations and recordings into interactive 3D visualizations you can share on the web.
 
-Visula is a scientific visualization library built on [wgpu](https://wgpu.rs). It targets the browser via WebGPU/WebGL first and runs natively for performance. Same API in Rust and Python.
+Visula is a scientific visualization library built on [wgpu](https://wgpu.rs).
+Applications can run natively in Linux, Windows or macOS, or target the web with WASM and WebGPU.
 
-> Visula is built around my own visualization needs and is shared in case it's useful to others. It's a work in progress — APIs may change.
+Visula is built around my own visualization needs and is shared in case it's useful to others. It's a work in progress — APIs may change.
 
 ![Showcase](screenshots/showcase.png)
 
-## The idea
+## Python example
 
-High-level primitives, low-level control. You start with spheres, lines, or meshes, and shape them with expressions that run on the GPU.
+The idea behind Visula is to make it easy to create data-driven visualizations.
+Primitives like spheres, lines or triangle meshes can be defined directly from data.
+This includes their position and color.
 
-If you want to add whiskers to each point, draw normals on top of a point cloud, or color particles by a field you compute on the fly — those aren't features Visula has to ship. They're things you express on top of what's already there, using the same primitives and expressions.
+InstanceBuffers can be used to define multiple instances of a given primitive:
+
 
 ```python
 from visula import SphereDelegate, Figure, InstanceBuffer
@@ -31,11 +35,13 @@ spheres = SphereDelegate(
 Figure().show([spheres])
 ```
 
-`position` is not a NumPy array — it's an expression. Visula compiles it into the shader and evaluates it per instance on the GPU. A million spheres cost the same to upload as one.
+Here, `position`, `radius` and `color` are all expressions.
+Visula compiles these into the shader and evaluates them per instance on the GPU.
+This means that there is only one array `t` uploaded to the GPU.
 
 ![Python spheres](screenshots/python_spheres.png)
 
-## The same in Rust
+## Rust example
 
 ```rust
 use visula::{Expression, InstanceDeviceExt, SphereGeometry, SphereMaterial, Spheres};
@@ -72,9 +78,9 @@ cargo run --example showcase
 cargo run --example molecular_dynamics
 cargo run --example neuron
 
-# Python
-./run-python.sh visula_pyo3/examples/simple.py
-./run-python.sh visula_pyo3/examples/controls.py
+# Python (uv sync builds the Rust extension on first run)
+uv run visula_pyo3/examples/simple.py
+uv run visula_pyo3/examples/controls.py
 
 # Web (WebGPU/WebGL)
 ./run-wasm.sh
