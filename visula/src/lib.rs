@@ -19,6 +19,8 @@ use wasm_bindgen::prelude::*;
 use winit::window::WindowId;
 
 use std::future::Future;
+#[cfg(not(target_arch = "wasm32"))]
+use std::path::PathBuf;
 use std::sync::Arc;
 use winit::window::Window;
 
@@ -54,7 +56,7 @@ pub mod simulation;
 pub mod text;
 pub mod vec_to_buffer;
 
-pub use application::Application;
+pub use application::{Application, PendingScreenshot};
 pub use camera::controller::{CameraController, CameraControllerResponse, CameraTransform};
 pub use camera::Camera;
 pub use custom_event::CustomEvent;
@@ -89,6 +91,33 @@ struct App<F, S> {
     event_loop_proxy: EventLoopProxy<CustomEvent>,
     main_window_id: Option<WindowId>,
     init_simulation: F,
+    #[cfg(not(target_arch = "wasm32"))]
+    auto_screenshot: Option<AutoScreenshot>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct AutoScreenshot {
+    path: PathBuf,
+    capture_after_frames: u32,
+    frames_rendered: u32,
+    captured: bool,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl AutoScreenshot {
+    fn from_env() -> Option<Self> {
+        let path = std::env::var_os("VISULA_SCREENSHOT")?;
+        let capture_after_frames = std::env::var("VISULA_SCREENSHOT_FRAMES")
+            .ok()
+            .and_then(|s| s.parse::<u32>().ok())
+            .unwrap_or(30);
+        Some(AutoScreenshot {
+            path: PathBuf::from(path),
+            capture_after_frames,
+            frames_rendered: 0,
+            captured: false,
+        })
+    }
 }
 
 impl<F, S> ApplicationHandler<CustomEvent> for App<F, S>
@@ -135,7 +164,22 @@ where
             WindowEvent::RedrawRequested => {
                 application.update();
                 simulation.update(application);
+                #[cfg(not(target_arch = "wasm32"))]
+                if let Some(auto) = self.auto_screenshot.as_mut() {
+                    if !auto.captured && auto.frames_rendered >= auto.capture_after_frames {
+                        application.request_screenshot(auto.path.clone());
+                        auto.captured = true;
+                    }
+                }
                 application.render(simulation);
+                #[cfg(not(target_arch = "wasm32"))]
+                if let Some(auto) = self.auto_screenshot.as_mut() {
+                    auto.frames_rendered = auto.frames_rendered.saturating_add(1);
+                    if auto.captured {
+                        event_loop.exit();
+                        return;
+                    }
+                }
                 application.window.request_redraw();
             }
             WindowEvent::CloseRequested => event_loop.exit(),
@@ -319,6 +363,8 @@ where
         init_simulation: init,
         event_loop_proxy: event_loop.create_proxy(),
         main_window_id: None,
+        #[cfg(not(target_arch = "wasm32"))]
+        auto_screenshot: AutoScreenshot::from_env(),
     };
 
     event_loop

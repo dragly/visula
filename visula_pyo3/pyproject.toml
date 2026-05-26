@@ -18,7 +18,7 @@ features = ["pyo3/extension-module"]
 python-source = "python"
 module-name = "visula._visula_pyo3"
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "maturin>=1.8.1",
 ]
