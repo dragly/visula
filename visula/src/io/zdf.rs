@@ -139,7 +139,6 @@ pub fn read_zdf<R: ReadSeek>(
                 position: position.into(),
                 radius,
                 color: color.into(),
-                padding: 0.0,
             })
         })
         .collect();

@@ -1,10 +1,9 @@
-use glam::{Quat, Vec3};
+use glam::Vec3;
 use visula::{
     primitives::mesh_primitive::MeshVertexAttributes, Expression, MeshGeometry, MeshMaterial,
     MeshPipeline,
 };
 use visula_core::TextureBuffer;
-use wgpu::util::DeviceExt;
 
 struct PlaneExample {
     mesh: MeshPipeline,
@@ -24,9 +23,8 @@ impl PlaneExample {
         let mut mesh = MeshPipeline::new(
             &app.rendering_descriptor(),
             &MeshGeometry {
-                position: Vec3::ZERO.into(),
-                rotation: Quat::IDENTITY.into(),
                 scale: (100.0 * Vec3::ONE).into(),
+                ..Default::default()
             },
             &MeshMaterial {
                 color: texture.sample(&Expression::UV),
@@ -63,17 +61,7 @@ impl PlaneExample {
 
         let indices: Vec<u32> = vec![0, 1, 2, 0, 2, 3];
 
-        mesh.vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Textured plane vertex buffer"),
-            contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        mesh.index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Textured plane index buffer"),
-            contents: bytemuck::cast_slice(&indices),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-        mesh.vertex_count = indices.len();
+        mesh.set_mesh_data(device, &vertices, &indices);
 
         let width: u32 = size.width;
         let height: u32 = size.height;
@@ -100,8 +88,6 @@ impl PlaneExample {
 }
 
 impl visula::Simulation for PlaneExample {
-    type Error = ();
-
     fn render(&mut self, data: &mut visula::RenderData) {
         self.mesh.render(data);
     }

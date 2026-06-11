@@ -6,7 +6,7 @@ use itertools::Itertools;
 use itertools_num::linspace;
 use visula::Renderable;
 use visula::{
-    Expression, InstanceBuffer, InstanceDeviceExt, LineGeometry, LineMaterial, Lines, RenderData,
+    vec3, InstanceBuffer, InstanceDeviceExt, LineGeometry, LineMaterial, Lines, RenderData,
     SphereGeometry, SphereMaterial, Spheres, UniformBuffer,
 };
 use visula_derive::{Instance, Uniform};
@@ -17,23 +17,21 @@ struct Cli {
     count: Option<usize>,
 }
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Instance, Pod, Zeroable)]
 struct Particle {
     position: glam::Vec3,
     velocity: glam::Vec3,
     acceleration: glam::Vec3,
     mass: f32,
-    _padding: [f32; 2],
 }
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct BondData {
     position_a: [f32; 3],
     position_b: [f32; 3],
     strength: f32,
-    _padding: f32,
 }
 
 trait TwoBodyForce {
@@ -107,7 +105,6 @@ fn integrate<F: TwoBodyForce>(
                     position_a: (*position_i).into(),
                     position_b: (*position_j).into(),
                     strength,
-                    _padding: 0.0,
                 });
             }
         }
@@ -165,16 +162,12 @@ fn generate(count: usize) -> Vec<Particle> {
                     velocity: Vec3::new(0.0, 0.0, 0.0),
                     acceleration: Vec3::new(0.0, 0.0, 0.0),
                     mass: 1.0,
-                    _padding: [0.0; 2],
                 })
             }
         }
     }
     current_particles
 }
-
-#[derive(Debug)]
-struct Error {}
 
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Debug, Pod, Uniform, Zeroable)]
@@ -185,11 +178,10 @@ struct Settings {
     _padding: f32,
 }
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Instance, Pod, Zeroable)]
 struct ColorData {
     value: glam::Vec3,
-    _padding: f32,
 }
 
 struct BoundingBox {
@@ -212,7 +204,7 @@ struct Simulation {
 }
 
 impl Simulation {
-    fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
+    fn new(application: &mut visula::Application) -> Simulation {
         let cli = Cli::parse();
         let count = cli.count.unwrap_or(8);
         let particles = generate(count);
@@ -235,7 +227,6 @@ impl Simulation {
         let color_data = (0..(count.pow(3)))
             .map(|_| ColorData {
                 value: Vec3::new(1.0, 0.5, 1.0),
-                _padding: Default::default(),
             })
             .collect_vec();
         let color_buffer = application.device.create_instance_buffer::<ColorData>();
@@ -248,9 +239,7 @@ impl Simulation {
                 radius: 1.0 + settings.radius,
                 color: color.value,
             },
-            &SphereMaterial {
-                color: Expression::InputColor.lit(),
-            },
+            &SphereMaterial::default(),
         )
         .unwrap();
 
@@ -260,20 +249,14 @@ impl Simulation {
                 start: bond.position_a,
                 end: bond.position_b,
                 width: settings.width,
-                color: Expression::Vector3 {
-                    x: bond.strength.clone().into(),
-                    y: 1.0.into(),
-                    z: 0.8.into(),
-                },
+                color: vec3(bond.strength, 1.0, 0.8),
             },
-            &LineMaterial {
-                color: Expression::InputColor.lit(),
-            },
+            &LineMaterial::default(),
         )
         .unwrap();
 
         let bound = count as f32 * 3.0;
-        Ok(Simulation {
+        Simulation {
             particles,
             spheres,
             particle_buffer,
@@ -288,7 +271,7 @@ impl Simulation {
             count,
             target_temperature: 10.0,
             last_update: Utc::now(),
-        })
+        }
     }
 
     fn reset(&mut self) {
@@ -297,7 +280,6 @@ impl Simulation {
 }
 
 impl visula::Simulation for Simulation {
-    type Error = Error;
     fn update(&mut self, application: &mut visula::Application) {
         let mut bond_data = Vec::new();
         let current_time = Utc::now();
@@ -360,5 +342,5 @@ impl visula::Simulation for Simulation {
 }
 
 fn main() {
-    visula::run(|app| Simulation::new(app).expect("Initializing simulation failed"));
+    visula::run(Simulation::new);
 }

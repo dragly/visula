@@ -817,44 +817,46 @@ impl std::fmt::Debug for Expression {
     }
 }
 
-impl Div<f32> for Expression {
+impl<T> Div<T> for Expression
+where
+    T: Into<Expression>,
+{
     type Output = Expression;
 
-    fn div(self, other: f32) -> Expression {
-        let other_scalar: Expression = other.into();
+    fn div(self, other: T) -> Expression {
+        let other_expression: Expression = other.into();
         Expression::BinaryOperator {
             left: ExpressionInner::new(self),
-            right: ExpressionInner::new(other_scalar),
+            right: ExpressionInner::new(other_expression),
             operator: naga::BinaryOperator::Divide,
         }
     }
 }
 
-impl Div<f32> for &Expression {
+impl<T> Div<T> for &Expression
+where
+    Expression: From<T>,
+{
     type Output = Expression;
 
-    fn div(self, other: f32) -> Expression {
-        self.clone() / other
+    fn div(self, other: T) -> Expression {
+        self.clone() / Expression::from(other)
     }
 }
 
-impl Div<Expression> for Expression {
+impl Div<Expression> for f32 {
     type Output = Expression;
 
     fn div(self, other: Expression) -> Expression {
-        Expression::BinaryOperator {
-            left: ExpressionInner::new(self),
-            right: ExpressionInner::new(other),
-            operator: naga::BinaryOperator::Divide,
-        }
+        Expression::from(self) / other
     }
 }
 
-impl Div<Expression> for &Expression {
+impl Div<&Expression> for f32 {
     type Output = Expression;
 
-    fn div(self, other: Expression) -> Expression {
-        self.clone() / other
+    fn div(self, other: &Expression) -> Expression {
+        Expression::from(self) / other
     }
 }
 
@@ -965,31 +967,94 @@ impl Add<&Expression> for glam::Vec4 {
     }
 }
 
-impl Sub<Expression> for Expression {
+impl<T> Sub<T> for Expression
+where
+    T: Into<Expression>,
+{
     type Output = Expression;
 
-    fn sub(self, other: Expression) -> Expression {
+    fn sub(self, other: T) -> Expression {
+        let other_expression: Expression = other.into();
         Expression::BinaryOperator {
             left: ExpressionInner::new(self),
-            right: ExpressionInner::new(other),
+            right: ExpressionInner::new(other_expression),
             operator: naga::BinaryOperator::Subtract,
         }
     }
 }
 
-impl Sub<&Expression> for Expression {
+impl<T> Sub<T> for &Expression
+where
+    Expression: From<T>,
+{
     type Output = Expression;
 
-    fn sub(self, other: &Expression) -> Expression {
-        self - other.clone()
+    fn sub(self, other: T) -> Expression {
+        self.clone() - Expression::from(other)
     }
 }
 
-impl Sub<&Expression> for &Expression {
+impl Sub<Expression> for f32 {
+    type Output = Expression;
+
+    fn sub(self, other: Expression) -> Expression {
+        Expression::from(self) - other
+    }
+}
+
+impl Sub<&Expression> for f32 {
     type Output = Expression;
 
     fn sub(self, other: &Expression) -> Expression {
-        self.clone() - other.clone()
+        Expression::from(self) - other
+    }
+}
+
+impl Sub<Expression> for glam::Vec2 {
+    type Output = Expression;
+
+    fn sub(self, other: Expression) -> Expression {
+        Expression::from(self) - other
+    }
+}
+
+impl Sub<&Expression> for glam::Vec2 {
+    type Output = Expression;
+
+    fn sub(self, other: &Expression) -> Expression {
+        Expression::from(self) - other
+    }
+}
+
+impl Sub<Expression> for glam::Vec3 {
+    type Output = Expression;
+
+    fn sub(self, other: Expression) -> Expression {
+        Expression::from(self) - other
+    }
+}
+
+impl Sub<&Expression> for glam::Vec3 {
+    type Output = Expression;
+
+    fn sub(self, other: &Expression) -> Expression {
+        Expression::from(self) - other
+    }
+}
+
+impl Sub<Expression> for glam::Vec4 {
+    type Output = Expression;
+
+    fn sub(self, other: Expression) -> Expression {
+        Expression::from(self) - other
+    }
+}
+
+impl Sub<&Expression> for glam::Vec4 {
+    type Output = Expression;
+
+    fn sub(self, other: &Expression) -> Expression {
+        Expression::from(self) - other
     }
 }
 
@@ -1004,71 +1069,65 @@ impl Neg for Expression {
     }
 }
 
-impl Mul<Expression> for Expression {
+impl Neg for &Expression {
     type Output = Expression;
 
-    fn mul(self, other: Expression) -> Expression {
+    fn neg(self) -> Expression {
+        -self.clone()
+    }
+}
+
+impl<T> Mul<T> for Expression
+where
+    T: Into<Expression>,
+{
+    type Output = Expression;
+
+    fn mul(self, other: T) -> Expression {
+        let other_expression: Expression = other.into();
         Expression::BinaryOperator {
             left: ExpressionInner::new(self),
-            right: ExpressionInner::new(other),
+            right: ExpressionInner::new(other_expression),
             operator: naga::BinaryOperator::Multiply,
         }
     }
 }
 
-impl Mul<&Expression> for Expression {
+impl<T> Mul<T> for &Expression
+where
+    Expression: From<T>,
+{
     type Output = Expression;
 
-    fn mul(self, other: &Expression) -> Expression {
-        self * other.clone()
+    fn mul(self, other: T) -> Expression {
+        self.clone() * Expression::from(other)
     }
 }
 
-impl Mul<&Expression> for &Expression {
+impl<T> Rem<T> for Expression
+where
+    T: Into<Expression>,
+{
     type Output = Expression;
 
-    fn mul(self, other: &Expression) -> Expression {
-        self.clone() * other.clone()
-    }
-}
-
-impl Rem<Expression> for Expression {
-    type Output = Expression;
-
-    fn rem(self, other: Expression) -> Expression {
+    fn rem(self, other: T) -> Expression {
+        let other_expression: Expression = other.into();
         Expression::BinaryOperator {
             left: ExpressionInner::new(self),
-            right: ExpressionInner::new(other),
+            right: ExpressionInner::new(other_expression),
             operator: naga::BinaryOperator::Modulo,
         }
     }
 }
 
-impl Rem<&Expression> for Expression {
+impl<T> Rem<T> for &Expression
+where
+    Expression: From<T>,
+{
     type Output = Expression;
 
-    fn rem(self, other: &Expression) -> Expression {
-        self % other.clone()
-    }
-}
-
-impl Rem<&Expression> for &Expression {
-    type Output = Expression;
-
-    fn rem(self, other: &Expression) -> Expression {
-        self.clone() % other.clone()
-    }
-}
-
-impl Mul<f32> for Expression {
-    type Output = Expression;
-
-    fn mul(self, other: f32) -> Expression {
-        Expression::BinaryOperator {
-            left: ExpressionInner::new(self),
-            right: ExpressionInner::new(other.into()),
-            operator: naga::BinaryOperator::Multiply,
-        }
+    fn rem(self, other: T) -> Expression {
+        self.clone() % Expression::from(other)
     }
 }
 
@@ -1152,5 +1211,56 @@ impl From<glam::Quat> for Expression {
             z: value.z.into(),
             w: value.w.into(),
         }
+    }
+}
+
+impl From<[f32; 2]> for Expression {
+    fn from(value: [f32; 2]) -> Expression {
+        vec2(value[0], value[1])
+    }
+}
+
+impl From<[f32; 3]> for Expression {
+    fn from(value: [f32; 3]) -> Expression {
+        vec3(value[0], value[1], value[2])
+    }
+}
+
+impl From<[f32; 4]> for Expression {
+    fn from(value: [f32; 4]) -> Expression {
+        vec4(value[0], value[1], value[2], value[3])
+    }
+}
+
+pub fn vec2(x: impl Into<ExpressionInner>, y: impl Into<ExpressionInner>) -> Expression {
+    Expression::Vector2 {
+        x: x.into(),
+        y: y.into(),
+    }
+}
+
+pub fn vec3(
+    x: impl Into<ExpressionInner>,
+    y: impl Into<ExpressionInner>,
+    z: impl Into<ExpressionInner>,
+) -> Expression {
+    Expression::Vector3 {
+        x: x.into(),
+        y: y.into(),
+        z: z.into(),
+    }
+}
+
+pub fn vec4(
+    x: impl Into<ExpressionInner>,
+    y: impl Into<ExpressionInner>,
+    z: impl Into<ExpressionInner>,
+    w: impl Into<ExpressionInner>,
+) -> Expression {
+    Expression::Vector4 {
+        x: x.into(),
+        y: y.into(),
+        z: z.into(),
+        w: w.into(),
     }
 }

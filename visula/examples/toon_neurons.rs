@@ -10,9 +10,8 @@ use visula::{
     ShadowRenderData, SphereGeometry, SphereMaterial, SpherePrimitive, Spheres,
 };
 use visula_derive::Instance;
-use wgpu::util::DeviceExt;
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct CylinderData {
     start: [f32; 3],
@@ -20,7 +19,6 @@ struct CylinderData {
     end: [f32; 3],
     end_radius: f32,
     color: [f32; 3],
-    _padding: f32,
 }
 
 struct NeuronConfig {
@@ -208,7 +206,6 @@ fn collect_dendrite_cylinders(
             end: dend.points[i + 1].into(),
             end_radius: dend.radii[i + 1],
             color,
-            _padding: 0.0,
         });
 
         if i > 0 {
@@ -216,7 +213,6 @@ fn collect_dendrite_cylinders(
                 position: dend.points[i].into(),
                 radius: dend.radii[i],
                 color,
-                padding: 0.0,
             });
         }
     }
@@ -227,7 +223,6 @@ fn collect_dendrite_cylinders(
             position: (*tip).into(),
             radius: tip_r,
             color,
-            padding: 0.0,
         });
     }
 
@@ -352,7 +347,6 @@ fn generate_axon_cylinders(
             end: p1.into(),
             end_radius: radius,
             color,
-            _padding: 0.0,
         });
     }
 
@@ -467,7 +461,6 @@ fn generate_all(settings: &GenerationSettings) -> GeneratedBufferData {
                 position: soma_pos.into(),
                 radius: neuron.scale,
                 color,
-                padding: 0.0,
             }
         })
         .collect();
@@ -593,25 +586,14 @@ impl ToonNeurons {
                 &app.rendering_descriptor(),
                 &MeshGeometry {
                     position: (*pos).into(),
-                    rotation: Quat::IDENTITY.into(),
-                    scale: Vec3::ONE.into(),
+                    ..Default::default()
                 },
                 &MeshMaterial {
                     color: Expression::InputColor.toon_lit(),
                 },
             )
             .unwrap();
-            mesh.vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Synapse vertex buffer"),
-                contents: bytemuck::cast_slice(&vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
-            mesh.index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Synapse index buffer"),
-                contents: bytemuck::cast_slice(&indices),
-                usage: wgpu::BufferUsages::INDEX,
-            });
-            mesh.vertex_count = indices.len();
+            mesh.set_mesh_data(device, &vertices, &indices);
             synapse_meshes.push(mesh);
         }
 
@@ -622,26 +604,14 @@ impl ToonNeurons {
             &app.rendering_descriptor(),
             &MeshGeometry {
                 position: Vec3::new(0.0, -0.3, 0.0).into(),
-                rotation: Quat::IDENTITY.into(),
-                scale: Vec3::ONE.into(),
+                ..Default::default()
             },
             &MeshMaterial {
                 color: Expression::InputColor.toon_lit(),
             },
         )
         .unwrap();
-
-        dish_floor.vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Dish floor vertex buffer"),
-            contents: bytemuck::cast_slice(&floor_verts),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        dish_floor.index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Dish floor index buffer"),
-            contents: bytemuck::cast_slice(&floor_indices),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-        dish_floor.vertex_count = floor_indices.len();
+        dish_floor.set_mesh_data(device, &floor_verts, &floor_indices);
 
         let rim_color = hex_to_rgba(0x5a7a50);
         let (rim_verts, rim_indices) = generate_torus(14.0, 0.4, 64, 16, rim_color);
@@ -650,25 +620,14 @@ impl ToonNeurons {
             &app.rendering_descriptor(),
             &MeshGeometry {
                 position: Vec3::new(0.0, -0.1, 0.0).into(),
-                rotation: Quat::IDENTITY.into(),
-                scale: Vec3::ONE.into(),
+                ..Default::default()
             },
             &MeshMaterial {
                 color: Expression::InputColor.toon_lit(),
             },
         )
         .unwrap();
-        dish_rim.vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Dish rim vertex buffer"),
-            contents: bytemuck::cast_slice(&rim_verts),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        dish_rim.index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Dish rim index buffer"),
-            contents: bytemuck::cast_slice(&rim_indices),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-        dish_rim.vertex_count = rim_indices.len();
+        dish_rim.set_mesh_data(device, &rim_verts, &rim_indices);
 
         app.post_processor.config.bloom = Some(visula::post_process::config::BloomConfig {
             threshold: 0.8,
@@ -712,8 +671,6 @@ impl ToonNeurons {
 }
 
 impl visula::Simulation for ToonNeurons {
-    type Error = ();
-
     fn update(&mut self, application: &mut visula::Application) {
         self.rendering_controls.update(application);
         if self.generation_settings.needs_regenerate {

@@ -1,10 +1,9 @@
-use glam::{Quat, Vec3};
+use glam::Vec3;
 use visula::{
     primitives::mesh_primitive::MeshVertexAttributes, Expression, MeshGeometry, MeshMaterial,
     MeshPipeline,
 };
 use visula_core::TextureBuffer;
-use wgpu::util::DeviceExt;
 
 const PI: f32 = std::f32::consts::PI;
 
@@ -106,36 +105,20 @@ impl TextureExample {
 
         let mut mesh = MeshPipeline::new(
             &app.rendering_descriptor(),
-            &MeshGeometry {
-                position: Vec3::ZERO.into(),
-                rotation: Quat::IDENTITY.into(),
-                scale: Vec3::ONE.into(),
-            },
+            &MeshGeometry::default(),
             &MeshMaterial {
                 color: texture.sample(&Expression::UV).lit(),
             },
         )
         .unwrap();
 
-        mesh.vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Trefoil vertex buffer"),
-            contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        mesh.index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Trefoil index buffer"),
-            contents: bytemuck::cast_slice(&indices),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-        mesh.vertex_count = indices.len();
+        mesh.set_mesh_data(device, &vertices, &indices);
 
         Self { mesh }
     }
 }
 
 impl visula::Simulation for TextureExample {
-    type Error = ();
-
     fn render(&mut self, data: &mut visula::RenderData) {
         self.mesh.render(data);
     }

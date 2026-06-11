@@ -185,12 +185,11 @@ struct StimulationTool {
     position: Vec3,
 }
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Instance, Pod, Zeroable)]
 struct Sphere {
     position: glam::Vec3,
     color: glam::Vec3,
-    _padding: [f32; 2],
 }
 
 struct Mouse {
@@ -218,9 +217,6 @@ struct Simulation {
     mesh: MeshPipeline,
 }
 
-#[derive(Debug)]
-struct Error {}
-
 #[derive(Clone, Debug)]
 enum Input {
     Repulsion { min_angle: f32, max_angle: f32 },
@@ -234,21 +230,19 @@ enum Output {
     TurnRight,
 }
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct BondData {
     position_a: Vec3,
     position_b: Vec3,
     strength: f32,
-    _padding: f32,
 }
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct LineData {
     start: Vec3,
     end: Vec3,
-    _padding: [f32; 2],
 }
 
 #[repr(C, align(16))]
@@ -316,22 +310,18 @@ impl Simulation {
             LineData {
                 start: Vec3::new(-BOUNDARY, 0.0, -BOUNDARY),
                 end: Vec3::new(BOUNDARY, 0.0, -BOUNDARY),
-                _padding: Default::default(),
             },
             LineData {
                 start: Vec3::new(-BOUNDARY, 0.0, -BOUNDARY),
                 end: Vec3::new(-BOUNDARY, 0.0, BOUNDARY),
-                _padding: Default::default(),
             },
             LineData {
                 start: Vec3::new(BOUNDARY, 0.0, -BOUNDARY),
                 end: Vec3::new(BOUNDARY, 0.0, BOUNDARY),
-                _padding: Default::default(),
             },
             LineData {
                 start: Vec3::new(-BOUNDARY, 0.0, BOUNDARY),
                 end: Vec3::new(BOUNDARY, 0.0, BOUNDARY),
-                _padding: Default::default(),
             },
         ];
 
@@ -689,7 +679,6 @@ impl Simulation {
 }
 
 impl visula::Simulation for Simulation {
-    type Error = Error;
     fn update(&mut self, application: &mut visula::Application) {
         let Simulation {
             connection_tool,
@@ -936,7 +925,6 @@ impl visula::Simulation for Simulation {
                 Sphere {
                     position: position.position,
                     color,
-                    _padding: Default::default(),
                 }
             })
             .collect();
@@ -980,7 +968,6 @@ impl visula::Simulation for Simulation {
                 Some(Sphere {
                     position,
                     color: Vec3::new(0.8, 0.9, 0.9),
-                    _padding: Default::default(),
                 })
             })
             .collect();
@@ -1005,7 +992,6 @@ impl visula::Simulation for Simulation {
                     position_a: start,
                     position_b: end,
                     strength: connection.strength as f32,
-                    _padding: Default::default(),
                 }
             })
             .collect();
@@ -1015,7 +1001,6 @@ impl visula::Simulation for Simulation {
                 position_a: connection.start,
                 position_b: connection.end,
                 strength: 1.0,
-                _padding: Default::default(),
             });
         }
 
@@ -1074,5 +1059,5 @@ impl visula::Simulation for Simulation {
 }
 
 fn main() {
-    visula::run(Simulation::new); //.expect("Initializing simulation failed"));
+    visula::run(Simulation::new);
 }

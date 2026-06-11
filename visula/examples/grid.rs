@@ -2,22 +2,18 @@ use bytemuck::{Pod, Zeroable};
 use glam::{Vec3, Vec4};
 use itertools::iproduct;
 use visula::{
-    CustomEvent, Expression, InstanceBuffer, LineGeometry, LineMaterial, Lines, RenderData,
+    vec3, CustomEvent, Expression, InstanceBuffer, LineGeometry, LineMaterial, Lines, RenderData,
     Renderable, UniformBuffer,
 };
 use visula_derive::{Instance, Uniform};
 use winit::event::{Event, WindowEvent};
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct LineData {
     position_a: [f32; 3],
     position_b: [f32; 3],
-    _padding: [f32; 2],
 }
-
-#[derive(Debug)]
-struct Error {}
 
 struct Simulation {
     lines: Lines,
@@ -35,15 +31,12 @@ struct Uniforms {
 }
 
 fn gaussian(a: &Expression, b: &Expression) -> Expression {
-    Expression::Vector3 {
-        x: 0.0.into(),
-        y: (10.0 * &(-((a - b).length()).pow(2.0) / (2.0 * 8.0)).exp()).into(),
-        z: 0.0.into(),
-    }
+    let distance = (a - b).length();
+    vec3(0.0, 10.0 * (-distance.pow(2.0) / (2.0 * 8.0)).exp(), 0.0)
 }
 
 impl Simulation {
-    fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
+    fn new(application: &mut visula::Application) -> Simulation {
         let column_count = 100;
         let row_count = 100;
         let columns = 0..column_count;
@@ -60,7 +53,6 @@ impl Simulation {
                     0.0,
                     offset[1] + row as f32 + direction[1],
                 ],
-                _padding: [0.0, 0.0],
             })
             .collect();
 
@@ -84,24 +76,21 @@ impl Simulation {
                 width: 0.1.into(),
                 color: Vec3::ZERO.into(),
             },
-            &LineMaterial {
-                color: Expression::InputColor.lit(),
-            },
+            &LineMaterial::default(),
         )
         .unwrap();
 
-        Ok(Simulation {
+        Simulation {
             lines,
             line_buffer,
             line_data,
             uniforms_data,
             uniforms_buffer,
-        })
+        }
     }
 }
 
 impl visula::Simulation for Simulation {
-    type Error = Error;
     fn update(&mut self, application: &mut visula::Application) {
         self.line_buffer
             .update(&application.device, &application.queue, &self.line_data);
@@ -148,5 +137,5 @@ impl visula::Simulation for Simulation {
 }
 
 fn main() {
-    visula::run(|app| Simulation::new(app).expect("Initializing simulation failed"));
+    visula::run(Simulation::new);
 }

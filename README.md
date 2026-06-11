@@ -43,30 +43,38 @@ This means that there is only one array `t` uploaded to the GPU.
 
 ## Rust example
 
+The same visualization in Rust:
+
 ```rust
-use visula::{Expression, InstanceDeviceExt, SphereGeometry, SphereMaterial, Spheres};
+use visula::{vec3, InstanceBuffer, SphereGeometry, SphereMaterial, Spheres};
 use visula_derive::Instance;
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Instance, bytemuck::Pod, bytemuck::Zeroable)]
 struct Particle {
-    position: glam::Vec3,
-    _padding: f32,
+    t: f32,
 }
 
-let buffer = application.device.create_instance_buffer::<Particle>();
-let particle = buffer.instance();
+let data: Vec<Particle> = (0..100_000)
+    .map(|i| Particle { t: i as f32 * 0.001 })
+    .collect();
+let buffer = InstanceBuffer::new_with_init(&application.device, &data);
+let t = buffer.instance().t;
 
+let position = 10.0 * vec3(t.cos(), t.sin(), t);
 let spheres = Spheres::new(
     &application.rendering_descriptor(),
     &SphereGeometry {
-        position: particle.position,
-        radius: 0.5.into(),
-        color: Expression::Position * 0.1 + 0.5,
+        position: position.clone(),
+        radius: 0.2.into(),
+        color: position / 4.0,
     },
-    &SphereMaterial { color: Expression::InputColor.lit() },
-)?;
+    &SphereMaterial::default(),
+)
+.unwrap();
 ```
+
+See [visula/examples/spheres.rs](visula/examples/spheres.rs) for the full runnable version.
 
 ![Molecular dynamics](screenshots/molecular_dynamics.png)
 
@@ -74,6 +82,7 @@ let spheres = Spheres::new(
 
 ```bash
 # Native Rust
+cargo run --example spheres
 cargo run --example showcase
 cargo run --example molecular_dynamics
 cargo run --example neuron

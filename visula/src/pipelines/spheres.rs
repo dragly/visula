@@ -3,6 +3,7 @@ use crate::rendering_descriptor::RenderingDescriptor;
 use crate::simulation::{RenderData, ShadowRenderData};
 use crate::Renderable;
 use bytemuck::{Pod, Zeroable};
+use glam::Vec3;
 use std::mem::size_of;
 use visula_core::Expression;
 use visula_derive::Delegate;
@@ -47,6 +48,24 @@ pub struct SphereGeometry {
 #[derive(Delegate)]
 pub struct SphereMaterial {
     pub color: Expression,
+}
+
+impl Default for SphereGeometry {
+    fn default() -> Self {
+        SphereGeometry {
+            position: Vec3::ZERO.into(),
+            radius: 1.0.into(),
+            color: Vec3::ONE.into(),
+        }
+    }
+}
+
+impl Default for SphereMaterial {
+    fn default() -> Self {
+        SphereMaterial {
+            color: Expression::InputColor.lit(),
+        }
+    }
 }
 
 impl Spheres {

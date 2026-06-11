@@ -7,22 +7,20 @@ use glam::Vec3;
 use visula_core::Expression;
 use visula_derive::Instance;
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Instance, Pod, Zeroable, Default)]
 struct LineData {
     start: Vec3,
     end: Vec3,
     color: Vec3,
-    _padding: [f32; 3],
 }
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Instance, Pod, Zeroable, Default)]
 struct SphereData {
     position: Vec3,
     color: Vec3,
     radius: f32,
-    _padding: f32,
 }
 
 #[derive(Clone, Copy, Debug, Instance, Default)]
@@ -101,7 +99,6 @@ impl Painter {
             start: line.start,
             end: line.end,
             color: line.color,
-            _padding: Default::default(),
         }));
     }
     pub fn spheres(&mut self, spheres: &[Sphere]) {
@@ -110,7 +107,6 @@ impl Painter {
                 position: sphere.position,
                 color: sphere.color,
                 radius: sphere.radius,
-                _padding: Default::default(),
             }));
     }
 

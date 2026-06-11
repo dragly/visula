@@ -308,9 +308,6 @@ fn generate(count: usize) -> Vec<Particle> {
     current_particles
 }
 
-#[derive(Debug)]
-struct Error {}
-
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Uniform, Zeroable)]
 struct Settings {
@@ -326,7 +323,7 @@ struct Simulation {
 }
 
 impl Simulation {
-    fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
+    fn new(application: &mut visula::Application) -> Simulation {
         let cli = Cli::parse();
         let count = cli.count.unwrap_or(6);
         let particles = generate(count);
@@ -352,17 +349,16 @@ impl Simulation {
         )
         .unwrap();
 
-        Ok(Simulation {
+        Simulation {
             particles,
             spheres,
             particle_buffer,
             rendering_controls: RenderingControls::new(),
-        })
+        }
     }
 }
 
 impl visula::Simulation for Simulation {
-    type Error = Error;
     fn update(&mut self, application: &mut visula::Application) {
         self.rendering_controls.update(application);
         let previous_particles = self.particles.clone();
@@ -400,5 +396,5 @@ impl visula::Simulation for Simulation {
 }
 
 fn main() {
-    visula::run(|app| Simulation::new(app).expect("Initializing simulation failed"));
+    visula::run(Simulation::new);
 }
