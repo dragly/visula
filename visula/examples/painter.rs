@@ -17,7 +17,6 @@ impl Simulation {
 }
 
 impl visula::Simulation for Simulation {
-    type Error = visula::error::Error;
     fn update(&mut self, application: &mut visula::Application) {
         self.painter.spheres(&[Sphere {
             position: Vec3::ZERO,

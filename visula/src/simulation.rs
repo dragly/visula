@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use egui::Context;
 use winit::event::Event;
 
@@ -26,7 +24,6 @@ pub struct ShadowRenderData<'a> {
 }
 
 pub trait Simulation {
-    type Error: Debug;
     fn handle_event(&mut self, _application: &mut Application, _event: &Event<CustomEvent>) {}
     fn update(&mut self, _application: &mut Application) {}
     fn render(&mut self, _data: &mut RenderData) {}
@@ -42,11 +39,7 @@ pub trait Simulation {
     }
 }
 
-impl<E> Simulation for Box<dyn Simulation<Error = E>>
-where
-    E: Debug,
-{
-    type Error = E;
+impl Simulation for Box<dyn Simulation> {
     fn handle_event(&mut self, application: &mut Application, event: &Event<CustomEvent>) {
         self.as_mut().handle_event(application, event)
     }

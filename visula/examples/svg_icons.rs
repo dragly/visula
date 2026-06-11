@@ -20,9 +20,6 @@ struct Args {
     svg_path: PathBuf,
 }
 
-#[derive(Debug)]
-struct Error {}
-
 struct RenderedPath {
     polygons: Polygons,
 }
@@ -126,7 +123,7 @@ struct Simulation {
 }
 
 impl Simulation {
-    fn new(application: &mut visula::Application, svg_path: &PathBuf) -> Result<Self, Error> {
+    fn new(application: &mut visula::Application, svg_path: &PathBuf) -> Self {
         let svg_data = std::fs::read(svg_path).expect("Failed to read SVG file");
         let tree =
             Tree::from_data(&svg_data, &usvg::Options::default()).expect("Failed to parse SVG");
@@ -162,7 +159,7 @@ impl Simulation {
             );
         }
 
-        Ok(Simulation { rendered_paths })
+        Simulation { rendered_paths }
     }
 }
 
@@ -256,8 +253,6 @@ fn process_node_with_scale(
 }
 
 impl visula::Simulation for Simulation {
-    type Error = Error;
-
     fn render(&mut self, data: &mut RenderData) {
         for path in &self.rendered_paths {
             path.polygons.render(data);
@@ -275,7 +270,5 @@ impl visula::Simulation for Simulation {
 fn main() {
     let args = Args::parse();
     let svg_path = args.svg_path.clone();
-    visula::run(move |app| {
-        Simulation::new(app, &svg_path).expect("Failed to initialize SVG viewer")
-    });
+    visula::run(move |app| Simulation::new(app, &svg_path));
 }

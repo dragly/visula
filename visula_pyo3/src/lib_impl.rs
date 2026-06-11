@@ -26,25 +26,22 @@ use visula_core::{UniformBufferInner, UniformField};
 use visula_derive::Instance;
 use wgpu::BufferUsages;
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct SphereData {
     position: [f32; 3],
-    _padding: f32,
 }
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct PointData {
     position: [f32; 3],
-    _padding: f32,
 }
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct FloatData {
     position: f32,
-    _padding: [f32; 3],
 }
 
 #[pyclass(name = "SphereDelegate", unsendable)]
@@ -363,10 +360,7 @@ impl PyInstanceBuffer {
             .to_vec(py)?
             .iter()
             .copied()
-            .map(|x| FloatData {
-                position: x as f32,
-                _padding: Default::default(),
-            })
+            .map(|x| FloatData { position: x as f32 })
             .collect();
         buffer.update(&application.device, &application.queue, &point_data);
         Ok(PyInstanceBuffer { inner: buffer })
@@ -387,10 +381,7 @@ impl PyInstanceBuffer {
             .to_vec(py)?
             .iter()
             .copied()
-            .map(|x| FloatData {
-                position: x as f32,
-                _padding: Default::default(),
-            })
+            .map(|x| FloatData { position: x as f32 })
             .collect();
         self.inner
             .update(&application.device, &application.queue, &point_data);
@@ -407,11 +398,7 @@ impl PyInstanceBuffer {
 #[pyfunction]
 fn vec3(x: &PyExpression, y: &PyExpression, z: &PyExpression) -> PyExpression {
     PyExpression {
-        inner: Expression::Vector3 {
-            x: x.inner.clone().into(),
-            y: y.inner.clone().into(),
-            z: z.inner.clone().into(),
-        },
+        inner: visula_core::vec3(&x.inner, &y.inner, &z.inner),
     }
 }
 
@@ -455,7 +442,6 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: Py<PyAny>) -> PyResul
             .axis_iter(Axis(major_axis))
             .map(|v| PointData {
                 position: [v[0] as f32, v[1] as f32, v[2] as f32],
-                _padding: Default::default(),
             })
             .collect();
 
@@ -472,10 +458,7 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: Py<PyAny>) -> PyResul
             .to_vec(py)?
             .iter()
             .copied()
-            .map(|x| FloatData {
-                position: x as f32,
-                _padding: Default::default(),
-            })
+            .map(|x| FloatData { position: x as f32 })
             .collect();
 
         buffer.update(&application.device, &application.queue, &point_data);
@@ -491,10 +474,7 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: Py<PyAny>) -> PyResul
             .to_vec(py)?
             .iter()
             .copied()
-            .map(|x| FloatData {
-                position: x,
-                _padding: Default::default(),
-            })
+            .map(|x| FloatData { position: x })
             .collect();
 
         buffer.update(&application.device, &application.queue, &point_data);

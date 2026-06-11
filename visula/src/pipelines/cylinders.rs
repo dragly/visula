@@ -3,6 +3,7 @@ use crate::rendering_descriptor::RenderingDescriptor;
 use crate::simulation::{RenderData, ShadowRenderData};
 use crate::Renderable;
 use bytemuck::{Pod, Zeroable};
+use glam::Vec3;
 use std::mem::size_of;
 use visula_core::Expression;
 use visula_derive::Delegate;
@@ -56,6 +57,26 @@ pub struct CylinderGeometry {
 #[derive(Delegate)]
 pub struct CylinderMaterial {
     pub color: Expression,
+}
+
+impl Default for CylinderGeometry {
+    fn default() -> Self {
+        CylinderGeometry {
+            start: Vec3::ZERO.into(),
+            end: Vec3::X.into(),
+            start_radius: 0.1.into(),
+            end_radius: 0.1.into(),
+            color: Vec3::ONE.into(),
+        }
+    }
+}
+
+impl Default for CylinderMaterial {
+    fn default() -> Self {
+        CylinderMaterial {
+            color: Expression::InputColor.lit(),
+        }
+    }
 }
 
 impl Cylinders {

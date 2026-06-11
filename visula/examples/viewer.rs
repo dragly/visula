@@ -5,7 +5,6 @@ use visula::{MeshMaterial, Renderable};
 
 use bytemuck::{Pod, Zeroable};
 use clap::Parser;
-use glam::{Quat, Vec3};
 use oxifive::ReadSeek;
 use winit::event::{Event, KeyEvent, WindowEvent};
 
@@ -79,11 +78,8 @@ impl Simulation {
     }
 }
 
-#[derive(Debug)]
-struct Error {}
-
 impl Simulation {
-    fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
+    fn new(application: &mut visula::Application) -> Simulation {
         #[cfg(not(target_arch = "wasm32"))]
         let args = Cli::parse();
         let sphere_buffer = InstanceBuffer::<SpherePrimitive>::new(&application.device);
@@ -110,11 +106,7 @@ impl Simulation {
         .unwrap();
         let mesh = MeshPipeline::new(
             &application.rendering_descriptor(),
-            &MeshGeometry {
-                position: Vec3::new(0.0, 0.0, 0.0).into(),
-                rotation: Quat::IDENTITY.into(),
-                scale: Vec3::ONE.into(),
-            },
+            &MeshGeometry::default(),
             &MeshMaterial {
                 color: Expression::from(Vec4::splat(1.0)).lit(),
             },
@@ -134,26 +126,23 @@ impl Simulation {
                 let input = File::open(filename).unwrap();
                 simulation.handle_zdf(application, input);
             }
-            Ok(simulation)
+            simulation
         }
         #[cfg(target_arch = "wasm32")]
         {
-            let simulation = Simulation {
+            Simulation {
                 render_mode: RenderMode::Points,
                 sphere_buffer,
                 spheres: points,
                 mesh,
                 settings: settings_data,
                 settings_buffer,
-            };
-            Ok(simulation)
+            }
         }
     }
 }
 
 impl visula::Simulation for Simulation {
-    type Error = Error;
-
     fn update(&mut self, application: &mut visula::Application) {
         self.settings_buffer
             .update(&application.queue, &self.settings);
@@ -251,5 +240,5 @@ fn main() {
     #[cfg(target_arch = "wasm32")]
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-    visula::run(|app| Simulation::new(app).expect("Initializing simulation failed"));
+    visula::run(Simulation::new);
 }

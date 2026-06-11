@@ -1,5 +1,5 @@
 use bytemuck::{Pod, Zeroable};
-use glam::{Quat, Vec3};
+use glam::Vec3;
 
 use visula::{
     primitives::generate_torus, CylinderGeometry, CylinderMaterial, Cylinders, Expression,
@@ -8,9 +8,8 @@ use visula::{
     SpherePrimitive, Spheres,
 };
 use visula_derive::Instance;
-use wgpu::util::DeviceExt;
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct CylinderData {
     start: [f32; 3],
@@ -18,7 +17,6 @@ struct CylinderData {
     end: [f32; 3],
     end_radius: f32,
     color: [f32; 3],
-    _pad: f32,
 }
 
 struct Simulation {
@@ -42,7 +40,6 @@ impl Simulation {
             end: [0.0, 3.0, 0.0],
             end_radius: 0.2,
             color: [0.8, 0.2, 0.2],
-            _pad: 0.0,
         }];
         cyl_buffer.update(device, &app.queue, &cyl_data);
 
@@ -69,25 +66,12 @@ impl Simulation {
             &app.rendering_descriptor(),
             &MeshGeometry {
                 position: Vec3::new(0.0, -1.0, 0.0).into(),
-                rotation: Quat::IDENTITY.into(),
-                scale: Vec3::ONE.into(),
+                ..Default::default()
             },
-            &MeshMaterial {
-                color: Expression::InputColor.lit(),
-            },
+            &MeshMaterial::default(),
         )
         .unwrap();
-        torus_mesh.vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Torus vertex buffer"),
-            contents: bytemuck::cast_slice(&torus_verts),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        torus_mesh.index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Torus index buffer"),
-            contents: bytemuck::cast_slice(&torus_indices),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-        torus_mesh.vertex_count = torus_indices.len();
+        torus_mesh.set_mesh_data(device, &torus_verts, &torus_indices);
 
         // Sphere primitives (ray-traced) with .toon_lit()
         let soma_data = vec![
@@ -95,13 +79,11 @@ impl Simulation {
                 position: [-4.0, 1.0, 0.0],
                 radius: 1.0,
                 color: [1.0, 0.39, 0.20],
-                padding: 0.0,
             },
             SpherePrimitive {
                 position: [4.0, 1.0, 0.0],
                 radius: 1.0,
                 color: [0.39, 0.78, 0.20],
-                padding: 0.0,
             },
         ];
         let soma_buffer: InstanceBuffer<SpherePrimitive> = device.create_instance_buffer();
@@ -140,8 +122,6 @@ impl Simulation {
 }
 
 impl visula::Simulation for Simulation {
-    type Error = ();
-
     fn update(&mut self, application: &mut visula::Application) {
         self.rendering_controls.update(application);
     }

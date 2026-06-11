@@ -1,21 +1,19 @@
 use bytemuck::{Pod, Zeroable};
-use glam::{Quat, Vec3, Vec4};
+use glam::{Vec3, Vec4};
 
 use visula::{
-    primitives::mesh_primitive::MeshVertexAttributes, Expression, InstanceBuffer,
+    primitives::mesh_primitive::MeshVertexAttributes, vec3, Expression, InstanceBuffer,
     InstanceDeviceExt, LineGeometry, LineMaterial, Lines, MeshGeometry, MeshMaterial, MeshPipeline,
     RenderData, Renderable, RenderingControls, ShadowRenderData, SphereGeometry, SphereMaterial,
     SpherePrimitive, Spheres,
 };
 use visula_derive::Instance;
-use wgpu::util::DeviceExt;
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct LineData {
     start: [f32; 3],
     end: [f32; 3],
-    _padding: [f32; 2],
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -66,9 +64,6 @@ struct Simulation {
     rendering_controls: RenderingControls,
 }
 
-#[derive(Debug)]
-struct Error {}
-
 fn create_sphere_variant(
     app: &visula::Application,
     sphere_buffer: &InstanceBuffer<SpherePrimitive>,
@@ -87,7 +82,7 @@ fn create_sphere_variant(
 }
 
 impl Simulation {
-    fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
+    fn new(application: &mut visula::Application) -> Simulation {
         let sphere_buffer: InstanceBuffer<SpherePrimitive> =
             application.device.create_instance_buffer();
 
@@ -129,7 +124,7 @@ impl Simulation {
                     start: line.start,
                     end: line.end,
                     width: 0.3.into(),
-                    color: Vec3::new(0.8, 0.8, 0.8).into(),
+                    color: vec3(0.8, 0.8, 0.8),
                 },
                 &LineMaterial { color: color_expr },
             )
@@ -163,7 +158,6 @@ impl Simulation {
             .map(|pair| LineData {
                 start: pair[0],
                 end: pair[1],
-                _padding: [0.0; 2],
             })
             .collect();
         line_buffer.update(&application.device, &application.queue, &line_data);
@@ -172,8 +166,7 @@ impl Simulation {
             &application.rendering_descriptor(),
             &MeshGeometry {
                 position: Vec3::new(4.0, 0.0, 0.0).into(),
-                rotation: Quat::IDENTITY.into(),
-                scale: Vec3::ONE.into(),
+                ..Default::default()
             },
             &MeshMaterial {
                 color: Expression::from(Vec4::new(0.8, 0.3, 0.2, 1.0)).lit(),
@@ -185,8 +178,7 @@ impl Simulation {
             &application.rendering_descriptor(),
             &MeshGeometry {
                 position: Vec3::new(0.0, -2.0, 0.0).into(),
-                rotation: Quat::IDENTITY.into(),
-                scale: Vec3::ONE.into(),
+                ..Default::default()
             },
             &MeshMaterial {
                 color: Expression::from(Vec4::new(0.9, 0.9, 0.9, 1.0)).lit(),
@@ -222,23 +214,7 @@ impl Simulation {
             },
         ];
         let ground_indices: Vec<u32> = vec![0, 1, 2, 0, 2, 3];
-        ground.vertex_buffer =
-            application
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Ground vertex buffer"),
-                    contents: bytemuck::cast_slice(&ground_vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
-        ground.index_buffer =
-            application
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Ground index buffer"),
-                    contents: bytemuck::cast_slice(&ground_indices),
-                    usage: wgpu::BufferUsages::INDEX,
-                });
-        ground.vertex_count = ground_indices.len();
+        ground.set_mesh_data(&application.device, &ground_vertices, &ground_indices);
 
         let sphere_data: Vec<SpherePrimitive> = sphere_positions
             .iter()
@@ -253,12 +229,11 @@ impl Simulation {
                 position: *pos,
                 radius: *radius,
                 color: *color,
-                padding: 0.0,
             })
             .collect();
         sphere_buffer.update(&application.device, &application.queue, &sphere_data);
 
-        Ok(Simulation {
+        Simulation {
             color_mode: ColorMode::Lit,
             sphere_variants,
             _sphere_buffer: sphere_buffer,
@@ -267,13 +242,11 @@ impl Simulation {
             mesh,
             ground,
             rendering_controls: RenderingControls::new(),
-        })
+        }
     }
 }
 
 impl visula::Simulation for Simulation {
-    type Error = Error;
-
     fn update(&mut self, application: &mut visula::Application) {
         self.rendering_controls.update(application);
     }
@@ -327,5 +300,5 @@ impl visula::Simulation for Simulation {
 }
 
 fn main() {
-    visula::run(|app| Simulation::new(app).expect("Initializing simulation failed"));
+    visula::run(Simulation::new);
 }

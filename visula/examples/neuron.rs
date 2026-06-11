@@ -4,7 +4,7 @@ use visula::Renderable;
 
 use glam::{Vec3, Vec4};
 use visula::{
-    CustomEvent, Expression, InstanceBuffer, LineGeometry, LineMaterial, Lines, RenderData,
+    vec3, CustomEvent, InstanceBuffer, LineGeometry, LineMaterial, Lines, RenderData,
     SphereGeometry, SphereMaterial, Spheres, UniformBuffer,
 };
 use visula_derive::{Instance, Uniform};
@@ -13,7 +13,7 @@ use winit::{
     event::{ElementState, Event, MouseButton, WindowEvent},
 };
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Instance, Pod, Zeroable)]
 struct Compartment {
     position: Vec3,
@@ -25,23 +25,21 @@ struct Compartment {
     n: f32,
     influence: f32,
     capacitance: f32,
-    _padding: f32,
 }
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Instance, Pod, Zeroable)]
 struct Particle {
     position: glam::Vec3,
     voltage: f32,
 }
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Clone, Copy, Instance, Pod, Zeroable)]
 struct BondData {
     position_a: Vec3,
     position_b: Vec3,
     strength: f32,
-    _padding: f32,
 }
 
 fn lennard_jones(position_a: Vec3, position_b: Vec3, eps: f32, sigma: f32) -> Vec3 {
@@ -52,9 +50,6 @@ fn lennard_jones(position_a: Vec3, position_b: Vec3, eps: f32, sigma: f32) -> Ve
         * eps.powi(24)
         * (2.0 * sigma.powi(12) / r_l.powi(12) - sigma.powi(6) / r_l.powi(6))
 }
-
-#[derive(Debug)]
-struct Error {}
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Uniform, Zeroable)]
@@ -82,7 +77,7 @@ struct Simulation {
 }
 
 impl Simulation {
-    fn new(application: &mut visula::Application) -> Result<Simulation, Error> {
+    fn new(application: &mut visula::Application) -> Simulation {
         let particle_buffer = InstanceBuffer::<Particle>::new(&application.device);
         let particle = particle_buffer.instance();
 
@@ -97,21 +92,19 @@ impl Simulation {
         };
         let settings_buffer = UniformBuffer::new_with_init(&application.device, &settings_data);
         let settings = settings_buffer.uniform();
-        let pos = &particle.position;
+        let voltage_color = (particle.voltage + 10.0) / 120.0;
         let spheres = Spheres::new(
             &application.rendering_descriptor(),
             &SphereGeometry {
-                position: pos.clone(),
+                position: particle.position,
                 radius: settings.radius,
-                color: Expression::Vector3 {
-                    x: (0.1 + (particle.voltage.clone() + 10.0) / 120.0).into(),
-                    y: (0.2 + (particle.voltage.clone() + 10.0) / 120.0).into(),
-                    z: (0.3 + (particle.voltage.clone() + 10.0) / 120.0).into(),
-                },
+                color: vec3(
+                    0.1 + &voltage_color,
+                    0.2 + &voltage_color,
+                    0.3 + &voltage_color,
+                ),
             },
-            &SphereMaterial {
-                color: Expression::InputColor.lit(),
-            },
+            &SphereMaterial::default(),
         )
         .unwrap();
 
@@ -121,15 +114,9 @@ impl Simulation {
                 start: bond.position_a,
                 end: bond.position_b,
                 width: settings.width,
-                color: Expression::Vector3 {
-                    x: bond.strength.clone().into(),
-                    y: 0.8.into(),
-                    z: 1.0.into(),
-                },
+                color: vec3(bond.strength, 0.8, 1.0),
             },
-            &LineMaterial {
-                color: Expression::InputColor.lit(),
-            },
+            &LineMaterial::default(),
         )
         .unwrap();
 
@@ -144,7 +131,6 @@ impl Simulation {
             n: 0.38079754,
             influence: 0.0,
             capacitance: 4.0,
-            _padding: Default::default(),
         });
         compartments.insert(Compartment {
             position: Vec3::new(2.0, 0.0, 0.0),
@@ -156,7 +142,6 @@ impl Simulation {
             n: 0.38079754,
             influence: 0.0,
             capacitance: 4.0,
-            _padding: Default::default(),
         });
         compartments.insert(Compartment {
             position: Vec3::new(2.0, 0.0, 2.0),
@@ -168,10 +153,9 @@ impl Simulation {
             n: 0.38079754,
             influence: 0.0,
             capacitance: 4.0,
-            _padding: Default::default(),
         });
 
-        Ok(Simulation {
+        Simulation {
             particles: vec![],
             spheres,
             particle_buffer,
@@ -181,12 +165,11 @@ impl Simulation {
             settings_buffer,
             compartments,
             mouse: Mouse { position: None },
-        })
+        }
     }
 }
 
 impl visula::Simulation for Simulation {
-    type Error = Error;
     fn update(&mut self, application: &mut visula::Application) {
         let compartments = &mut self.compartments;
         let injecting_current = false;
@@ -318,7 +301,6 @@ impl visula::Simulation for Simulation {
                             position_a: compartment_a.position,
                             position_b: compartment_b.position,
                             strength: 0.5 + value,
-                            _padding: 0.0,
                         });
                     }
                 }
@@ -415,7 +397,6 @@ impl visula::Simulation for Simulation {
                     n: 0.38079754,
                     influence: 0.0,
                     capacitance: 4.0,
-                    _padding: 0.0,
                 });
             }
             Event::WindowEvent {
@@ -431,5 +412,5 @@ impl visula::Simulation for Simulation {
 }
 
 fn main() {
-    visula::run(|app| Simulation::new(app).expect("Initializing simulation failed"));
+    visula::run(Simulation::new);
 }

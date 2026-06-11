@@ -1,6 +1,7 @@
 use std::cell::Ref;
 use std::mem::size_of;
 
+use glam::{Quat, Vec3};
 use naga::back::wgsl::WriterFlags;
 use naga::valid::ValidationFlags;
 use wgpu::util::DeviceExt;
@@ -30,6 +31,24 @@ pub struct MeshGeometry {
 #[derive(Delegate)]
 pub struct MeshMaterial {
     pub color: Expression,
+}
+
+impl Default for MeshGeometry {
+    fn default() -> Self {
+        MeshGeometry {
+            rotation: Quat::IDENTITY.into(),
+            position: Vec3::ZERO.into(),
+            scale: Vec3::ONE.into(),
+        }
+    }
+}
+
+impl Default for MeshMaterial {
+    fn default() -> Self {
+        MeshMaterial {
+            color: Expression::InputColor.lit(),
+        }
+    }
 }
 
 impl MeshPipeline {
@@ -201,6 +220,25 @@ impl MeshPipeline {
             vertex_binding_builder,
             fragment_binding_builder,
         })
+    }
+
+    pub fn set_mesh_data(
+        &mut self,
+        device: &wgpu::Device,
+        vertices: &[MeshVertexAttributes],
+        indices: &[u32],
+    ) {
+        self.vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Mesh vertex buffer"),
+            contents: bytemuck::cast_slice(vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        self.index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Mesh index buffer"),
+            contents: bytemuck::cast_slice(indices),
+            usage: wgpu::BufferUsages::INDEX,
+        });
+        self.vertex_count = indices.len();
     }
 
     pub fn render(

@@ -1,6 +1,5 @@
 use std::fs::File;
 
-use glam::{Quat, Vec3};
 use std::io::BufReader;
 
 use clap::Parser;
@@ -53,11 +52,7 @@ impl Simulation {
                 };
                 let mut mesh_pipeline = MeshPipeline::new(
                     &application.rendering_descriptor(),
-                    &MeshGeometry {
-                        position: Vec3::new(0.0, 0.0, 0.0).into(),
-                        rotation: Quat::IDENTITY.into(),
-                        scale: Vec3::ONE.into(),
-                    },
+                    &MeshGeometry::default(),
                     &MeshMaterial {
                         color: color_expression,
                     },
@@ -83,8 +78,6 @@ impl Simulation {
 }
 
 impl visula::Simulation for Simulation {
-    type Error = Error;
-
     fn update(&mut self, _application: &mut visula::Application) {}
 
     fn render(&mut self, data: &mut RenderData) {

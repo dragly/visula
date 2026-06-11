@@ -3,6 +3,7 @@ use crate::rendering_descriptor::RenderingDescriptor;
 use crate::simulation::{RenderData, ShadowRenderData};
 use crate::Renderable;
 use bytemuck::{Pod, Zeroable};
+use glam::{Quat, Vec3};
 use std::mem::size_of;
 use visula_core::Expression;
 use visula_derive::Delegate;
@@ -56,6 +57,26 @@ pub struct TorusGeometry {
 #[derive(Delegate)]
 pub struct TorusMaterial {
     pub color: Expression,
+}
+
+impl Default for TorusGeometry {
+    fn default() -> Self {
+        TorusGeometry {
+            position: Vec3::ZERO.into(),
+            major_radius: 1.0.into(),
+            minor_radius: 0.25.into(),
+            rotation: Quat::IDENTITY.into(),
+            color: Vec3::ONE.into(),
+        }
+    }
+}
+
+impl Default for TorusMaterial {
+    fn default() -> Self {
+        TorusMaterial {
+            color: Expression::InputColor.lit(),
+        }
+    }
 }
 
 impl Torus {

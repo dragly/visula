@@ -45,12 +45,7 @@ struct PySimulation<'a> {
     controls: &'a mut Vec<Py<PySlider>>,
 }
 
-#[derive(Debug)]
-pub struct PySimulationError;
-
 impl Simulation for PySimulation<'_> {
-    type Error = PySimulationError;
-
     fn render(&mut self, data: &mut RenderData) {
         for renderable in self.renderables {
             renderable.render(data);

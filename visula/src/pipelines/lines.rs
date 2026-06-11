@@ -64,7 +64,7 @@ impl Default for LineGeometry {
 impl Default for LineMaterial {
     fn default() -> Self {
         LineMaterial {
-            color: Vec3::new(1.0, 1.0, 1.0).into(),
+            color: Expression::InputColor.lit(),
         }
     }
 }
