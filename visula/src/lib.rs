@@ -187,18 +187,6 @@ where
         }
     }
 
-    fn device_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        device_id: winit::event::DeviceId,
-        event: winit::event::DeviceEvent,
-    ) {
-        let Some(ref mut application) = self.application else {
-            return;
-        };
-        application.device_event(event_loop, device_id, &event);
-    }
-
     fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: CustomEvent) {
         match event {
             CustomEvent::Application(application) => {

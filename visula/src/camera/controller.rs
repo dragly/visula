@@ -7,7 +7,7 @@ use winit::window::{Window, WindowId};
 use winit::{
     dpi::PhysicalPosition,
     event::{
-        DeviceEvent, ElementState, MouseButton,
+        ElementState, MouseButton,
         MouseScrollDelta::{LineDelta, PixelDelta},
         TouchPhase, WindowEvent,
     },
@@ -156,60 +156,31 @@ impl CameraController {
         self.current_transform.center = center;
     }
 
-    pub fn device_event(&mut self, event: &DeviceEvent) -> CameraControllerResponse {
-        let mut response = CameraControllerResponse {
-            needs_redraw: false,
-            captured_event: false,
-        };
-        if !self.enabled {
-            return response;
-        }
-        if self.shift_pressed {
-            return response;
+    fn apply_rotation(&mut self, position_diff: Vec2) -> bool {
+        if (position_diff.x + position_diff.y).abs() < 0.000001 {
+            return false;
         }
         let up = self.target_transform.up.normalize();
         let forward = self.target_transform.forward.normalize();
         let right = Vec3::cross(forward, up).normalize();
-        if let DeviceEvent::MouseMotion { delta, .. } = event {
-            let position_diff = Vec2 {
-                x: delta.0 as f32,
-                y: delta.1 as f32,
-            };
-            if self.left_pressed {
-                if self.control_pressed {
-                    let offset_up = -position_diff.y;
-                    let offset_right = position_diff.x;
-                    let offset = offset_up + offset_right;
-                    let rotation = Quat::from_axis_angle(forward, self.roll_speed * offset);
-                    self.target_transform.up = (rotation * self.target_transform.up).normalize();
-                    self.target_transform.true_up =
-                        (rotation * self.target_transform.true_up).normalize();
-                    self.target_transform.forward =
-                        (rotation * self.target_transform.forward).normalize();
-                } else {
-                    if (position_diff.x + position_diff.y).abs() < 0.000001 {
-                        return CameraControllerResponse {
-                            needs_redraw: false,
-                            captured_event: false,
-                        };
-                    }
-                    let rotation_x = Quat::from_axis_angle(
-                        self.target_transform.true_up,
-                        -self.rotational_speed * position_diff.x,
-                    );
-                    let rotation_y =
-                        Quat::from_axis_angle(right, -self.rotational_speed * position_diff.y);
-                    self.target_transform.forward =
-                        (rotation_x * rotation_y * self.target_transform.forward).normalize();
-                    self.target_transform.up =
-                        (rotation_x * rotation_y * self.target_transform.up).normalize();
-                }
-                response.needs_redraw = true;
-                response.captured_event = true;
-                self.state = State::Moving;
-            }
+        if self.control_pressed {
+            let offset = -position_diff.y + position_diff.x;
+            let rotation = Quat::from_axis_angle(forward, self.roll_speed * offset);
+            self.target_transform.up = (rotation * self.target_transform.up).normalize();
+            self.target_transform.true_up = (rotation * self.target_transform.true_up).normalize();
+            self.target_transform.forward = (rotation * self.target_transform.forward).normalize();
+        } else {
+            let rotation_x = Quat::from_axis_angle(
+                self.target_transform.true_up,
+                -self.rotational_speed * position_diff.x,
+            );
+            let rotation_y = Quat::from_axis_angle(right, -self.rotational_speed * position_diff.y);
+            self.target_transform.forward =
+                (rotation_x * rotation_y * self.target_transform.forward).normalize();
+            self.target_transform.up =
+                (rotation_x * rotation_y * self.target_transform.up).normalize();
         }
-        response
+        true
     }
 
     pub fn window_event(
@@ -291,10 +262,26 @@ impl CameraController {
                     }
                 }
             }
+            WindowEvent::CursorMoved { position, .. } if self.left_pressed => {
+                let position_diff = match self.last_screen_position {
+                    None => Vec2::ZERO,
+                    Some(last) => Vec2 {
+                        x: (position.x - last.x) as f32,
+                        y: (position.y - last.y) as f32,
+                    },
+                };
+                self.last_screen_position = Some(*position);
+                if self.apply_rotation(position_diff) {
+                    response.needs_redraw = true;
+                    response.captured_event = true;
+                    self.state = State::Moving;
+                }
+            }
             WindowEvent::MouseInput { state, button, .. } => match &button {
                 MouseButton::Left => match state {
                     ElementState::Pressed => {
                         self.left_pressed = true;
+                        self.last_screen_position = None;
                         self.state = State::PressedWaiting;
                     }
                     ElementState::Released => {
@@ -320,6 +307,7 @@ impl CameraController {
             WindowEvent::Touch(touch) => match touch.phase {
                 TouchPhase::Started => {
                     self.left_pressed = true;
+                    self.last_screen_position = None;
                     self.state = State::PressedWaiting;
                 }
                 TouchPhase::Ended => {
@@ -327,10 +315,6 @@ impl CameraController {
                     self.state = State::Released;
                 }
                 TouchPhase::Moved => {
-                    let up = self.target_transform.up.normalize();
-                    let forward = self.target_transform.forward.normalize();
-                    let right = Vec3::cross(forward, up).normalize();
-
                     let position_diff = match self.last_screen_position {
                         None => Vec2::ZERO,
                         Some(last) => Vec2 {
@@ -338,23 +322,11 @@ impl CameraController {
                             y: (touch.location.y - last.y) as f32,
                         },
                     };
-                    if (position_diff.x + position_diff.y).abs() < 0.000001 {
-                        return CameraControllerResponse {
-                            needs_redraw: false,
-                            captured_event: false,
-                        };
-                    }
-                    let rotation_x = Quat::from_axis_angle(
-                        self.target_transform.true_up,
-                        -self.rotational_speed * position_diff.x,
-                    );
-                    let rotation_y =
-                        Quat::from_axis_angle(right, -self.rotational_speed * position_diff.y);
-                    self.target_transform.forward =
-                        (rotation_x * rotation_y * self.target_transform.forward).normalize();
-                    self.target_transform.up =
-                        (rotation_x * rotation_y * self.target_transform.up).normalize();
                     self.last_screen_position = Some(touch.location);
+                    if self.apply_rotation(position_diff) {
+                        response.needs_redraw = true;
+                        response.captured_event = true;
+                    }
                 }
                 TouchPhase::Cancelled => {
                     self.left_pressed = false;
