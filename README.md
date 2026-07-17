@@ -24,12 +24,12 @@ import visula as vl
 import numpy as np
 
 t = InstanceBuffer(np.linspace(0, 100, 100_000))
-position = 10.0 * vl.vec3(vl.cos(t), vl.sin(t), t)
+position = 10.0 * vl.vec3(vl.cos(t), vl.sin(t), t / 50.0 - 1.0)
 
 spheres = Spheres(
     position=position,
     radius=0.2,
-    color=position / 4.0,
+    color=vl.colormap(t / 100.0, "viridis"),
 )
 
 Figure().show([spheres])
@@ -38,6 +38,7 @@ Figure().show([spheres])
 Here, `position`, `radius` and `color` are all expressions.
 Visula compiles these into the shader and evaluates them per instance on the GPU.
 This means that there is only one array `t` uploaded to the GPU.
+The `colormap` function maps a value in [0, 1] to a color — `viridis`, `plasma`, `magma` and `inferno` are available — and it too runs in the shader.
 
 ![Python spheres](screenshots/python_spheres.png)
 

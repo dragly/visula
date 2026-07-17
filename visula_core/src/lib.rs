@@ -1,4 +1,5 @@
 pub mod binding_builder;
+pub mod colormap;
 pub mod inject;
 pub mod input;
 pub mod instance_binding;
@@ -17,6 +18,7 @@ pub mod delegate;
 pub mod error;
 
 pub use binding_builder::*;
+pub use colormap::*;
 pub use delegate::*;
 pub use error::*;
 pub use input::*;

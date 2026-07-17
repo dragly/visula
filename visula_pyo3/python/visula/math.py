@@ -1,4 +1,9 @@
+from ._visula_pyo3 import colormap as _colormap
 from .expression import Expression, _ensure_expression
+
+
+def colormap(value, name="viridis"):
+    return Expression(_colormap(Expression(value).inner, name))
 
 
 def _unary(name):

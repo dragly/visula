@@ -659,6 +659,25 @@ impl PyInstanceBuffer {
 }
 
 #[pyfunction]
+#[pyo3(signature = (value, name="viridis"))]
+fn colormap(value: &PyExpression, name: &str) -> PyResult<PyExpression> {
+    let map = match name.to_lowercase().as_str() {
+        "viridis" => visula_core::Colormap::Viridis,
+        "plasma" => visula_core::Colormap::Plasma,
+        "magma" => visula_core::Colormap::Magma,
+        "inferno" => visula_core::Colormap::Inferno,
+        _ => {
+            return Err(PyRuntimeError::new_err(format!(
+                "Unknown colormap '{name}', expected one of: viridis, plasma, magma, inferno"
+            )))
+        }
+    };
+    Ok(PyExpression {
+        inner: visula_core::colormap(&value.inner, map),
+    })
+}
+
+#[pyfunction]
 fn vec2(x: &PyExpression, y: &PyExpression) -> PyExpression {
     PyExpression {
         inner: visula_core::vec2(&x.inner, &y.inner),
@@ -887,6 +906,7 @@ fn show(
 fn visula_pyo3(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(show, m)?)?;
     m.add_function(wrap_pyfunction!(convert, m)?)?;
+    m.add_function(wrap_pyfunction!(colormap, m)?)?;
     m.add_function(wrap_pyfunction!(vec2, m)?)?;
     m.add_function(wrap_pyfunction!(vec3, m)?)?;
     m.add_function(wrap_pyfunction!(vec4, m)?)?;
