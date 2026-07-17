@@ -42,16 +42,10 @@ pub enum Expression {
         z: ExpressionInner,
         w: ExpressionInner,
     },
-    Length(ExpressionInner),
-    Exp(ExpressionInner),
-    Pow {
-        base: ExpressionInner,
-        exponent: ExpressionInner,
+    Math {
+        function: naga::MathFunction,
+        arguments: Vec<ExpressionInner>,
     },
-    Floor(ExpressionInner),
-    Cos(ExpressionInner),
-    Sin(ExpressionInner),
-    Tan(ExpressionInner),
     UV,
     Normal,
     Position,
@@ -62,33 +56,115 @@ pub enum Expression {
     ViewDirection,
 }
 
+fn math(function: naga::MathFunction, arguments: Vec<ExpressionInner>) -> Expression {
+    Expression::Math {
+        function,
+        arguments,
+    }
+}
+
 impl Expression {
     pub fn pow(&self, exponent: impl Into<ExpressionInner>) -> Expression {
-        fn inner(base: ExpressionInner, exponent: ExpressionInner) -> Expression {
-            Expression::Pow { base, exponent }
-        }
-        inner(self.into(), exponent.into())
+        math(naga::MathFunction::Pow, vec![self.into(), exponent.into()])
     }
 
     pub fn exp(&self) -> Expression {
-        Expression::Exp(self.into())
+        math(naga::MathFunction::Exp, vec![self.into()])
     }
 
     pub fn length(&self) -> Expression {
-        Expression::Length(self.into())
+        math(naga::MathFunction::Length, vec![self.into()])
     }
 
     pub fn floor(&self) -> Expression {
-        Expression::Floor(self.into())
+        math(naga::MathFunction::Floor, vec![self.into()])
     }
     pub fn cos(&self) -> Expression {
-        Expression::Cos(self.into())
+        math(naga::MathFunction::Cos, vec![self.into()])
     }
     pub fn sin(&self) -> Expression {
-        Expression::Sin(self.into())
+        math(naga::MathFunction::Sin, vec![self.into()])
     }
     pub fn tan(&self) -> Expression {
-        Expression::Tan(self.into())
+        math(naga::MathFunction::Tan, vec![self.into()])
+    }
+    pub fn sqrt(&self) -> Expression {
+        math(naga::MathFunction::Sqrt, vec![self.into()])
+    }
+    pub fn abs(&self) -> Expression {
+        math(naga::MathFunction::Abs, vec![self.into()])
+    }
+    pub fn fract(&self) -> Expression {
+        math(naga::MathFunction::Fract, vec![self.into()])
+    }
+    pub fn ceil(&self) -> Expression {
+        math(naga::MathFunction::Ceil, vec![self.into()])
+    }
+    pub fn round(&self) -> Expression {
+        math(naga::MathFunction::Round, vec![self.into()])
+    }
+    pub fn sign(&self) -> Expression {
+        math(naga::MathFunction::Sign, vec![self.into()])
+    }
+    pub fn log(&self) -> Expression {
+        math(naga::MathFunction::Log, vec![self.into()])
+    }
+    pub fn normalize(&self) -> Expression {
+        math(naga::MathFunction::Normalize, vec![self.into()])
+    }
+    pub fn min(&self, other: impl Into<ExpressionInner>) -> Expression {
+        math(naga::MathFunction::Min, vec![self.into(), other.into()])
+    }
+    pub fn max(&self, other: impl Into<ExpressionInner>) -> Expression {
+        math(naga::MathFunction::Max, vec![self.into(), other.into()])
+    }
+    pub fn dot(&self, other: impl Into<ExpressionInner>) -> Expression {
+        math(naga::MathFunction::Dot, vec![self.into(), other.into()])
+    }
+    pub fn cross(&self, other: impl Into<ExpressionInner>) -> Expression {
+        math(naga::MathFunction::Cross, vec![self.into(), other.into()])
+    }
+    pub fn distance(&self, other: impl Into<ExpressionInner>) -> Expression {
+        math(
+            naga::MathFunction::Distance,
+            vec![self.into(), other.into()],
+        )
+    }
+    pub fn atan2(&self, other: impl Into<ExpressionInner>) -> Expression {
+        math(naga::MathFunction::Atan2, vec![self.into(), other.into()])
+    }
+    pub fn clamp(
+        &self,
+        low: impl Into<ExpressionInner>,
+        high: impl Into<ExpressionInner>,
+    ) -> Expression {
+        math(
+            naga::MathFunction::Clamp,
+            vec![self.into(), low.into(), high.into()],
+        )
+    }
+    pub fn mix(
+        &self,
+        other: impl Into<ExpressionInner>,
+        amount: impl Into<ExpressionInner>,
+    ) -> Expression {
+        math(
+            naga::MathFunction::Mix,
+            vec![self.into(), other.into(), amount.into()],
+        )
+    }
+    pub fn smoothstep(
+        &self,
+        edge_low: impl Into<ExpressionInner>,
+        edge_high: impl Into<ExpressionInner>,
+    ) -> Expression {
+        math(
+            naga::MathFunction::SmoothStep,
+            vec![edge_low.into(), edge_high.into(), self.into()],
+        )
+    }
+    pub fn step(&self, edge: impl Into<ExpressionInner>) -> Expression {
+        math(naga::MathFunction::Step, vec![edge.into(), self.into()])
     }
 
     pub fn directional_lit(&self) -> Expression {
@@ -357,115 +433,27 @@ impl Expression {
                         naga::Span::default(),
                     )
             }
-            Expression::Length(value) => {
-                let arg = value.setup(module, binding_builder);
+            Expression::Math {
+                function,
+                arguments,
+            } => {
+                let mut handles = arguments
+                    .iter()
+                    .map(|argument| argument.setup(module, binding_builder));
+                let arg = handles.next().expect("Math expression without arguments");
+                let arg1 = handles.next();
+                let arg2 = handles.next();
+                let arg3 = handles.next();
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
                     .append(
                         naga::Expression::Math {
-                            fun: naga::MathFunction::Length,
-                            arg,
-                            arg1: None,
-                            arg2: None,
-                            arg3: None,
-                        },
-                        naga::Span::default(),
-                    )
-            }
-            Expression::Floor(value) => {
-                let arg = value.setup(module, binding_builder);
-                module.entry_points[binding_builder.entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::Math {
-                            fun: naga::MathFunction::Floor,
-                            arg,
-                            arg1: None,
-                            arg2: None,
-                            arg3: None,
-                        },
-                        naga::Span::default(),
-                    )
-            }
-            Expression::Exp(value) => {
-                let arg = value.setup(module, binding_builder);
-                module.entry_points[binding_builder.entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::Math {
-                            fun: naga::MathFunction::Exp,
-                            arg,
-                            arg1: None,
-                            arg2: None,
-                            arg3: None,
-                        },
-                        naga::Span::default(),
-                    )
-            }
-            Expression::Cos(value) => {
-                let arg = value.setup(module, binding_builder);
-                module.entry_points[binding_builder.entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::Math {
-                            fun: naga::MathFunction::Cos,
-                            arg,
-                            arg1: None,
-                            arg2: None,
-                            arg3: None,
-                        },
-                        naga::Span::default(),
-                    )
-            }
-            Expression::Sin(value) => {
-                let arg = value.setup(module, binding_builder);
-                module.entry_points[binding_builder.entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::Math {
-                            fun: naga::MathFunction::Sin,
-                            arg,
-                            arg1: None,
-                            arg2: None,
-                            arg3: None,
-                        },
-                        naga::Span::default(),
-                    )
-            }
-            Expression::Tan(value) => {
-                let arg = value.setup(module, binding_builder);
-                module.entry_points[binding_builder.entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::Math {
-                            fun: naga::MathFunction::Tan,
-                            arg,
-                            arg1: None,
-                            arg2: None,
-                            arg3: None,
-                        },
-                        naga::Span::default(),
-                    )
-            }
-            Expression::Pow { base, exponent } => {
-                let arg = base.setup(module, binding_builder);
-                let arg1 = Some(exponent.setup(module, binding_builder));
-                module.entry_points[binding_builder.entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::Math {
-                            fun: naga::MathFunction::Pow,
+                            fun: function,
                             arg,
                             arg1,
-                            arg2: None,
-                            arg3: None,
+                            arg2,
+                            arg3,
                         },
                         naga::Span::default(),
                     )
@@ -767,26 +755,8 @@ impl std::fmt::Debug for Expression {
             Expression::Vector4 { .. } => {
                 write!(fmt, "Vector4")?;
             }
-            Expression::Length(_) => {
-                write!(fmt, "Length")?;
-            }
-            Expression::Floor(_) => {
-                write!(fmt, "Floor")?;
-            }
-            Expression::Exp(_) => {
-                write!(fmt, "Exp")?;
-            }
-            Expression::Pow { .. } => {
-                write!(fmt, "Pow")?;
-            }
-            Expression::Sin(_) => {
-                write!(fmt, "Sin")?;
-            }
-            Expression::Cos(_) => {
-                write!(fmt, "Cos")?;
-            }
-            Expression::Tan(_) => {
-                write!(fmt, "Tan")?;
+            Expression::Math { function, .. } => {
+                write!(fmt, "{function:?}")?;
             }
             Expression::UV => {
                 write!(fmt, "UV")?;
@@ -1263,4 +1233,49 @@ pub fn vec4(
         z: z.into(),
         w: w.into(),
     }
+}
+
+pub fn min(a: impl Into<ExpressionInner>, b: impl Into<ExpressionInner>) -> Expression {
+    math(naga::MathFunction::Min, vec![a.into(), b.into()])
+}
+
+pub fn max(a: impl Into<ExpressionInner>, b: impl Into<ExpressionInner>) -> Expression {
+    math(naga::MathFunction::Max, vec![a.into(), b.into()])
+}
+
+pub fn clamp(
+    value: impl Into<ExpressionInner>,
+    low: impl Into<ExpressionInner>,
+    high: impl Into<ExpressionInner>,
+) -> Expression {
+    math(
+        naga::MathFunction::Clamp,
+        vec![value.into(), low.into(), high.into()],
+    )
+}
+
+pub fn mix(
+    a: impl Into<ExpressionInner>,
+    b: impl Into<ExpressionInner>,
+    amount: impl Into<ExpressionInner>,
+) -> Expression {
+    math(
+        naga::MathFunction::Mix,
+        vec![a.into(), b.into(), amount.into()],
+    )
+}
+
+pub fn smoothstep(
+    edge_low: impl Into<ExpressionInner>,
+    edge_high: impl Into<ExpressionInner>,
+    value: impl Into<ExpressionInner>,
+) -> Expression {
+    math(
+        naga::MathFunction::SmoothStep,
+        vec![edge_low.into(), edge_high.into(), value.into()],
+    )
+}
+
+pub fn step(edge: impl Into<ExpressionInner>, value: impl Into<ExpressionInner>) -> Expression {
+    math(naga::MathFunction::Step, vec![edge.into(), value.into()])
 }

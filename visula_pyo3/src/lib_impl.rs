@@ -164,6 +164,111 @@ impl PyExpression {
             inner: self.inner.tan(),
         }
     }
+    fn sqrt(&self) -> PyExpression {
+        Self {
+            inner: self.inner.sqrt(),
+        }
+    }
+    fn abs(&self) -> PyExpression {
+        Self {
+            inner: self.inner.abs(),
+        }
+    }
+    fn exp(&self) -> PyExpression {
+        Self {
+            inner: self.inner.exp(),
+        }
+    }
+    fn log(&self) -> PyExpression {
+        Self {
+            inner: self.inner.log(),
+        }
+    }
+    fn floor(&self) -> PyExpression {
+        Self {
+            inner: self.inner.floor(),
+        }
+    }
+    fn ceil(&self) -> PyExpression {
+        Self {
+            inner: self.inner.ceil(),
+        }
+    }
+    fn round(&self) -> PyExpression {
+        Self {
+            inner: self.inner.round(),
+        }
+    }
+    fn fract(&self) -> PyExpression {
+        Self {
+            inner: self.inner.fract(),
+        }
+    }
+    fn sign(&self) -> PyExpression {
+        Self {
+            inner: self.inner.sign(),
+        }
+    }
+    fn length(&self) -> PyExpression {
+        Self {
+            inner: self.inner.length(),
+        }
+    }
+    fn normalize(&self) -> PyExpression {
+        Self {
+            inner: self.inner.normalize(),
+        }
+    }
+    fn min(&self, other: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.min(&other.inner),
+        }
+    }
+    fn max(&self, other: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.max(&other.inner),
+        }
+    }
+    fn dot(&self, other: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.dot(&other.inner),
+        }
+    }
+    fn cross(&self, other: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.cross(&other.inner),
+        }
+    }
+    fn distance(&self, other: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.distance(&other.inner),
+        }
+    }
+    fn atan2(&self, other: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.atan2(&other.inner),
+        }
+    }
+    fn step(&self, edge: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.step(&edge.inner),
+        }
+    }
+    fn clamp(&self, low: &PyExpression, high: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.clamp(&low.inner, &high.inner),
+        }
+    }
+    fn mix(&self, other: &PyExpression, amount: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.mix(&other.inner, &amount.inner),
+        }
+    }
+    fn smoothstep(&self, edge_low: &PyExpression, edge_high: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.smoothstep(&edge_low.inner, &edge_high.inner),
+        }
+    }
 }
 
 #[pyclass]
