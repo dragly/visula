@@ -271,12 +271,86 @@ impl PyExpression {
     }
 }
 
-#[pyclass]
-#[derive(Clone, Debug)]
+const SLIDER_CAPACITY: usize = 64;
+
+pub struct SliderBank {
+    inner: Rc<RefCell<UniformBufferInner>>,
+    descriptor: Rc<visula_core::UniformDescriptor>,
+    count: usize,
+}
+
+impl SliderBank {
+    fn new(device: &wgpu::Device) -> Self {
+        let size = (SLIDER_CAPACITY * 4) as u64;
+        let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            mapped_at_creation: false,
+            size,
+            label: Some("sliders"),
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+        });
+
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        });
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+        });
+
+        let fields = (0..SLIDER_CAPACITY)
+            .map(|index| visula_core::UniformFieldDescriptor {
+                name: format!("value{index}"),
+                size: 4,
+                naga_type: naga::Type {
+                    name: None,
+                    inner: naga::TypeInner::Scalar(naga::Scalar {
+                        kind: naga::ScalarKind::Float,
+                        width: 4,
+                    }),
+                },
+            })
+            .collect();
+
+        let descriptor = Rc::new(visula_core::UniformDescriptor {
+            struct_name: "Sliders".to_owned(),
+            variable_name: "sliders".to_owned(),
+            struct_span: (SLIDER_CAPACITY * 4) as u32,
+            fields,
+        });
+
+        SliderBank {
+            inner: Rc::new(RefCell::new(UniformBufferInner {
+                label: "sliders".to_owned(),
+                buffer,
+                handle: Uuid::new_v4(),
+                bind_group,
+                bind_group_layout: Rc::new(bind_group_layout),
+            })),
+            descriptor,
+            count: 0,
+        }
+    }
+}
+
+#[pyclass(unsendable)]
 pub struct PySlider {
     #[pyo3(get, set)]
     pub name: String,
-    #[pyo3(get, set)]
     pub value: f32,
     #[pyo3(get, set)]
     pub minimum: f32,
@@ -284,18 +358,89 @@ pub struct PySlider {
     pub maximum: f32,
     #[pyo3(get, set)]
     pub step: f32,
+    index: usize,
+    inner: Rc<RefCell<UniformBufferInner>>,
+    descriptor: Rc<visula_core::UniformDescriptor>,
+    queue: wgpu::Queue,
+}
+
+impl PySlider {
+    pub fn write_value(&self) {
+        let inner = self.inner.borrow();
+        self.queue.write_buffer(
+            &inner.buffer,
+            (self.index * 4) as u64,
+            bytemuck::bytes_of(&self.value),
+        );
+    }
 }
 
 #[pymethods]
 impl PySlider {
     #[new]
-    fn new(name: &str, value: f32, minimum: f32, maximum: f32, step: f32) -> Self {
-        Self {
+    #[pyo3(signature = (pyapplication, name, value=0.0, minimum=0.0, maximum=1.0, step=0.0))]
+    fn new(
+        pyapplication: &Bound<PyApplication>,
+        name: &str,
+        value: f32,
+        minimum: f32,
+        maximum: f32,
+        step: f32,
+    ) -> PyResult<Self> {
+        let mut app_mut = pyapplication.borrow_mut();
+        let Some(ref application) = app_mut.application else {
+            return Err(PyRuntimeError::new_err("Application not yet initialized"));
+        };
+        let queue = application.queue.clone();
+        if app_mut.slider_bank.is_none() {
+            let device = &app_mut.application.as_ref().unwrap().device;
+            app_mut.slider_bank = Some(SliderBank::new(device));
+        }
+        let bank = app_mut.slider_bank.as_mut().unwrap();
+        if bank.count >= SLIDER_CAPACITY {
+            return Err(PyRuntimeError::new_err(format!(
+                "Cannot create more than {SLIDER_CAPACITY} sliders"
+            )));
+        }
+        let index = bank.count;
+        bank.count += 1;
+
+        let slider = Self {
             name: name.to_owned(),
             value,
             minimum,
             maximum,
             step,
+            index,
+            inner: bank.inner.clone(),
+            descriptor: bank.descriptor.clone(),
+            queue,
+        };
+        slider.write_value();
+        Ok(slider)
+    }
+
+    #[getter]
+    fn get_value(&self) -> f32 {
+        self.value
+    }
+
+    #[setter]
+    fn set_value(&mut self, value: f32) {
+        self.value = value;
+        self.write_value();
+    }
+
+    fn expression(&self) -> PyExpression {
+        let inner = self.inner.borrow();
+        PyExpression {
+            inner: Expression::UniformField(UniformField {
+                field_index: self.index,
+                bind_group_layout: inner.bind_group_layout.clone(),
+                buffer_handle: inner.handle,
+                inner: self.inner.clone(),
+                descriptor: self.descriptor.clone(),
+            }),
         }
     }
 }
