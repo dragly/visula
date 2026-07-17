@@ -47,35 +47,30 @@ The `colormap` function maps a value in [0, 1] to a color — `viridis`, `plasma
 The same visualization in Rust:
 
 ```rust
-use visula::{vec3, InstanceBuffer, SphereGeometry, SphereMaterial, Spheres};
-use visula_derive::Instance;
+use visula::{colormap, vec3, Colormap, SphereGeometry, SphereMaterial, Spheres};
 
-#[repr(C)]
-#[derive(Clone, Copy, Instance, bytemuck::Pod, bytemuck::Zeroable)]
-struct Particle {
-    t: f32,
+fn main() {
+    visula::run(|application| {
+        let data: Vec<f32> = (0..100_000).map(|i| i as f32 * 0.001).collect();
+        let t = application.instances(&data);
+        let position = 10.0 * vec3(t.cos(), t.sin(), &t / 50.0 - 1.0);
+        Spheres::new(
+            &application.rendering_descriptor(),
+            &SphereGeometry {
+                position,
+                radius: 0.2.into(),
+                color: colormap(&t / 100.0, Colormap::Viridis),
+            },
+            &SphereMaterial::default(),
+        )
+        .unwrap()
+    });
 }
-
-let data: Vec<Particle> = (0..100_000)
-    .map(|i| Particle { t: i as f32 * 0.001 })
-    .collect();
-let buffer = InstanceBuffer::new_with_init(&application.device, &data);
-let t = buffer.instance().t;
-
-let position = 10.0 * vec3(t.cos(), t.sin(), t);
-let spheres = Spheres::new(
-    &application.rendering_descriptor(),
-    &SphereGeometry {
-        position: position.clone(),
-        radius: 0.2.into(),
-        color: position / 4.0,
-    },
-    &SphereMaterial::default(),
-)
-.unwrap();
 ```
 
-See [visula/examples/spheres.rs](visula/examples/spheres.rs) for the full runnable version.
+This is [visula/examples/spheres.rs](visula/examples/spheres.rs).
+For structured per-instance data, derive `Instance` on a struct and each field becomes an expression; see [visula/examples/molecular_dynamics.rs](visula/examples/molecular_dynamics.rs).
+For simulations that update every frame, implement the `Simulation` trait instead of returning renderables; see [visula/examples/showcase.rs](visula/examples/showcase.rs).
 
 ![Molecular dynamics](screenshots/molecular_dynamics.png)
 

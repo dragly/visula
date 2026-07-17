@@ -698,6 +698,13 @@ impl Application {
             sample_count: self.sample_count,
         }
     }
+
+    pub fn instances<T>(&self, data: &[T]) -> T::Type
+    where
+        T: visula_core::Instance + bytemuck::Pod,
+    {
+        visula_core::InstanceBuffer::new_with_init(&self.device, data).instance()
+    }
 }
 
 /// Handle to a screenshot whose texture-to-buffer copy has been encoded but not yet finalized.
