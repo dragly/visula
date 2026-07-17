@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from visula import SphereDelegate, Figure, InstanceBuffer, Uniform, Slider
+from visula import Spheres, Figure, InstanceBuffer, Uniform, Slider
 import visula as vl
 import numpy as np
 
@@ -40,7 +40,7 @@ def create_particles(t, a, b, c):
 t = InstanceBuffer(np.linspace(0, 3.14 * count / 1000, count))
 position = create_particles(t, parameters_uniform.a, parameters_uniform.b, parameters_uniform.c)
 
-spheres = SphereDelegate(
+spheres = Spheres(
     position=position,
     radius=parameters_uniform.radius,
     color=1.0 * position / 4.0 + 8.0 / 3.0,

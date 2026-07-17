@@ -129,9 +129,6 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
         let Some(ref mut application) = self.application else {
             return;
         };
-        let Some(ref mut update) = self.update else {
-            return;
-        };
         application.window_event(window_id, &event);
         match event {
             WindowEvent::RedrawRequested => {
@@ -155,13 +152,15 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
                         return;
                     }
                 }
-                Python::attach(|py| {
-                    let result = update.call(py, (), None);
-                    if let Err(err) = result {
-                        println!("Could not call update: {err:?}");
-                        println!("{}", err.traceback(py).unwrap().format().unwrap());
-                    }
-                });
+                if let Some(ref update) = self.update {
+                    Python::attach(|py| {
+                        let result = update.call(py, (), None);
+                        if let Err(err) = result {
+                            println!("Could not call update: {err:?}");
+                            println!("{}", err.traceback(py).unwrap().format().unwrap());
+                        }
+                    });
+                }
             }
             WindowEvent::CloseRequested => event_loop.exit(),
             _ => {}

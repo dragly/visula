@@ -44,18 +44,19 @@ struct FloatData {
     position: f32,
 }
 
-#[pyclass(name = "SphereDelegate", unsendable)]
+#[pyclass(name = "Spheres", unsendable)]
 #[derive(Clone)]
-struct PySphereDelegate {
+struct PySpheres {
     pub position: Py<PyAny>,
-    pub radius: Py<PyAny>,
-    pub color: Py<PyAny>,
+    pub radius: Option<Py<PyAny>>,
+    pub color: Option<Py<PyAny>>,
 }
 
 #[pymethods]
-impl PySphereDelegate {
+impl PySpheres {
     #[new]
-    fn new(position: Py<PyAny>, radius: Py<PyAny>, color: Py<PyAny>) -> Self {
+    #[pyo3(signature = (position, radius=None, color=None))]
+    fn new(position: Py<PyAny>, radius: Option<Py<PyAny>>, color: Option<Py<PyAny>>) -> Self {
         Self {
             position,
             radius,
@@ -64,19 +65,25 @@ impl PySphereDelegate {
     }
 }
 
-#[pyclass(name = "LineDelegate", unsendable)]
+#[pyclass(name = "Lines", unsendable)]
 #[derive(Clone)]
-struct PyLineDelegate {
+struct PyLines {
     pub start: Py<PyAny>,
     pub end: Py<PyAny>,
-    pub width: Py<PyAny>,
-    pub color: Py<PyAny>,
+    pub width: Option<Py<PyAny>>,
+    pub color: Option<Py<PyAny>>,
 }
 
 #[pymethods]
-impl PyLineDelegate {
+impl PyLines {
     #[new]
-    fn new(start: Py<PyAny>, end: Py<PyAny>, width: Py<PyAny>, color: Py<PyAny>) -> Self {
+    #[pyo3(signature = (start, end, width=None, color=None))]
+    fn new(
+        start: Py<PyAny>,
+        end: Py<PyAny>,
+        width: Option<Py<PyAny>>,
+        color: Option<Py<PyAny>>,
+    ) -> Self {
         Self {
             start,
             end,
@@ -133,6 +140,12 @@ impl PyExpression {
     fn pow(&self, other: &PyExpression) -> PyExpression {
         PyExpression {
             inner: self.inner.clone().pow(other.inner.clone()),
+        }
+    }
+
+    fn neg(&self) -> PyExpression {
+        Self {
+            inner: -self.inner.clone(),
         }
     }
 
@@ -396,9 +409,23 @@ impl PyInstanceBuffer {
 }
 
 #[pyfunction]
+fn vec2(x: &PyExpression, y: &PyExpression) -> PyExpression {
+    PyExpression {
+        inner: visula_core::vec2(&x.inner, &y.inner),
+    }
+}
+
+#[pyfunction]
 fn vec3(x: &PyExpression, y: &PyExpression, z: &PyExpression) -> PyExpression {
     PyExpression {
         inner: visula_core::vec3(&x.inner, &y.inner, &z.inner),
+    }
+}
+
+#[pyfunction]
+fn vec4(x: &PyExpression, y: &PyExpression, z: &PyExpression, w: &PyExpression) -> PyExpression {
+    PyExpression {
+        inner: visula_core::vec4(&x.inner, &y.inner, &z.inner, &w.inner),
     }
 }
 
@@ -507,12 +534,25 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: Py<PyAny>) -> PyResul
     )))
 }
 
+fn convert_or(
+    py: Python,
+    pyapplication: &PyApplication,
+    obj: &Option<Py<PyAny>>,
+    default: Expression,
+) -> PyResult<Expression> {
+    match obj {
+        Some(obj) => Ok(convert(py, pyapplication, obj.clone_ref(py))?.inner),
+        None => Ok(default),
+    }
+}
+
 #[pyfunction]
+#[pyo3(signature = (py_application, py_renderables, update=None, controls=Vec::new()))]
 fn show(
     py: Python,
     py_application: &Bound<PyApplication>,
     py_renderables: Vec<Py<PyAny>>,
-    update: Py<PyFunction>,
+    update: Option<Py<PyFunction>>,
     controls: Vec<Py<PySlider>>,
 ) -> PyResult<()> {
     {
@@ -524,38 +564,54 @@ fn show(
         let renderables: Vec<Box<dyn Renderable>> = py_renderables
             .iter()
             .map(|renderable| -> PyResult<Box<dyn Renderable>> {
-                if let Ok(pysphere) = renderable.extract::<PySphereDelegate>(py) {
+                if let Ok(pysphere) = renderable.extract::<PySpheres>(py) {
                     return Ok(Box::new(
                         Spheres::new(
                             &application.rendering_descriptor(),
                             &SphereGeometry {
                                 position: convert(py, &py_application_mut, pysphere.position)?
                                     .inner,
-                                radius: convert(py, &py_application_mut, pysphere.radius)?.inner,
-                                color: convert(py, &py_application_mut, pysphere.color)?.inner,
+                                radius: convert_or(
+                                    py,
+                                    &py_application_mut,
+                                    &pysphere.radius,
+                                    1.0.into(),
+                                )?,
+                                color: convert_or(
+                                    py,
+                                    &py_application_mut,
+                                    &pysphere.color,
+                                    Vec3::ONE.into(),
+                                )?,
                             },
-                            &SphereMaterial {
-                                color: Expression::InputColor,
-                            },
+                            &SphereMaterial::default(),
                         )
                         .map_err(|e| {
                             PyRuntimeError::new_err(format!("Failed to create spheres: {e}"))
                         })?,
                     ));
                 }
-                if let Ok(pylines) = renderable.extract::<PyLineDelegate>(py) {
+                if let Ok(pylines) = renderable.extract::<PyLines>(py) {
                     return Ok(Box::new(
                         Lines::new(
                             &application.rendering_descriptor(),
                             &LineGeometry {
                                 start: convert(py, &py_application_mut, pylines.start)?.inner,
                                 end: convert(py, &py_application_mut, pylines.end)?.inner,
-                                width: convert(py, &py_application_mut, pylines.width)?.inner,
-                                color: convert(py, &py_application_mut, pylines.color)?.inner,
+                                width: convert_or(
+                                    py,
+                                    &py_application_mut,
+                                    &pylines.width,
+                                    1.0.into(),
+                                )?,
+                                color: convert_or(
+                                    py,
+                                    &py_application_mut,
+                                    &pylines.color,
+                                    Vec3::ONE.into(),
+                                )?,
                             },
-                            &LineMaterial {
-                                color: Expression::InputColor,
-                            },
+                            &LineMaterial::default(),
                         )
                         .map_err(|e| {
                             PyRuntimeError::new_err(format!("Failed to create lines: {e}"))
@@ -569,7 +625,7 @@ fn show(
             .collect::<PyResult<Vec<_>>>()?;
 
         py_application_mut.renderables = renderables;
-        py_application_mut.update = Some(update);
+        py_application_mut.update = update;
         py_application_mut.controls = controls;
     }
 
@@ -581,9 +637,11 @@ fn show(
 fn visula_pyo3(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(show, m)?)?;
     m.add_function(wrap_pyfunction!(convert, m)?)?;
+    m.add_function(wrap_pyfunction!(vec2, m)?)?;
     m.add_function(wrap_pyfunction!(vec3, m)?)?;
-    m.add_class::<PySphereDelegate>()?;
-    m.add_class::<PyLineDelegate>()?;
+    m.add_function(wrap_pyfunction!(vec4, m)?)?;
+    m.add_class::<PySpheres>()?;
+    m.add_class::<PyLines>()?;
     m.add_class::<PyExpression>()?;
     m.add_class::<PyApplication>()?;
     m.add_class::<PyEventLoop>()?;

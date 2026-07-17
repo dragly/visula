@@ -19,14 +19,14 @@ InstanceBuffers can be used to define multiple instances of a given primitive:
 
 
 ```python
-from visula import SphereDelegate, Figure, InstanceBuffer
+from visula import Spheres, Figure, InstanceBuffer
 import visula as vl
 import numpy as np
 
 t = InstanceBuffer(np.linspace(0, 100, 100_000))
 position = 10.0 * vl.vec3(vl.cos(t), vl.sin(t), t)
 
-spheres = SphereDelegate(
+spheres = Spheres(
     position=position,
     radius=0.2,
     color=position / 4.0,
