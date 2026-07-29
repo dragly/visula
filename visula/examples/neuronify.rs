@@ -1025,7 +1025,7 @@ impl visula::Simulation for Simulation {
         egui::Window::new("Settings").show(context, |ui| {
             ui.label("Tool");
             for value in Tool::iter() {
-                ui.selectable_value(&mut self.tool, value.clone(), format!("{:?}", &value));
+                ui.selectable_value(&mut self.tool, value.clone(), format!("{value:?}"));
             }
             ui.label("Simulation speed");
             ui.add(egui::Slider::new(&mut self.iterations, 1..=20));
