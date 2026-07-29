@@ -444,6 +444,11 @@ impl Expression {
                 let arg1 = handles.next();
                 let arg2 = handles.next();
                 let arg3 = handles.next();
+                if handles.next().is_some() {
+                    panic!(
+                        "Math expression with more than 4 arguments is not supported by naga::Expression::Math"
+                    );
+                }
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
