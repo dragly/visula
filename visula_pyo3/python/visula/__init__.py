@@ -1,8 +1,9 @@
 from ._visula_pyo3 import Lines, Spheres
 from .figure import Figure
-from .expression import Expression, vec2, vec3, vec4
+from .expression import Expression, ExpressionLike, vec2, vec3, vec4
 from .instance_buffer import InstanceBuffer
 from .math import (
+    ColormapName,
     abs,
     atan2,
     ceil,
@@ -38,6 +39,8 @@ __all__ = [
     "Spheres",
     "Figure",
     "Expression",
+    "ExpressionLike",
+    "ColormapName",
     "InstanceBuffer",
     "Uniform",
     "Slider",

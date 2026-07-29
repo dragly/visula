@@ -1,70 +1,120 @@
+from typing import Literal
+
 from ._visula_pyo3 import colormap as _colormap
-from .expression import Expression, _ensure_expression
+from .expression import Expression, ExpressionLike, _ensure_expression
+
+ColormapName = Literal["viridis", "plasma", "magma", "inferno"]
 
 
-def colormap(value, name="viridis"):
-    return Expression(_colormap(Expression(value).inner, name))
+def colormap(value: ExpressionLike, name: ColormapName = "viridis") -> Expression:
+    return Expression(_colormap(_ensure_expression(value), name))
 
 
-def _unary(name):
-    def function(expr):
-        return Expression(getattr(Expression(expr).inner, name)())
-
-    function.__name__ = name
-    return function
+def cos(value: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(value).cos())
 
 
-def _binary(name):
-    def function(a, b):
-        return Expression(getattr(Expression(a).inner, name)(_ensure_expression(b)))
-
-    function.__name__ = name
-    return function
+def sin(value: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(value).sin())
 
 
-cos = _unary("cos")
-sin = _unary("sin")
-tan = _unary("tan")
-sqrt = _unary("sqrt")
-abs = _unary("abs")
-exp = _unary("exp")
-log = _unary("log")
-floor = _unary("floor")
-ceil = _unary("ceil")
-round = _unary("round")
-fract = _unary("fract")
-sign = _unary("sign")
-length = _unary("length")
-normalize = _unary("normalize")
-
-min = _binary("min")
-max = _binary("max")
-dot = _binary("dot")
-cross = _binary("cross")
-distance = _binary("distance")
-atan2 = _binary("atan2")
-pow = _binary("pow")
+def tan(value: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(value).tan())
 
 
-def clamp(value, low, high):
+def sqrt(value: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(value).sqrt())
+
+
+def abs(value: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(value).abs())
+
+
+def exp(value: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(value).exp())
+
+
+def log(value: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(value).log())
+
+
+def floor(value: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(value).floor())
+
+
+def ceil(value: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(value).ceil())
+
+
+def round(value: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(value).round())
+
+
+def fract(value: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(value).fract())
+
+
+def sign(value: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(value).sign())
+
+
+def length(value: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(value).length())
+
+
+def normalize(value: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(value).normalize())
+
+
+def min(a: ExpressionLike, b: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(a).min(_ensure_expression(b)))
+
+
+def max(a: ExpressionLike, b: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(a).max(_ensure_expression(b)))
+
+
+def dot(a: ExpressionLike, b: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(a).dot(_ensure_expression(b)))
+
+
+def cross(a: ExpressionLike, b: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(a).cross(_ensure_expression(b)))
+
+
+def distance(a: ExpressionLike, b: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(a).distance(_ensure_expression(b)))
+
+
+def atan2(y: ExpressionLike, x: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(y).atan2(_ensure_expression(x)))
+
+
+def pow(base: ExpressionLike, exponent: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(base).pow(_ensure_expression(exponent)))
+
+
+def clamp(value: ExpressionLike, low: ExpressionLike, high: ExpressionLike) -> Expression:
     return Expression(
-        Expression(value).inner.clamp(_ensure_expression(low), _ensure_expression(high))
+        _ensure_expression(value).clamp(_ensure_expression(low), _ensure_expression(high))
     )
 
 
-def mix(a, b, amount):
+def mix(a: ExpressionLike, b: ExpressionLike, amount: ExpressionLike) -> Expression:
     return Expression(
-        Expression(a).inner.mix(_ensure_expression(b), _ensure_expression(amount))
+        _ensure_expression(a).mix(_ensure_expression(b), _ensure_expression(amount))
     )
 
 
-def smoothstep(edge_low, edge_high, value):
+def smoothstep(
+    edge_low: ExpressionLike, edge_high: ExpressionLike, value: ExpressionLike
+) -> Expression:
     return Expression(
-        Expression(value).inner.smoothstep(
+        _ensure_expression(value).smoothstep(
             _ensure_expression(edge_low), _ensure_expression(edge_high)
         )
     )
 
 
-def step(edge, value):
-    return Expression(Expression(value).inner.step(_ensure_expression(edge)))
+def step(edge: ExpressionLike, value: ExpressionLike) -> Expression:
+    return Expression(_ensure_expression(value).step(_ensure_expression(edge)))
