@@ -13,7 +13,7 @@ pub struct UniformField {
     pub buffer_handle: uuid::Uuid,
     pub field_index: usize,
     pub inner: Rc<RefCell<UniformBufferInner>>,
-    pub descriptor: Rc<UniformDescriptor>,
+    pub descriptor: Rc<RefCell<UniformDescriptor>>,
 }
 
 pub trait UniformHandle {}

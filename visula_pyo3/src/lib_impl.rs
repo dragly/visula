@@ -24,6 +24,7 @@ use visula_core::glam::{Vec3, Vec4};
 use visula_core::uuid::Uuid;
 use visula_core::{UniformBufferInner, UniformField};
 use visula_derive::Instance;
+use wgpu::util::DeviceExt;
 use wgpu::BufferUsages;
 
 #[repr(C)]
@@ -271,20 +272,19 @@ impl PyExpression {
     }
 }
 
-const SLIDER_CAPACITY: usize = 64;
-
 pub struct SliderBank {
     inner: Rc<RefCell<UniformBufferInner>>,
-    descriptor: Rc<visula_core::UniformDescriptor>,
-    count: usize,
+    descriptor: Rc<RefCell<visula_core::UniformDescriptor>>,
+    values: Vec<f32>,
 }
 
 impl SliderBank {
     fn new(device: &wgpu::Device) -> Self {
-        let size = (SLIDER_CAPACITY * 4) as u64;
+        // Placeholder that the first add() replaces; bind groups reject
+        // zero-sized buffers.
         let buffer = device.create_buffer(&wgpu::BufferDescriptor {
             mapped_at_creation: false,
-            size,
+            size: 16,
             label: Some("sliders"),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         });
@@ -312,27 +312,6 @@ impl SliderBank {
             }],
         });
 
-        let fields = (0..SLIDER_CAPACITY)
-            .map(|index| visula_core::UniformFieldDescriptor {
-                name: format!("value{index}"),
-                size: 4,
-                naga_type: naga::Type {
-                    name: None,
-                    inner: naga::TypeInner::Scalar(naga::Scalar {
-                        kind: naga::ScalarKind::Float,
-                        width: 4,
-                    }),
-                },
-            })
-            .collect();
-
-        let descriptor = Rc::new(visula_core::UniformDescriptor {
-            struct_name: "Sliders".to_owned(),
-            variable_name: "sliders".to_owned(),
-            struct_span: (SLIDER_CAPACITY * 4) as u32,
-            fields,
-        });
-
         SliderBank {
             inner: Rc::new(RefCell::new(UniformBufferInner {
                 label: "sliders".to_owned(),
@@ -341,9 +320,87 @@ impl SliderBank {
                 bind_group,
                 bind_group_layout: Rc::new(bind_group_layout),
             })),
-            descriptor,
-            count: 0,
+            descriptor: Rc::new(RefCell::new(visula_core::UniformDescriptor {
+                struct_name: "Sliders".to_owned(),
+                variable_name: "sliders".to_owned(),
+                struct_span: 0,
+                fields: Vec::new(),
+            })),
+            values: Vec::new(),
         }
+    }
+
+    fn field_name(&self, name: &str, index: usize) -> String {
+        let mut sanitized: String = name
+            .chars()
+            .map(|character| {
+                if character.is_ascii_alphanumeric() || character == '_' {
+                    character
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+        if sanitized
+            .chars()
+            .next()
+            .is_none_or(|first| first.is_ascii_digit())
+        {
+            sanitized = format!("slider_{sanitized}");
+        }
+        let descriptor = self.descriptor.borrow();
+        let taken = |candidate: &str| {
+            descriptor
+                .fields
+                .iter()
+                .any(|field| field.name == candidate)
+        };
+        let mut candidate = sanitized.clone();
+        if taken(&candidate) {
+            candidate = format!("{sanitized}_{index}");
+        }
+        while taken(&candidate) {
+            candidate.push('_');
+        }
+        candidate
+    }
+
+    fn add(&mut self, device: &wgpu::Device, name: &str, value: f32) -> usize {
+        let index = self.values.len();
+        let field_name = self.field_name(name, index);
+        self.values.push(value);
+        {
+            let mut descriptor = self.descriptor.borrow_mut();
+            descriptor.fields.push(visula_core::UniformFieldDescriptor {
+                name: field_name,
+                size: 4,
+                naga_type: naga::Type {
+                    name: None,
+                    inner: naga::TypeInner::Scalar(naga::Scalar {
+                        kind: naga::ScalarKind::Float,
+                        width: 4,
+                    }),
+                },
+            });
+            descriptor.struct_span = (self.values.len() * 4) as u32;
+        }
+
+        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("sliders"),
+            contents: bytemuck::cast_slice(&self.values),
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+        });
+        let mut inner = self.inner.borrow_mut();
+        inner.bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &inner.bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+        });
+        inner.buffer = buffer;
+        index
     }
 }
 
@@ -360,7 +417,7 @@ pub struct PySlider {
     pub step: f32,
     index: usize,
     inner: Rc<RefCell<UniformBufferInner>>,
-    descriptor: Rc<visula_core::UniformDescriptor>,
+    descriptor: Rc<RefCell<visula_core::UniformDescriptor>>,
     queue: wgpu::Queue,
 }
 
@@ -388,24 +445,16 @@ impl PySlider {
         step: f32,
     ) -> PyResult<Self> {
         let mut app_mut = pyapplication.borrow_mut();
+        let app_mut = &mut *app_mut;
         let Some(ref application) = app_mut.application else {
             return Err(PyRuntimeError::new_err("Application not yet initialized"));
         };
-        let queue = application.queue.clone();
-        if app_mut.slider_bank.is_none() {
-            let device = &app_mut.application.as_ref().unwrap().device;
-            app_mut.slider_bank = Some(SliderBank::new(device));
-        }
-        let bank = app_mut.slider_bank.as_mut().unwrap();
-        if bank.count >= SLIDER_CAPACITY {
-            return Err(PyRuntimeError::new_err(format!(
-                "Cannot create more than {SLIDER_CAPACITY} sliders"
-            )));
-        }
-        let index = bank.count;
-        bank.count += 1;
+        let bank = app_mut
+            .slider_bank
+            .get_or_insert_with(|| SliderBank::new(&application.device));
+        let index = bank.add(&application.device, name, value);
 
-        let slider = Self {
+        Ok(Self {
             name: name.to_owned(),
             value,
             minimum,
@@ -414,10 +463,8 @@ impl PySlider {
             index,
             inner: bank.inner.clone(),
             descriptor: bank.descriptor.clone(),
-            queue,
-        };
-        slider.write_value();
-        Ok(slider)
+            queue: application.queue.clone(),
+        })
     }
 
     #[getter]
@@ -580,12 +627,12 @@ impl PyUniformBuffer {
             });
         }
 
-        let descriptor = Rc::new(visula_core::UniformDescriptor {
+        let descriptor = Rc::new(RefCell::new(visula_core::UniformDescriptor {
             struct_name: self.name.clone(),
             variable_name: self.name.to_lowercase(),
             struct_span: self.size as u32,
             fields: descriptor_fields,
-        });
+        }));
 
         Ok(PyExpression {
             inner: Expression::UniformField(UniformField {

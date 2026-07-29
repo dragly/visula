@@ -571,7 +571,7 @@ impl Expression {
             Expression::UniformField(field) => {
                 if !binding_builder.uniforms.contains_key(&field.buffer_handle) {
                     crate::integrate::integrate_uniform(
-                        &field.descriptor,
+                        &field.descriptor.borrow(),
                         &field.inner,
                         &field.buffer_handle,
                         module,
