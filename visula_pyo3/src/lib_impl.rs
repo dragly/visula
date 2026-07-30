@@ -369,6 +369,10 @@ impl SliderBank {
         let index = self.values.len();
         let field_name = self.field_name(name, index);
         self.values.push(value);
+
+        // Uniform buffer bindings are typically required to be 16-byte aligned.
+        let span = ((self.values.len() * 4 + 15) / 16) * 16;
+
         {
             let mut descriptor = self.descriptor.borrow_mut();
             descriptor.fields.push(visula_core::UniformFieldDescriptor {
@@ -382,12 +386,15 @@ impl SliderBank {
                     }),
                 },
             });
-            descriptor.struct_span = (self.values.len() * 4) as u32;
+            descriptor.struct_span = span as u32;
         }
+
+        let mut padded = self.values.clone();
+        padded.resize(span / 4, 0.0);
 
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("sliders"),
-            contents: bytemuck::cast_slice(&self.values),
+            contents: bytemuck::cast_slice(&padded),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         });
         let mut inner = self.inner.borrow_mut();
