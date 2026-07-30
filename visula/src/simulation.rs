@@ -4,6 +4,7 @@ use winit::event::Event;
 use crate::application::Application;
 use crate::camera::Camera;
 use crate::light::DirectionalLight;
+use crate::pipelines::{Circles, Cylinders, Lines, Polygons, Rects, Renderable, Spheres, Torus};
 use crate::CustomEvent;
 
 pub struct RenderData<'a> {
@@ -35,6 +36,36 @@ pub trait Simulation {
             g: 0.2,
             b: 0.3,
             a: 1.0,
+        }
+    }
+}
+
+macro_rules! impl_simulation_for_renderable {
+    ($($type:ty),* $(,)?) => {
+        $(
+            impl Simulation for $type {
+                fn render(&mut self, data: &mut RenderData) {
+                    Renderable::render(self, data)
+                }
+                fn render_shadow(&mut self, data: &mut ShadowRenderData) {
+                    Renderable::render_shadow(self, data)
+                }
+            }
+        )*
+    };
+}
+
+impl_simulation_for_renderable!(Circles, Cylinders, Lines, Polygons, Rects, Spheres, Torus);
+
+impl Simulation for Vec<Box<dyn Renderable>> {
+    fn render(&mut self, data: &mut RenderData) {
+        for renderable in self.iter() {
+            renderable.render(data);
+        }
+    }
+    fn render_shadow(&mut self, data: &mut ShadowRenderData) {
+        for renderable in self.iter() {
+            renderable.render_shadow(data);
         }
     }
 }

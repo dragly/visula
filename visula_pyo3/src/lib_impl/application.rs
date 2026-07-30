@@ -15,7 +15,7 @@ use visula::{
 
 use winit::platform::pump_events::EventLoopExtPumpEvents;
 
-use super::{PyEventLoop, PySlider};
+use super::{PyEventLoop, PySlider, SliderBank};
 
 struct AutoScreenshot {
     path: PathBuf,
@@ -66,10 +66,18 @@ impl Simulation for PySimulation<'_> {
             Python::attach(|py| {
                 for slider in self.controls.iter_mut() {
                     let mut slider_mut = slider.borrow_mut(py);
+                    let slider_mut = &mut *slider_mut;
                     let minimum = slider_mut.minimum;
                     let maximum = slider_mut.maximum;
+                    let step = slider_mut.step;
                     ui.label(&slider_mut.name);
-                    ui.add(Slider::new(&mut slider_mut.value, minimum..=maximum));
+                    let mut widget = Slider::new(&mut slider_mut.value, minimum..=maximum);
+                    if step > 0.0 {
+                        widget = widget.step_by(step as f64);
+                    }
+                    if ui.add(widget).changed() {
+                        slider_mut.write_value();
+                    }
                 }
             });
         });
@@ -83,6 +91,7 @@ pub struct PyApplication {
     pub renderables: Vec<Box<dyn Renderable>>,
     pub controls: Vec<Py<PySlider>>,
     pub update: Option<Py<PyFunction>>,
+    pub slider_bank: Option<SliderBank>,
     auto_screenshot: Option<AutoScreenshot>,
 }
 
@@ -95,6 +104,7 @@ impl PyApplication {
             renderables: Vec::new(),
             controls: Vec::new(),
             update: None,
+            slider_bank: None,
             event_loop_proxy: event_loop
                 .event_loop
                 .as_ref()
@@ -129,9 +139,6 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
         let Some(ref mut application) = self.application else {
             return;
         };
-        let Some(ref mut update) = self.update else {
-            return;
-        };
         application.window_event(window_id, &event);
         match event {
             WindowEvent::RedrawRequested => {
@@ -155,13 +162,15 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
                         return;
                     }
                 }
-                Python::attach(|py| {
-                    let result = update.call(py, (), None);
-                    if let Err(err) = result {
-                        println!("Could not call update: {err:?}");
-                        println!("{}", err.traceback(py).unwrap().format().unwrap());
-                    }
-                });
+                if let Some(ref update) = self.update {
+                    Python::attach(|py| {
+                        let result = update.call(py, (), None);
+                        if let Err(err) = result {
+                            println!("Could not call update: {err:?}");
+                            println!("{}", err.traceback(py).unwrap().format().unwrap());
+                        }
+                    });
+                }
             }
             WindowEvent::CloseRequested => event_loop.exit(),
             _ => {}

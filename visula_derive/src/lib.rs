@@ -245,14 +245,14 @@ pub fn uniform(input: TokenStream) -> TokenStream {
         impl visula_core::Uniform for #name {
             type Type = #uniform_struct_name;
             fn uniform(inner: std::rc::Rc<std::cell::RefCell<visula_core::UniformBufferInner>>) -> Self::Type {
-                let descriptor = std::rc::Rc::new(visula_core::UniformDescriptor {
+                let descriptor = std::rc::Rc::new(std::cell::RefCell::new(visula_core::UniformDescriptor {
                     struct_name: stringify!(#uniform_struct_name).to_string(),
                     variable_name: stringify!(#name).to_lowercase(),
                     struct_span: std::mem::size_of::<#name>() as u32,
                     fields: vec![
                         #(#descriptor_fields,)*
                     ],
-                });
+                }));
                 Self::Type {
                     #(#uniform_field_values,)*
                     handle: inner.borrow().handle,

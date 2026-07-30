@@ -34,8 +34,8 @@ pub use cgmath;
 pub use egui_wgpu;
 pub use visula_core;
 pub use visula_core::{
-    glam, naga, uuid, vec2, vec3, vec4, wgpu, Expression, InstanceBuffer, InstanceDeviceExt,
-    TextureInput, UniformBuffer,
+    clamp, colormap, glam, max, min, mix, naga, smoothstep, step, uuid, vec2, vec3, vec4, wgpu,
+    Colormap, Expression, InstanceBuffer, InstanceDeviceExt, TextureInput, UniformBuffer,
 };
 
 pub mod application;

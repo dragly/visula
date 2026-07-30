@@ -24,6 +24,7 @@ use visula_core::glam::{Vec3, Vec4};
 use visula_core::uuid::Uuid;
 use visula_core::{UniformBufferInner, UniformField};
 use visula_derive::Instance;
+use wgpu::util::DeviceExt;
 use wgpu::BufferUsages;
 
 #[repr(C)]
@@ -44,18 +45,19 @@ struct FloatData {
     position: f32,
 }
 
-#[pyclass(name = "SphereDelegate", unsendable)]
+#[pyclass(name = "Spheres", unsendable)]
 #[derive(Clone)]
-struct PySphereDelegate {
+struct PySpheres {
     pub position: Py<PyAny>,
-    pub radius: Py<PyAny>,
-    pub color: Py<PyAny>,
+    pub radius: Option<Py<PyAny>>,
+    pub color: Option<Py<PyAny>>,
 }
 
 #[pymethods]
-impl PySphereDelegate {
+impl PySpheres {
     #[new]
-    fn new(position: Py<PyAny>, radius: Py<PyAny>, color: Py<PyAny>) -> Self {
+    #[pyo3(signature = (position, radius=None, color=None))]
+    fn new(position: Py<PyAny>, radius: Option<Py<PyAny>>, color: Option<Py<PyAny>>) -> Self {
         Self {
             position,
             radius,
@@ -64,19 +66,25 @@ impl PySphereDelegate {
     }
 }
 
-#[pyclass(name = "LineDelegate", unsendable)]
+#[pyclass(name = "Lines", unsendable)]
 #[derive(Clone)]
-struct PyLineDelegate {
+struct PyLines {
     pub start: Py<PyAny>,
     pub end: Py<PyAny>,
-    pub width: Py<PyAny>,
-    pub color: Py<PyAny>,
+    pub width: Option<Py<PyAny>>,
+    pub color: Option<Py<PyAny>>,
 }
 
 #[pymethods]
-impl PyLineDelegate {
+impl PyLines {
     #[new]
-    fn new(start: Py<PyAny>, end: Py<PyAny>, width: Py<PyAny>, color: Py<PyAny>) -> Self {
+    #[pyo3(signature = (start, end, width=None, color=None))]
+    fn new(
+        start: Py<PyAny>,
+        end: Py<PyAny>,
+        width: Option<Py<PyAny>>,
+        color: Option<Py<PyAny>>,
+    ) -> Self {
         Self {
             start,
             end,
@@ -136,6 +144,12 @@ impl PyExpression {
         }
     }
 
+    fn neg(&self) -> PyExpression {
+        Self {
+            inner: -self.inner.clone(),
+        }
+    }
+
     fn cos(&self) -> PyExpression {
         Self {
             inner: self.inner.cos(),
@@ -151,14 +165,256 @@ impl PyExpression {
             inner: self.inner.tan(),
         }
     }
+    fn sqrt(&self) -> PyExpression {
+        Self {
+            inner: self.inner.sqrt(),
+        }
+    }
+    fn abs(&self) -> PyExpression {
+        Self {
+            inner: self.inner.abs(),
+        }
+    }
+    fn exp(&self) -> PyExpression {
+        Self {
+            inner: self.inner.exp(),
+        }
+    }
+    fn log(&self) -> PyExpression {
+        Self {
+            inner: self.inner.log(),
+        }
+    }
+    fn floor(&self) -> PyExpression {
+        Self {
+            inner: self.inner.floor(),
+        }
+    }
+    fn ceil(&self) -> PyExpression {
+        Self {
+            inner: self.inner.ceil(),
+        }
+    }
+    fn round(&self) -> PyExpression {
+        Self {
+            inner: self.inner.round(),
+        }
+    }
+    fn fract(&self) -> PyExpression {
+        Self {
+            inner: self.inner.fract(),
+        }
+    }
+    fn sign(&self) -> PyExpression {
+        Self {
+            inner: self.inner.sign(),
+        }
+    }
+    fn length(&self) -> PyExpression {
+        Self {
+            inner: self.inner.length(),
+        }
+    }
+    fn normalize(&self) -> PyExpression {
+        Self {
+            inner: self.inner.normalize(),
+        }
+    }
+    fn min(&self, other: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.min(&other.inner),
+        }
+    }
+    fn max(&self, other: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.max(&other.inner),
+        }
+    }
+    fn dot(&self, other: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.dot(&other.inner),
+        }
+    }
+    fn cross(&self, other: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.cross(&other.inner),
+        }
+    }
+    fn distance(&self, other: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.distance(&other.inner),
+        }
+    }
+    fn atan2(&self, other: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.atan2(&other.inner),
+        }
+    }
+    fn step(&self, edge: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.step(&edge.inner),
+        }
+    }
+    fn clamp(&self, low: &PyExpression, high: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.clamp(&low.inner, &high.inner),
+        }
+    }
+    fn mix(&self, other: &PyExpression, amount: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.mix(&other.inner, &amount.inner),
+        }
+    }
+    fn smoothstep(&self, edge_low: &PyExpression, edge_high: &PyExpression) -> PyExpression {
+        Self {
+            inner: self.inner.smoothstep(&edge_low.inner, &edge_high.inner),
+        }
+    }
 }
 
-#[pyclass]
-#[derive(Clone, Debug)]
+pub struct SliderBank {
+    inner: Rc<RefCell<UniformBufferInner>>,
+    descriptor: Rc<RefCell<visula_core::UniformDescriptor>>,
+    values: Vec<f32>,
+}
+
+impl SliderBank {
+    fn new(device: &wgpu::Device) -> Self {
+        // Placeholder that the first add() replaces; bind groups reject
+        // zero-sized buffers.
+        let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            mapped_at_creation: false,
+            size: 16,
+            label: Some("sliders"),
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+        });
+
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        });
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+        });
+
+        SliderBank {
+            inner: Rc::new(RefCell::new(UniformBufferInner {
+                label: "sliders".to_owned(),
+                buffer,
+                handle: Uuid::new_v4(),
+                bind_group,
+                bind_group_layout: Rc::new(bind_group_layout),
+            })),
+            descriptor: Rc::new(RefCell::new(visula_core::UniformDescriptor {
+                struct_name: "Sliders".to_owned(),
+                variable_name: "sliders".to_owned(),
+                struct_span: 0,
+                fields: Vec::new(),
+            })),
+            values: Vec::new(),
+        }
+    }
+
+    fn field_name(&self, name: &str, index: usize) -> String {
+        let mut sanitized: String = name
+            .chars()
+            .map(|character| {
+                if character.is_ascii_alphanumeric() || character == '_' {
+                    character
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+        if sanitized
+            .chars()
+            .next()
+            .is_none_or(|first| first.is_ascii_digit())
+        {
+            sanitized = format!("slider_{sanitized}");
+        }
+        let descriptor = self.descriptor.borrow();
+        let taken = |candidate: &str| {
+            descriptor
+                .fields
+                .iter()
+                .any(|field| field.name == candidate)
+        };
+        let mut candidate = sanitized.clone();
+        if taken(&candidate) {
+            candidate = format!("{sanitized}_{index}");
+        }
+        while taken(&candidate) {
+            candidate.push('_');
+        }
+        candidate
+    }
+
+    fn add(&mut self, device: &wgpu::Device, name: &str, value: f32) -> usize {
+        let index = self.values.len();
+        let field_name = self.field_name(name, index);
+        self.values.push(value);
+
+        // Uniform buffer bindings are typically required to be 16-byte aligned.
+        let span = (self.values.len() * 4).div_ceil(16) * 16;
+
+        {
+            let mut descriptor = self.descriptor.borrow_mut();
+            descriptor.fields.push(visula_core::UniformFieldDescriptor {
+                name: field_name,
+                size: 4,
+                naga_type: naga::Type {
+                    name: None,
+                    inner: naga::TypeInner::Scalar(naga::Scalar {
+                        kind: naga::ScalarKind::Float,
+                        width: 4,
+                    }),
+                },
+            });
+            descriptor.struct_span = span as u32;
+        }
+
+        let mut padded = self.values.clone();
+        padded.resize(span / 4, 0.0);
+
+        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("sliders"),
+            contents: bytemuck::cast_slice(&padded),
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+        });
+        let mut inner = self.inner.borrow_mut();
+        inner.bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &inner.bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+        });
+        inner.buffer = buffer;
+        index
+    }
+}
+
+#[pyclass(unsendable)]
 pub struct PySlider {
     #[pyo3(get, set)]
     pub name: String,
-    #[pyo3(get, set)]
     pub value: f32,
     #[pyo3(get, set)]
     pub minimum: f32,
@@ -166,18 +422,79 @@ pub struct PySlider {
     pub maximum: f32,
     #[pyo3(get, set)]
     pub step: f32,
+    index: usize,
+    inner: Rc<RefCell<UniformBufferInner>>,
+    descriptor: Rc<RefCell<visula_core::UniformDescriptor>>,
+    queue: wgpu::Queue,
+}
+
+impl PySlider {
+    pub fn write_value(&self) {
+        let inner = self.inner.borrow();
+        self.queue.write_buffer(
+            &inner.buffer,
+            (self.index * 4) as u64,
+            bytemuck::bytes_of(&self.value),
+        );
+    }
 }
 
 #[pymethods]
 impl PySlider {
     #[new]
-    fn new(name: &str, value: f32, minimum: f32, maximum: f32, step: f32) -> Self {
-        Self {
+    #[pyo3(signature = (pyapplication, name, value=0.0, minimum=0.0, maximum=1.0, step=0.0))]
+    fn new(
+        pyapplication: &Bound<PyApplication>,
+        name: &str,
+        value: f32,
+        minimum: f32,
+        maximum: f32,
+        step: f32,
+    ) -> PyResult<Self> {
+        let mut app_mut = pyapplication.borrow_mut();
+        let app_mut = &mut *app_mut;
+        let Some(ref application) = app_mut.application else {
+            return Err(PyRuntimeError::new_err("Application not yet initialized"));
+        };
+        let bank = app_mut
+            .slider_bank
+            .get_or_insert_with(|| SliderBank::new(&application.device));
+        let index = bank.add(&application.device, name, value);
+
+        Ok(Self {
             name: name.to_owned(),
             value,
             minimum,
             maximum,
             step,
+            index,
+            inner: bank.inner.clone(),
+            descriptor: bank.descriptor.clone(),
+            queue: application.queue.clone(),
+        })
+    }
+
+    #[getter]
+    fn get_value(&self) -> f32 {
+        self.value
+    }
+
+    #[setter]
+    fn set_value(&mut self, value: f32) {
+        self.value = value;
+        self.write_value();
+    }
+
+    fn expression(&self) -> PyExpression {
+        let inner = self.inner.borrow();
+        PyExpression {
+            inner: Expression::UniformField(UniformField {
+                field_index: self.index,
+                bind_group_layout: inner.bind_group_layout.clone(),
+                buffer_handle: inner.handle,
+                inner: self.inner.clone(),
+                descriptor: self.descriptor.clone(),
+            }),
         }
     }
 }
@@ -317,12 +634,12 @@ impl PyUniformBuffer {
             });
         }
 
-        let descriptor = Rc::new(visula_core::UniformDescriptor {
+        let descriptor = Rc::new(RefCell::new(visula_core::UniformDescriptor {
             struct_name: self.name.clone(),
             variable_name: self.name.to_lowercase(),
             struct_span: self.size as u32,
             fields: descriptor_fields,
-        });
+        }));
 
         Ok(PyExpression {
             inner: Expression::UniformField(UniformField {
@@ -396,9 +713,42 @@ impl PyInstanceBuffer {
 }
 
 #[pyfunction]
+#[pyo3(signature = (value, name="viridis"))]
+fn colormap(value: &PyExpression, name: &str) -> PyResult<PyExpression> {
+    let map = match name.to_lowercase().as_str() {
+        "viridis" => visula_core::Colormap::Viridis,
+        "plasma" => visula_core::Colormap::Plasma,
+        "magma" => visula_core::Colormap::Magma,
+        "inferno" => visula_core::Colormap::Inferno,
+        _ => {
+            return Err(PyRuntimeError::new_err(format!(
+                "Unknown colormap '{name}', expected one of: viridis, plasma, magma, inferno"
+            )))
+        }
+    };
+    Ok(PyExpression {
+        inner: visula_core::colormap(&value.inner, map),
+    })
+}
+
+#[pyfunction]
+fn vec2(x: &PyExpression, y: &PyExpression) -> PyExpression {
+    PyExpression {
+        inner: visula_core::vec2(&x.inner, &y.inner),
+    }
+}
+
+#[pyfunction]
 fn vec3(x: &PyExpression, y: &PyExpression, z: &PyExpression) -> PyExpression {
     PyExpression {
         inner: visula_core::vec3(&x.inner, &y.inner, &z.inner),
+    }
+}
+
+#[pyfunction]
+fn vec4(x: &PyExpression, y: &PyExpression, z: &PyExpression, w: &PyExpression) -> PyExpression {
+    PyExpression {
+        inner: visula_core::vec4(&x.inner, &y.inner, &z.inner, &w.inner),
     }
 }
 
@@ -507,12 +857,25 @@ fn convert(py: Python, pyapplication: &PyApplication, obj: Py<PyAny>) -> PyResul
     )))
 }
 
+fn convert_or(
+    py: Python,
+    pyapplication: &PyApplication,
+    obj: &Option<Py<PyAny>>,
+    default: Expression,
+) -> PyResult<Expression> {
+    match obj {
+        Some(obj) => Ok(convert(py, pyapplication, obj.clone_ref(py))?.inner),
+        None => Ok(default),
+    }
+}
+
 #[pyfunction]
+#[pyo3(signature = (py_application, py_renderables, update=None, controls=Vec::new()))]
 fn show(
     py: Python,
     py_application: &Bound<PyApplication>,
     py_renderables: Vec<Py<PyAny>>,
-    update: Py<PyFunction>,
+    update: Option<Py<PyFunction>>,
     controls: Vec<Py<PySlider>>,
 ) -> PyResult<()> {
     {
@@ -524,38 +887,54 @@ fn show(
         let renderables: Vec<Box<dyn Renderable>> = py_renderables
             .iter()
             .map(|renderable| -> PyResult<Box<dyn Renderable>> {
-                if let Ok(pysphere) = renderable.extract::<PySphereDelegate>(py) {
+                if let Ok(pysphere) = renderable.extract::<PySpheres>(py) {
                     return Ok(Box::new(
                         Spheres::new(
                             &application.rendering_descriptor(),
                             &SphereGeometry {
                                 position: convert(py, &py_application_mut, pysphere.position)?
                                     .inner,
-                                radius: convert(py, &py_application_mut, pysphere.radius)?.inner,
-                                color: convert(py, &py_application_mut, pysphere.color)?.inner,
+                                radius: convert_or(
+                                    py,
+                                    &py_application_mut,
+                                    &pysphere.radius,
+                                    1.0.into(),
+                                )?,
+                                color: convert_or(
+                                    py,
+                                    &py_application_mut,
+                                    &pysphere.color,
+                                    Vec3::ONE.into(),
+                                )?,
                             },
-                            &SphereMaterial {
-                                color: Expression::InputColor,
-                            },
+                            &SphereMaterial::default(),
                         )
                         .map_err(|e| {
                             PyRuntimeError::new_err(format!("Failed to create spheres: {e}"))
                         })?,
                     ));
                 }
-                if let Ok(pylines) = renderable.extract::<PyLineDelegate>(py) {
+                if let Ok(pylines) = renderable.extract::<PyLines>(py) {
                     return Ok(Box::new(
                         Lines::new(
                             &application.rendering_descriptor(),
                             &LineGeometry {
                                 start: convert(py, &py_application_mut, pylines.start)?.inner,
                                 end: convert(py, &py_application_mut, pylines.end)?.inner,
-                                width: convert(py, &py_application_mut, pylines.width)?.inner,
-                                color: convert(py, &py_application_mut, pylines.color)?.inner,
+                                width: convert_or(
+                                    py,
+                                    &py_application_mut,
+                                    &pylines.width,
+                                    1.0.into(),
+                                )?,
+                                color: convert_or(
+                                    py,
+                                    &py_application_mut,
+                                    &pylines.color,
+                                    Vec3::ONE.into(),
+                                )?,
                             },
-                            &LineMaterial {
-                                color: Expression::InputColor,
-                            },
+                            &LineMaterial::default(),
                         )
                         .map_err(|e| {
                             PyRuntimeError::new_err(format!("Failed to create lines: {e}"))
@@ -569,7 +948,7 @@ fn show(
             .collect::<PyResult<Vec<_>>>()?;
 
         py_application_mut.renderables = renderables;
-        py_application_mut.update = Some(update);
+        py_application_mut.update = update;
         py_application_mut.controls = controls;
     }
 
@@ -581,9 +960,12 @@ fn show(
 fn visula_pyo3(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(show, m)?)?;
     m.add_function(wrap_pyfunction!(convert, m)?)?;
+    m.add_function(wrap_pyfunction!(colormap, m)?)?;
+    m.add_function(wrap_pyfunction!(vec2, m)?)?;
     m.add_function(wrap_pyfunction!(vec3, m)?)?;
-    m.add_class::<PySphereDelegate>()?;
-    m.add_class::<PyLineDelegate>()?;
+    m.add_function(wrap_pyfunction!(vec4, m)?)?;
+    m.add_class::<PySpheres>()?;
+    m.add_class::<PyLines>()?;
     m.add_class::<PyExpression>()?;
     m.add_class::<PyApplication>()?;
     m.add_class::<PyEventLoop>()?;

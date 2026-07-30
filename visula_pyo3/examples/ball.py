@@ -1,8 +1,7 @@
 import numpy as np
 from itertools import combinations
-from visula import LineDelegate, SphereDelegate, Figure
+from visula import Lines, Spheres, Figure
 import visula as vl
-import numpy as np
 
 
 fig = Figure()
@@ -57,22 +56,16 @@ for face in faces:
 
 edges = np.array(list(edge for edge in edges))
 
-spheres = SphereDelegate(
+spheres = Spheres(
     position=vertices,
     radius=0.2,
     color=vl.vec3(1.0, 1.0, 0.0),
 )
 
-lines = LineDelegate(
+lines = Lines(
     start=vertices[edges[:, 0]],
     end=vertices[edges[:, 1]],
     width=0.1,
-    color=vl.vec3(1.0, 1.0, 1.0),
 )
 
-
-def update():
-    pass
-
-
-fig.show([spheres, lines], update=update)
+fig.show([spheres, lines])
