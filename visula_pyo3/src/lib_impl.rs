@@ -371,7 +371,7 @@ impl SliderBank {
         self.values.push(value);
 
         // Uniform buffer bindings are typically required to be 16-byte aligned.
-        let span = ((self.values.len() * 4 + 15) / 16) * 16;
+        let span = (self.values.len() * 4).div_ceil(16) * 16;
 
         {
             let mut descriptor = self.descriptor.borrow_mut();
