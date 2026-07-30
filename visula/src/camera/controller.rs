@@ -233,9 +233,13 @@ impl CameraController {
                 self.window_size = *size;
             }
             WindowEvent::ModifiersChanged(state) => {
-                self.control_pressed = state
-                    .state()
-                    .contains(winit::keyboard::ModifiersState::CONTROL);
+                let modifiers = state.state();
+                self.control_pressed = modifiers.contains(winit::keyboard::ModifiersState::CONTROL);
+                let shift_pressed = modifiers.contains(winit::keyboard::ModifiersState::SHIFT);
+                if self.shift_pressed && !shift_pressed {
+                    self.first_intersection = None;
+                }
+                self.shift_pressed = shift_pressed;
             }
             WindowEvent::MouseWheel { delta, .. } if self.zoom_enabled => {
                 let diff = match delta {
@@ -301,6 +305,7 @@ impl CameraController {
                         self.left_pressed = false;
                         response.captured_event = self.state == State::Moving;
                         self.state = State::Released;
+                        self.first_intersection = None;
                     }
                 },
                 MouseButton::Right => match state {
