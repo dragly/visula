@@ -19,9 +19,9 @@ winit = { version = "0.30" }
 egui = { version = "0.34" }
 egui-wgpu = { version = "0.34", features = ["winit"] }
 egui-winit = { version = "0.34", default-features = false }
-pyo3 = { version = "0.27", features = ["py-clone", "extension-module"] }
-pyo3-build-config = { version = "0.27", features = ["resolve-config"] }
-numpy = { version = "0.27", features = ["nalgebra"] }
+pyo3 = { version = "0.29", features = ["py-clone", "extension-module"] }
+pyo3-build-config = { version = "0.29", features = ["resolve-config"] }
+numpy = { version = "0.29", features = ["nalgebra"] }
 pollster = "0.3.0"
 itertools = "0.10.5"
 env_logger = "0.11"
