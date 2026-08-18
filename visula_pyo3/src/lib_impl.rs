@@ -45,7 +45,7 @@ struct FloatData {
     position: f32,
 }
 
-#[pyclass(name = "Spheres", unsendable)]
+#[pyclass(name = "Spheres", unsendable, from_py_object)]
 #[derive(Clone)]
 struct PySpheres {
     pub position: Py<PyAny>,
@@ -66,7 +66,7 @@ impl PySpheres {
     }
 }
 
-#[pyclass(name = "Lines", unsendable)]
+#[pyclass(name = "Lines", unsendable, from_py_object)]
 #[derive(Clone)]
 struct PyLines {
     pub start: Py<PyAny>,
@@ -94,7 +94,7 @@ impl PyLines {
     }
 }
 
-#[pyclass(name = "Expression", unsendable)]
+#[pyclass(name = "Expression", unsendable, from_py_object)]
 #[derive(Clone)]
 struct PyExpression {
     inner: Expression,
@@ -499,7 +499,7 @@ impl PySlider {
     }
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 struct PyUniformField {
     name: String,

@@ -27,10 +27,10 @@ pub fn delegate(input: TokenStream) -> TokenStream {
 
                         pyo3_fields.push(quote! {
                             #[pyo3(get, set)]
-                            pub #ident : ::pyo3::PyObject,
+                            pub #ident : ::pyo3::Py<::pyo3::PyAny>,
                         });
                         pyo3_attributes.push(quote! {
-                            #ident : ::pyo3::PyObject,
+                            #ident : ::pyo3::Py<::pyo3::PyAny>,
                         });
                         pyo3_field_names.push(quote! {
                             #ident,
@@ -40,10 +40,11 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                 _ => unimplemented!(),
             };
             let pyclass_struct_name = format_ident!("Py{}", struct_ident);
-            let pyclass_attribute: TokenStream2 =
-                format!("#[::pyo3::pyclass(name = \"{struct_ident}\", unsendable)]")
-                    .parse()
-                    .unwrap();
+            let pyclass_attribute: TokenStream2 = format!(
+                "#[::pyo3::pyclass(name = \"{struct_ident}\", unsendable, skip_from_py_object)]"
+            )
+            .parse()
+            .unwrap();
             quote! {
                 #[cfg(not(target_arch = "wasm32"))]
                 #pyclass_attribute
