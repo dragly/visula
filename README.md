@@ -1,20 +1,22 @@
 # Visula
 
-Turn data streams from simulations and recordings into interactive 3D visualizations you can share on the web.
+Visula is a visualization library based on [wgpu](https://wgpu.rs).
+It was made to make it easy to express data visualizations.
+I am using it for basic visualizations,
+interactive presentations, demos, applications and games.
 
-Visula is a scientific visualization library built on [wgpu](https://wgpu.rs).
-Applications can run natively in Linux, Windows or macOS, or target the web with WASM and WebGPU.
+The library is designed around my own needs, but has been shared in case
+others find it useful too.
 
-Visula is built around my own visualization needs and is shared in case it's useful to others. It's a work in progress — APIs may change.
+Visula works natively in Linux, Windows or macOS,
+or can be used to target the web with WASM and WebGPU.
 
 ![Showcase](screenshots/showcase.png)
 
 ## Python example
 
-The idea behind Visula is to make it easy to create data-driven visualizations.
+The idea is to make it easy to create data-driven visualizations.
 Primitives like spheres, lines or triangle meshes can be defined directly from data.
-This includes their position and color.
-
 InstanceBuffers can be used to define multiple instances of a given primitive:
 
 
@@ -38,7 +40,6 @@ Figure().show([spheres])
 Here, `position`, `radius` and `color` are all expressions.
 Visula compiles these into the shader and evaluates them per instance on the GPU.
 This means that there is only one array `t` uploaded to the GPU.
-The `colormap` function maps a value in [0, 1] to a color — `viridis`, `plasma`, `magma` and `inferno` are available — and it too runs in the shader.
 
 ![Python spheres](screenshots/python_spheres.png)
 
@@ -68,11 +69,7 @@ fn main() {
 }
 ```
 
-This is [visula/examples/spheres.rs](visula/examples/spheres.rs).
-For structured per-instance data, derive `Instance` on a struct and each field becomes an expression; see [visula/examples/molecular_dynamics.rs](visula/examples/molecular_dynamics.rs).
-For simulations that update every frame, implement the `Simulation` trait instead of returning renderables; see [visula/examples/showcase.rs](visula/examples/showcase.rs).
 
-![Molecular dynamics](screenshots/molecular_dynamics.png)
 
 ## Run the examples
 
@@ -91,7 +88,11 @@ uv run visula_pyo3/examples/controls.py
 ./run-wasm.sh
 ```
 
-See `visula/examples/` and `visula_pyo3/examples/` for the full set.
+Below is a screenshot of the molecular dynamics example:
+
+![Molecular dynamics](screenshots/molecular_dynamics.png)
+
+See `visula/examples/` and `visula_pyo3/examples/` for more examples.
 
 ## License
 
