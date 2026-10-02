@@ -7,7 +7,7 @@ use winit::window::{Window, WindowId};
 use winit::{
     dpi::PhysicalPosition,
     event::{
-        DeviceEvent, ElementState, MouseButton,
+        ElementState, MouseButton,
         MouseScrollDelta::{LineDelta, PixelDelta},
         TouchPhase, WindowEvent,
     },
@@ -59,6 +59,7 @@ pub struct CameraController {
     pub target_transform: CameraTransform,
     pub smoothing: f32,
     last_screen_position: Option<PhysicalPosition<f64>>,
+    last_cursor_position: Option<PhysicalPosition<f64>>,
     window_size: PhysicalSize<u32>,
     first_intersection: Option<Vec3>,
     pub drag_plane: DragPlane,
@@ -114,6 +115,7 @@ impl CameraController {
             previous_time: Instant::now(),
             smoothing: 0.8,
             last_screen_position: None,
+            last_cursor_position: None,
             window_size: window.inner_size(),
             first_intersection: None,
             drag_plane: DragPlane::Camera,
@@ -156,60 +158,66 @@ impl CameraController {
         self.current_transform.center = center;
     }
 
-    pub fn device_event(&mut self, event: &DeviceEvent) -> CameraControllerResponse {
-        let mut response = CameraControllerResponse {
-            needs_redraw: false,
-            captured_event: false,
-        };
-        if !self.enabled {
-            return response;
-        }
-        if self.shift_pressed {
-            return response;
-        }
+    fn rotate(&mut self, position_diff: Vec2) {
         let up = self.target_transform.up.normalize();
         let forward = self.target_transform.forward.normalize();
         let right = Vec3::cross(forward, up).normalize();
-        if let DeviceEvent::MouseMotion { delta, .. } = event {
-            let position_diff = Vec2 {
-                x: delta.0 as f32,
-                y: delta.1 as f32,
-            };
-            if self.left_pressed {
-                if self.control_pressed {
-                    let offset_up = -position_diff.y;
-                    let offset_right = position_diff.x;
-                    let offset = offset_up + offset_right;
-                    let rotation = Quat::from_axis_angle(forward, self.roll_speed * offset);
-                    self.target_transform.up = (rotation * self.target_transform.up).normalize();
-                    self.target_transform.true_up =
-                        (rotation * self.target_transform.true_up).normalize();
-                    self.target_transform.forward =
-                        (rotation * self.target_transform.forward).normalize();
-                } else {
-                    if (position_diff.x + position_diff.y).abs() < 0.000001 {
-                        return CameraControllerResponse {
-                            needs_redraw: false,
-                            captured_event: false,
-                        };
-                    }
-                    let rotation_x = Quat::from_axis_angle(
-                        self.target_transform.true_up,
-                        -self.rotational_speed * position_diff.x,
-                    );
-                    let rotation_y =
-                        Quat::from_axis_angle(right, -self.rotational_speed * position_diff.y);
-                    self.target_transform.forward =
-                        (rotation_x * rotation_y * self.target_transform.forward).normalize();
-                    self.target_transform.up =
-                        (rotation_x * rotation_y * self.target_transform.up).normalize();
-                }
-                response.needs_redraw = true;
-                response.captured_event = true;
-                self.state = State::Moving;
+        if self.control_pressed {
+            let offset_up = -position_diff.y;
+            let offset_right = position_diff.x;
+            let offset = offset_up + offset_right;
+            let rotation = Quat::from_axis_angle(forward, self.roll_speed * offset);
+            self.target_transform.up = (rotation * self.target_transform.up).normalize();
+            self.target_transform.true_up = (rotation * self.target_transform.true_up).normalize();
+            self.target_transform.forward = (rotation * self.target_transform.forward).normalize();
+        } else {
+            let rotation_x = Quat::from_axis_angle(
+                self.target_transform.true_up,
+                -self.rotational_speed * position_diff.x,
+            );
+            let rotation_y = Quat::from_axis_angle(right, -self.rotational_speed * position_diff.y);
+            self.target_transform.forward =
+                (rotation_x * rotation_y * self.target_transform.forward).normalize();
+            self.target_transform.up =
+                (rotation_x * rotation_y * self.target_transform.up).normalize();
+        }
+    }
+
+    fn pan(&mut self, position: PhysicalPosition<f64>) {
+        let ndc_ray = Vec4::new(
+            2.0 * position.x as f32 / self.window_size.width as f32 - 1.0,
+            1.0 - 2.0 * position.y as f32 / self.window_size.height as f32,
+            0.0,
+            1.0,
+        );
+        let mut camera_ray = self
+            .projection_matrix(self.window_size.width as f32 / self.window_size.height as f32)
+            .inverse()
+            * ndc_ray;
+        camera_ray.w = 0.0;
+        let world_ray = (self.view_matrix().inverse() * camera_ray)
+            .xyz()
+            .normalize();
+        let camera_position = self.target_transform.position();
+        let camera_center = self.target_transform.center;
+        let camera_forward = self.target_transform.forward;
+        let t = match self.drag_plane {
+            DragPlane::Z => -camera_position.y / world_ray.y,
+            DragPlane::Camera => {
+                (camera_center - camera_position).dot(camera_forward)
+                    / camera_forward.dot(world_ray)
+            }
+        };
+        let intersection = camera_position + t * world_ray;
+        match self.first_intersection {
+            None => {
+                self.first_intersection = Some(intersection);
+            }
+            Some(first_intersection) => {
+                self.target_transform.center =
+                    first_intersection - intersection + self.target_transform.center;
             }
         }
-        response
     }
 
     pub fn window_event(
@@ -255,43 +263,21 @@ impl CameraController {
                 response.needs_redraw = true;
                 response.captured_event = true;
             }
-            WindowEvent::CursorMoved { position, .. }
-                if (self.right_pressed || (self.left_pressed && self.shift_pressed)) =>
-            {
-                let ndc_ray = Vec4::new(
-                    2.0 * position.x as f32 / self.window_size.width as f32 - 1.0,
-                    1.0 - 2.0 * position.y as f32 / self.window_size.height as f32,
-                    0.0,
-                    1.0,
-                );
-                let mut camera_ray = self
-                    .projection_matrix(
-                        self.window_size.width as f32 / self.window_size.height as f32,
-                    )
-                    .inverse()
-                    * ndc_ray;
-                camera_ray.w = 0.0;
-                let world_ray = (self.view_matrix().inverse() * camera_ray)
-                    .xyz()
-                    .normalize();
-                let camera_position = self.target_transform.position();
-                let camera_center = self.target_transform.center;
-                let camera_forward = self.target_transform.forward;
-                let t = match self.drag_plane {
-                    DragPlane::Z => -camera_position.y / world_ray.y,
-                    DragPlane::Camera => {
-                        (camera_center - camera_position).dot(camera_forward)
-                            / camera_forward.dot(world_ray)
-                    }
-                };
-                let intersection = camera_position + t * world_ray;
-                match self.first_intersection {
-                    None => {
-                        self.first_intersection = Some(intersection);
-                    }
-                    Some(first_intersection) => {
-                        self.target_transform.center =
-                            first_intersection - intersection + self.target_transform.center;
+            WindowEvent::CursorMoved { position, .. } => {
+                let previous_position = self.last_cursor_position.replace(*position);
+                if self.right_pressed || (self.left_pressed && self.shift_pressed) {
+                    self.pan(*position);
+                } else if self.left_pressed {
+                    if let Some(previous_position) = previous_position {
+                        let position_diff = Vec2 {
+                            x: (position.x - previous_position.x) as f32,
+                            y: (position.y - previous_position.y) as f32,
+                        };
+                        if position_diff != Vec2::ZERO {
+                            self.rotate(position_diff);
+                            response.needs_redraw = true;
+                            self.state = State::Moving;
+                        }
                     }
                 }
             }
@@ -299,6 +285,7 @@ impl CameraController {
                 MouseButton::Left => match state {
                     ElementState::Pressed => {
                         self.left_pressed = true;
+                        self.last_cursor_position = None;
                         self.state = State::PressedWaiting;
                     }
                     ElementState::Released => {
