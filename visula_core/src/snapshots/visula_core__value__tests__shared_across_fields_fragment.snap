@@ -1,0 +1,20 @@
+---
+source: visula_core/src/value.rs
+expression: wgsl
+---
+struct Fields {
+    a: vec3<f32>,
+    b: f32,
+}
+
+@fragment 
+fn fs_main(@location(0) @interpolate(flat) value: f32) -> @location(0) vec4<f32> {
+    var fields: Fields;
+
+    let output: Fields = fields;
+    let phase: f32 = (value * 2f);
+    fields.a = vec3<f32>(cos(phase), sin(phase), 0f);
+    fields.b = phase;
+    let _e14: vec3<f32> = fields.a;
+    return vec4<f32>(_e14, 1f);
+}

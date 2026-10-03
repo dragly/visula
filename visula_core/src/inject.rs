@@ -21,6 +21,7 @@ pub fn inject(
     variable_name: &str,
     fields: &[Expression],
 ) -> Result<(), ShaderError> {
+    binding_builder.shared.clear();
     let variable = entry_point!(module, binding_builder.shader_stage)
         .function
         .local_variables
@@ -95,6 +96,7 @@ pub fn inject_before_return(
     variable_name: &str,
     fields: &[Expression],
 ) -> Result<(), ShaderError> {
+    binding_builder.shared.clear();
     let variable = entry_point!(module, binding_builder.shader_stage)
         .function
         .local_variables
