@@ -1,6 +1,7 @@
 use std::{
     fmt::{Error, Formatter},
     ops::{Add, Deref, Div, Mul, Neg, Rem, Sub},
+    rc::Rc,
 };
 
 use naga::{GlobalVariable, ResourceBinding, Span};
@@ -54,6 +55,13 @@ pub enum Expression {
     Lit(ExpressionInner),
     ToonLit(ExpressionInner),
     ViewDirection,
+    Shared(Rc<SharedInner>),
+}
+
+pub struct SharedInner {
+    id: uuid::Uuid,
+    value: Expression,
+    name: Option<String>,
 }
 
 fn math(function: naga::MathFunction, arguments: Vec<ExpressionInner>) -> Expression {
@@ -177,6 +185,26 @@ impl Expression {
 
     pub fn toon_lit(&self) -> Expression {
         Expression::ToonLit(self.into())
+    }
+
+    /// Evaluates this expression once per shader stage, however often it is used.
+    ///
+    /// The same node used in both a vertex and a fragment expression is evaluated
+    /// once in each stage.
+    pub fn shared(&self) -> Expression {
+        Expression::Shared(Rc::new(SharedInner {
+            id: uuid::Uuid::new_v4(),
+            value: self.clone(),
+            name: None,
+        }))
+    }
+
+    pub fn shared_with_name(&self, name: &str) -> Expression {
+        Expression::Shared(Rc::new(SharedInner {
+            id: uuid::Uuid::new_v4(),
+            value: self.clone(),
+            name: Some(name.to_string()),
+        }))
     }
 }
 
@@ -719,6 +747,28 @@ impl Expression {
                     });
                 result
             }
+            Expression::Shared(shared) => {
+                if let Some(handle) = binding_builder.shared.get(&shared.id) {
+                    return *handle;
+                }
+                let handle = shared.value.setup(module, binding_builder);
+                let function = &mut module.entry_points[binding_builder.entry_point_index].function;
+                let expression = &function.expressions[handle];
+                let already_available = expression.needs_pre_emit()
+                    || matches!(expression, naga::Expression::CallResult(_))
+                    || function.named_expressions.contains_key(&handle);
+                if !already_available {
+                    let name = shared.name.as_deref().unwrap_or("_visula_shared");
+                    function.named_expressions.insert(handle, name.to_string());
+                    binding_builder
+                        .pending_statements
+                        .push(naga::Statement::Emit(naga::Range::new_from_bounds(
+                            handle, handle,
+                        )));
+                }
+                binding_builder.shared.insert(shared.id, handle);
+                handle
+            }
         }
     }
 }
@@ -786,6 +836,11 @@ impl std::fmt::Debug for Expression {
             }
             Expression::ViewDirection => {
                 write!(fmt, "ViewDirection")?;
+            }
+            Expression::Shared(shared) => {
+                write!(fmt, "Shared {{ value: ")?;
+                shared.value.fmt(fmt)?;
+                write!(fmt, "}}")?;
             }
         }
         Ok(())
@@ -1324,6 +1379,89 @@ mod tests {
         let device = device();
         let settings = UniformBuffer::<Settings>::new(&device).uniform();
         let wgsl = lower_to_wgsl(ShaderStage::Vertex, &[("f32", settings.time)]);
+        insta::assert_snapshot!(wgsl);
+    }
+
+    #[test]
+    fn shared_sub_expression() {
+        let device = device();
+        let t = InstanceBuffer::<f32>::new(&device).instance();
+        let s = (&t * 2.0).shared();
+        let wgsl = lower_to_wgsl(
+            ShaderStage::Vertex,
+            &[("vec3<f32>", vec3(s.cos(), s.sin(), &s))],
+        );
+        assert_eq!(wgsl.matches(" * ").count(), 1);
+        insta::assert_snapshot!(wgsl);
+    }
+
+    #[test]
+    fn unshared_sub_expression() {
+        let device = device();
+        let t = InstanceBuffer::<f32>::new(&device).instance();
+        let s = &t * 2.0;
+        let wgsl = lower_to_wgsl(
+            ShaderStage::Vertex,
+            &[("vec3<f32>", vec3(s.cos(), s.sin(), &s))],
+        );
+        assert_eq!(wgsl.matches(" * ").count(), 3);
+        insta::assert_snapshot!(wgsl);
+    }
+
+    #[test]
+    fn shared_across_fields() {
+        let device = device();
+        let t = InstanceBuffer::<f32>::new(&device).instance();
+        let phase = (&t * 2.0).shared_with_name("phase");
+        let wgsl = lower_to_wgsl(
+            ShaderStage::Vertex,
+            &[("f32", phase.cos()), ("f32", phase.sin())],
+        );
+        assert_eq!(wgsl.matches(" * ").count(), 1);
+        insta::assert_snapshot!(wgsl);
+    }
+
+    #[test]
+    fn shared_across_fields_fragment() {
+        let device = device();
+        let t = InstanceBuffer::<f32>::new(&device).instance();
+        let phase = (&t * 2.0).shared_with_name("phase");
+        let wgsl = lower_to_wgsl(
+            ShaderStage::Fragment,
+            &[
+                ("vec3<f32>", vec3(phase.cos(), phase.sin(), 0.0)),
+                ("f32", phase.clone()),
+            ],
+        );
+        assert_eq!(wgsl.matches(" * ").count(), 1);
+        insta::assert_snapshot!(wgsl);
+    }
+
+    #[test]
+    fn nested_shared() {
+        let device = device();
+        let t = InstanceBuffer::<f32>::new(&device).instance();
+        let a = (&t * 2.0).shared();
+        let b = (a.cos() + &a).shared();
+        let wgsl = lower_to_wgsl(
+            ShaderStage::Vertex,
+            &[("vec3<f32>", vec3(b.sin(), b.cos(), &a))],
+        );
+        assert_eq!(wgsl.matches(" * ").count(), 1);
+        assert_eq!(wgsl.matches(" + ").count(), 1);
+        insta::assert_snapshot!(wgsl);
+    }
+
+    #[test]
+    fn shared_without_new_let() {
+        let device = device();
+        let t = InstanceBuffer::<f32>::new(&device).instance();
+        let s = (&t * 2.0).shared();
+        let wgsl = lower_to_wgsl(
+            ShaderStage::Vertex,
+            &[("vec3<f32>", vec3(t.shared(), &s, s.shared()))],
+        );
+        assert_eq!(wgsl.matches("let ").count(), 2);
         insta::assert_snapshot!(wgsl);
     }
 }

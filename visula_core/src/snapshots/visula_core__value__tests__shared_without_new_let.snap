@@ -1,0 +1,17 @@
+---
+source: visula_core/src/value.rs
+expression: wgsl
+---
+struct Fields {
+    a: vec3<f32>,
+}
+
+@vertex 
+fn vs_main(@location(0) value: f32) -> @builtin(position) vec4<f32> {
+    var fields: Fields;
+
+    let _visula_shared: f32 = (value * 2f);
+    fields.a = vec3<f32>(value, _visula_shared, _visula_shared);
+    let output: Fields = fields;
+    return vec4(0f);
+}
