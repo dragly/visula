@@ -17,3 +17,6 @@ thiserror = {workspace = true}
 
 [dev-dependencies]
 env_logger = {workspace = true}
+insta = "1"
+visula_derive = {path = "../visula_derive"}
+wgpu = {workspace = true, features = ["noop"]}

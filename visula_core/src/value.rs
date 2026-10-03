@@ -1284,3 +1284,46 @@ pub fn smoothstep(
 pub fn step(edge: impl Into<ExpressionInner>, value: impl Into<ExpressionInner>) -> Expression {
     math(naga::MathFunction::Step, vec![edge.into(), value.into()])
 }
+
+#[cfg(test)]
+mod tests {
+    use bytemuck::{Pod, Zeroable};
+    use naga::ShaderStage;
+    use visula_derive::Uniform;
+
+    use super::*;
+    use crate::test_util::{device, lower_to_wgsl};
+    use crate::{InstanceBuffer, UniformBuffer};
+
+    #[repr(C)]
+    #[derive(Clone, Copy, Pod, Zeroable, Uniform)]
+    struct Settings {
+        time: f32,
+        scale: f32,
+    }
+
+    #[test]
+    fn literal() {
+        let wgsl = lower_to_wgsl(ShaderStage::Vertex, &[("f32", 1.5.into())]);
+        insta::assert_snapshot!(wgsl);
+    }
+
+    #[test]
+    fn instance_field_vec3() {
+        let device = device();
+        let t = InstanceBuffer::<f32>::new(&device).instance();
+        let wgsl = lower_to_wgsl(
+            ShaderStage::Vertex,
+            &[("vec3<f32>", vec3(t.cos(), t.sin(), &t))],
+        );
+        insta::assert_snapshot!(wgsl);
+    }
+
+    #[test]
+    fn uniform_field() {
+        let device = device();
+        let settings = UniformBuffer::<Settings>::new(&device).uniform();
+        let wgsl = lower_to_wgsl(ShaderStage::Vertex, &[("f32", settings.time)]);
+        insta::assert_snapshot!(wgsl);
+    }
+}

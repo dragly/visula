@@ -17,6 +17,11 @@ pub mod vertex_attr_format;
 pub mod delegate;
 pub mod error;
 
+#[cfg(test)]
+extern crate self as visula_core;
+#[cfg(test)]
+pub mod test_util;
+
 pub use binding_builder::*;
 pub use colormap::*;
 pub use delegate::*;

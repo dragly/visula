@@ -1,0 +1,24 @@
+---
+source: visula_core/src/value.rs
+expression: wgsl
+---
+struct Fields {
+    a: f32,
+}
+
+struct SettingsUniform {
+    time: f32,
+    scale: f32,
+}
+
+@group(1) @binding(0) 
+var<uniform> settings: SettingsUniform;
+
+@vertex 
+fn vs_main() -> @builtin(position) vec4<f32> {
+    var fields: Fields;
+
+    fields.a = settings.time;
+    let output: Fields = fields;
+    return vec4(0f);
+}
