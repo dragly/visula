@@ -308,11 +308,12 @@ fn generate(count: usize) -> Vec<Particle> {
     current_particles
 }
 
-#[repr(C)]
+#[repr(C, align(16))]
 #[derive(Copy, Clone, Debug, Pod, Uniform, Zeroable)]
 struct Settings {
     radius: f32,
     width: f32,
+    _padding: [f32; 2],
 }
 
 struct Simulation {
@@ -333,6 +334,7 @@ impl Simulation {
         let settings_data = Settings {
             radius: 2.0,
             width: 0.3,
+            _padding: [0.0; 2],
         };
         let settings_buffer = UniformBuffer::new_with_init(&application.device, &settings_data);
         let settings = settings_buffer.uniform();
