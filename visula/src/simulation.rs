@@ -16,6 +16,7 @@ pub struct RenderData<'a> {
     pub encoder: &'a mut wgpu::CommandEncoder,
     pub camera: &'a Camera,
     pub light: &'a DirectionalLight,
+    pub sample_count: u32,
 }
 
 pub struct ShadowRenderData<'a> {

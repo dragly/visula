@@ -20,7 +20,7 @@ use wgpu::{
     GlBackendOptions, InstanceDescriptor, SurfaceTexture, TextureFormat, TextureView,
     TextureViewDescriptor,
 };
-use winit::{event::WindowEvent, window::Window};
+use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
 #[derive(Debug)]
 pub struct Application {
@@ -158,11 +158,20 @@ impl Application {
         let mut config = surface
             .get_default_config(&adapter, size.width.max(640), size.height.max(480))
             .ok_or(crate::error::Error::NoSurfaceConfig)?;
-        config.present_mode = wgpu::PresentMode::Fifo;
+        #[cfg(target_arch = "wasm32")]
+        {
+            config.present_mode = wgpu::PresentMode::AutoVsync;
+            config.alpha_mode = wgpu::CompositeAlphaMode::Opaque;
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            config.present_mode = wgpu::PresentMode::Fifo;
+        }
         if surface_supports_copy_src {
             config.usage |= wgpu::TextureUsages::COPY_SRC;
         }
         let surface_view_format = config.format.add_srgb_suffix();
+        #[cfg(not(target_arch = "wasm32"))]
         config.view_formats.push(surface_view_format);
         surface.configure(&device, &config);
 
@@ -325,46 +334,50 @@ impl Application {
         if captured_event {
             return true;
         }
-        match event {
-            WindowEvent::CloseRequested => println!("{}", crude_profiler::report()),
-            WindowEvent::Resized(size) => {
-                let depth_texture = self.device.create_texture(&wgpu::TextureDescriptor {
-                    size: wgpu::Extent3d {
-                        width: size.width,
-                        height: size.height,
-                        depth_or_array_layers: 1,
-                    },
-                    mip_level_count: 1,
-                    sample_count: self.sample_count,
-                    dimension: wgpu::TextureDimension::D2,
-                    format: wgpu::TextureFormat::Depth32Float,
-                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                        | wgpu::TextureUsages::TEXTURE_BINDING,
-                    label: None,
-                    view_formats: &[],
-                });
-                self.depth_texture =
-                    depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
-                self.config.width = size.width;
-                self.config.height = size.height;
-                self.multisampled_framebuffer = Self::create_multisampled_framebuffer(
-                    &self.device,
-                    size.width,
-                    size.height,
-                    self.sample_count,
-                );
-                self.surface.configure(&self.device, &self.config);
-                self.post_processor.resize(
-                    &self.device,
-                    size.width,
-                    size.height,
-                    &self.depth_texture,
-                    &self.camera,
-                );
-            }
-            _ => {}
+        if let WindowEvent::Resized(size) = event {
+            self.resize(*size);
         }
         false
+    }
+
+    pub fn resize(&mut self, size: PhysicalSize<u32>) {
+        if size.width == 0 || size.height == 0 {
+            return;
+        }
+        if size.width == self.config.width && size.height == self.config.height {
+            return;
+        }
+        let depth_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: size.width,
+                height: size.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: self.sample_count,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth32Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            label: None,
+            view_formats: &[],
+        });
+        self.depth_texture = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        self.config.width = size.width;
+        self.config.height = size.height;
+        self.multisampled_framebuffer = Self::create_multisampled_framebuffer(
+            &self.device,
+            size.width,
+            size.height,
+            self.sample_count,
+        );
+        self.surface.configure(&self.device, &self.config);
+        self.post_processor.resize(
+            &self.device,
+            size.width,
+            size.height,
+            &self.depth_texture,
+            &self.camera,
+        );
     }
 
     pub fn update(&mut self) {
@@ -437,7 +450,10 @@ impl Application {
         let mut encoder = self.encoder();
 
         let view = frame.texture.create_view(&TextureViewDescriptor {
+            #[cfg(not(target_arch = "wasm32"))]
             format: Some(self.config.view_formats[0]),
+            #[cfg(target_arch = "wasm32")]
+            format: Some(self.config.format),
             ..wgpu::TextureViewDescriptor::default()
         });
 
@@ -546,6 +562,7 @@ impl Application {
             encoder: &mut encoder,
             camera: &self.camera,
             light: &self.light,
+            sample_count: self.sample_count,
         });
 
         self.post_processor.render_ssao(&mut encoder, &self.queue);

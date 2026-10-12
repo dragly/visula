@@ -122,8 +122,6 @@ fn integrate<F: TwoBodyForce>(
     two_body: F,
     dt: f32,
 ) {
-    let g = crude_profiler::push("integrate");
-    g.replace("position");
     for (out_particle, in_particle) in out_state.iter_mut().zip(in_state.iter()) {
         out_particle.velocity += 0.5 * in_particle.acceleration * dt;
         out_particle.position += out_particle.velocity * dt;
@@ -138,7 +136,6 @@ fn integrate<F: TwoBodyForce>(
 
     let sphere_tree = Rc::new(RefCell::new(SphereTree::Empty));
 
-    g.replace("tree building");
     for particle in &intermediate_state {
         let mut queue: VecDeque<Rc<RefCell<SphereTree>>> = VecDeque::new();
         let mut current_node;
@@ -223,7 +220,6 @@ fn integrate<F: TwoBodyForce>(
     }
 
     let mut queue: VecDeque<Rc<RefCell<SphereTree>>> = VecDeque::new();
-    g.replace("tree iteration");
     for (intermediate_particle, out_particle) in intermediate_state.iter().zip(out_state.iter_mut())
     {
         queue.push_front(sphere_tree.clone());
@@ -256,7 +252,6 @@ fn integrate<F: TwoBodyForce>(
             }
         }
     }
-    g.replace("bounds");
     for (intermediate_particle, out_particle) in intermediate_state.iter().zip(out_state.iter_mut())
     {
         out_particle.acceleration += gravity / out_particle.mass;
@@ -271,12 +266,10 @@ fn integrate<F: TwoBodyForce>(
         let bounds_force = 6.0 * (bounds_force_min + bounds_force_max);
         out_particle.acceleration += bounds_force / out_particle.mass;
 
-        g.replace("damping");
         let damping =
             -intermediate_particle.velocity * intermediate_particle.velocity.magnitude2() / 100.0;
         out_particle.acceleration += damping / out_particle.mass;
     }
-    g.replace("freezing");
     for particle in out_state.iter_mut() {
         particle.velocity += 0.5 * particle.acceleration * dt;
         if particle.velocity.magnitude2() < 0.1 {
@@ -308,11 +301,12 @@ fn generate(count: usize) -> Vec<Particle> {
     current_particles
 }
 
-#[repr(C)]
+#[repr(C, align(16))]
 #[derive(Copy, Clone, Debug, Pod, Uniform, Zeroable)]
 struct Settings {
     radius: f32,
     width: f32,
+    _padding: [f32; 2],
 }
 
 struct Simulation {
@@ -333,6 +327,7 @@ impl Simulation {
         let settings_data = Settings {
             radius: 2.0,
             width: 0.3,
+            _padding: [0.0; 2],
         };
         let settings_buffer = UniformBuffer::new_with_init(&application.device, &settings_data);
         let settings = settings_buffer.uniform();

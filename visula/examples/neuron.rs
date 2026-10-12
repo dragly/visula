@@ -51,13 +51,13 @@ fn lennard_jones(position_a: Vec3, position_b: Vec3, eps: f32, sigma: f32) -> Ve
         * (2.0 * sigma.powi(12) / r_l.powi(12) - sigma.powi(6) / r_l.powi(6))
 }
 
-#[repr(C)]
+#[repr(C, align(16))]
 #[derive(Copy, Clone, Debug, Pod, Uniform, Zeroable)]
 struct Settings {
     radius: f32,
     width: f32,
     speed: i32,
-    //_padding: f32,
+    _padding: f32,
 }
 
 struct Mouse {
@@ -88,7 +88,7 @@ impl Simulation {
             radius: 10.0,
             width: 4.0,
             speed: 4,
-            //_padding: 0.0,
+            _padding: 0.0,
         };
         let settings_buffer = UniformBuffer::new_with_init(&application.device, &settings_data);
         let settings = settings_buffer.uniform();

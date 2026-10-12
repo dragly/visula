@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>visula examples</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2em auto; padding: 0 1em; color: #222; }
+      h1 { font-weight: 500; }
+      ul { line-height: 1.8; padding-left: 1.2em; }
+      a { color: #1a6cd6; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+    <h1>visula examples</h1>
+    <ul id="examples"></ul>
+    <script>
+      const examples = [
+        "clay", "debug_cylinder", "gltf_viewer", "grid", "line", "mesh",
+        "molecular_dynamics", "neuron", "neuronify", "painter", "plane",
+        "showcase", "svg_icons", "texture", "toon_neurons", "viewer",
+      ];
+      const ul = document.getElementById("examples");
+      for (const name of examples) {
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        a.href = `/${name}/`;
+        a.textContent = name;
+        li.appendChild(a);
+        ul.appendChild(li);
+      }
+    </script>
+  </body>
+</html>

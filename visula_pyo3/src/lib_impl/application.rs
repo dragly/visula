@@ -172,6 +172,14 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
                     });
                 }
             }
+            WindowEvent::Resized(size) if size.width > 0 && size.height > 0 => {
+                application.update();
+                let mut sim = PySimulation {
+                    renderables: &self.renderables,
+                    controls: &mut self.controls,
+                };
+                application.render(&mut sim);
+            }
             WindowEvent::CloseRequested => event_loop.exit(),
             _ => {}
         }
@@ -179,7 +187,10 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
 
     fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: CustomEvent) {
         match event {
-            CustomEvent::Application(application) => self.application = Some(*application),
+            CustomEvent::Application(mut application) => {
+                application.resize(application.window.inner_size());
+                self.application = Some(*application);
+            }
             CustomEvent::DropEvent(_) => {}
         }
     }
