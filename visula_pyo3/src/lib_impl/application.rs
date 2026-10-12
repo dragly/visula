@@ -179,7 +179,10 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
 
     fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: CustomEvent) {
         match event {
-            CustomEvent::Application(application) => self.application = Some(*application),
+            CustomEvent::Application(mut application) => {
+                application.resize(application.window.inner_size());
+                self.application = Some(*application);
+            }
             CustomEvent::DropEvent(_) => {}
         }
     }

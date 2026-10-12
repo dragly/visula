@@ -3,8 +3,6 @@ use wasm_bindgen::JsCast;
 #[cfg(target_arch = "wasm32")]
 use web_sys::HtmlCanvasElement;
 use winit::application::ApplicationHandler;
-#[cfg(target_arch = "wasm32")]
-use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
 use winit::event_loop::EventLoop;
@@ -189,7 +187,8 @@ where
 
     fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: CustomEvent) {
         match event {
-            CustomEvent::Application(application) => {
+            CustomEvent::Application(mut application) => {
+                application.resize(application.window.inner_size());
                 application.window.request_redraw();
                 self.application = Some(*application);
             }
@@ -260,11 +259,6 @@ pub fn create_window_with_config(
             let canvas = canvas
                 .dyn_into::<HtmlCanvasElement>()
                 .expect("could not cast to HtmlCanvasElement");
-
-            builder = builder.with_inner_size(LogicalSize::new(
-                canvas.client_width(),
-                canvas.client_height(),
-            ));
             builder = builder.with_canvas(Some(canvas));
             canvas_existed = true;
         }

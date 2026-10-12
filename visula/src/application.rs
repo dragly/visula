@@ -20,7 +20,7 @@ use wgpu::{
     GlBackendOptions, InstanceDescriptor, SurfaceTexture, TextureFormat, TextureView,
     TextureViewDescriptor,
 };
-use winit::{event::WindowEvent, window::Window};
+use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
 #[derive(Debug)]
 pub struct Application {
@@ -335,40 +335,49 @@ impl Application {
             return true;
         }
         if let WindowEvent::Resized(size) = event {
-            let depth_texture = self.device.create_texture(&wgpu::TextureDescriptor {
-                size: wgpu::Extent3d {
-                    width: size.width,
-                    height: size.height,
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: self.sample_count,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Depth32Float,
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                    | wgpu::TextureUsages::TEXTURE_BINDING,
-                label: None,
-                view_formats: &[],
-            });
-            self.depth_texture = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
-            self.config.width = size.width;
-            self.config.height = size.height;
-            self.multisampled_framebuffer = Self::create_multisampled_framebuffer(
-                &self.device,
-                size.width,
-                size.height,
-                self.sample_count,
-            );
-            self.surface.configure(&self.device, &self.config);
-            self.post_processor.resize(
-                &self.device,
-                size.width,
-                size.height,
-                &self.depth_texture,
-                &self.camera,
-            );
+            self.resize(*size);
         }
         false
+    }
+
+    pub fn resize(&mut self, size: PhysicalSize<u32>) {
+        if size.width == 0 || size.height == 0 {
+            return;
+        }
+        if size.width == self.config.width && size.height == self.config.height {
+            return;
+        }
+        let depth_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: size.width,
+                height: size.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: self.sample_count,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth32Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            label: None,
+            view_formats: &[],
+        });
+        self.depth_texture = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        self.config.width = size.width;
+        self.config.height = size.height;
+        self.multisampled_framebuffer = Self::create_multisampled_framebuffer(
+            &self.device,
+            size.width,
+            size.height,
+            self.sample_count,
+        );
+        self.surface.configure(&self.device, &self.config);
+        self.post_processor.resize(
+            &self.device,
+            size.width,
+            size.height,
+            &self.depth_texture,
+            &self.camera,
+        );
     }
 
     pub fn update(&mut self) {
