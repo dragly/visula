@@ -180,6 +180,10 @@ where
                 }
                 application.window.request_redraw();
             }
+            WindowEvent::Resized(size) if size.width > 0 && size.height > 0 => {
+                application.update();
+                application.render(simulation);
+            }
             WindowEvent::CloseRequested => event_loop.exit(),
             _ => {}
         }
