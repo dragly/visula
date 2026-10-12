@@ -661,15 +661,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
-name = "crude-profiler"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9389510ac716b6ace8c4b635420cf023e12c81b61e933bfef06639142f149ecd"
-dependencies = [
- "lazy_static 0.2.11",
-]
-
-[[package]]
 name = "crunchy"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1193,7 +1184,7 @@ dependencies = [
  "byteorder",
  "gltf-json",
  "image",
- "lazy_static 1.5.0",
+ "lazy_static",
 ]
 
 [[package]]
@@ -1580,12 +1571,6 @@ dependencies = [
  "euclid",
  "smallvec",
 ]
-
-[[package]]
-name = "lazy_static"
-version = "0.2.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76f033c7ad61445c5b347c7382dd1237847eb1bce590fe50365dcb33d546be73"
 
 [[package]]
 name = "lazy_static"
@@ -3635,7 +3620,6 @@ dependencies = [
  "clap",
  "console_error_panic_hook",
  "console_log",
- "crude-profiler",
  "egui",
  "egui-wgpu",
  "egui-winit",
