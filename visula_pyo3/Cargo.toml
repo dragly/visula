@@ -1,17 +1,22 @@
 [package]
 name = "visula-pyo3"
-version = "0.1.0"
+description = "Python bindings for visula"
+version.workspace = true
+authors.workspace = true
 edition = "2021"
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
 name = "visula_pyo3"
 crate-type = ["cdylib"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-visula = { path = "../visula", features = ["python"] }
-visula-core = { path = "../visula_core" }
-visula-derive = { path = "../visula_derive" }
+visula = { workspace = true, features = ["python"] }
+visula-core = { workspace = true }
+visula-derive = { workspace = true }
 byteorder = { version = "1.5.0" }
 bytemuck = { workspace = true }
 wgpu = { workspace = true }
