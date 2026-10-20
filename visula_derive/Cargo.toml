@@ -1,5 +1,5 @@
 [package]
-name = "visula_derive"
+name = "visula-derive"
 version = "0.1.0"
 authors = ["Svenn-Arne Dragly <s@dragly.com>"]
 edition = "2018"
