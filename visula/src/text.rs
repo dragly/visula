@@ -3,6 +3,7 @@ use lyon::math::point;
 use lyon::path::Path;
 use lyon::tessellation::{BuffersBuilder, FillOptions, FillTessellator, FillVertex, VertexBuffers};
 
+#[derive(Default)]
 pub struct TessellatedGeometry {
     pub vertices: Vec<PolygonVertex>,
     pub indices: Vec<u32>,
@@ -17,54 +18,143 @@ impl TessellatedGeometry {
     }
 }
 
+pub struct FontMetrics {
+    pub ascent: f32,
+    pub descent: f32,
+    pub line_height: f32,
+}
+
+pub struct WrappedText {
+    pub geometry: TessellatedGeometry,
+    pub width: f32,
+    pub height: f32,
+}
+
 pub fn tessellate_text(
     font_data: &[u8],
     text: &str,
     scale: f32,
 ) -> Result<TessellatedGeometry, crate::error::Error> {
-    let face = ttf_parser::Face::parse(font_data, 0).map_err(|_| crate::error::Error::FontParse)?;
-    let units_per_em = face.units_per_em() as f32;
-    let scale_factor = scale / units_per_em;
+    let face = ScaledFace::parse(font_data, scale)?;
+    let mut geometry = TessellatedGeometry::default();
+    face.tessellate_line(text, 0.0, &mut geometry);
+    Ok(geometry)
+}
 
-    let mut all_vertices = Vec::new();
-    let mut all_indices = Vec::new();
-    let mut cursor_x: f32 = 0.0;
+pub fn tessellate_text_wrapped(
+    font_data: &[u8],
+    text: &str,
+    scale: f32,
+    max_width: f32,
+) -> Result<WrappedText, crate::error::Error> {
+    let face = ScaledFace::parse(font_data, scale)?;
+    let metrics = face.metrics();
+    let lines = face.wrap_lines(text, max_width);
+    let mut geometry = TessellatedGeometry::default();
+    let mut width: f32 = 0.0;
+    for (index, line) in lines.iter().enumerate() {
+        let baseline_y = -(metrics.ascent + metrics.line_height * index as f32);
+        width = width.max(face.tessellate_line(line, baseline_y, &mut geometry));
+    }
+    Ok(WrappedText {
+        geometry,
+        width,
+        height: metrics.line_height * lines.len() as f32,
+    })
+}
 
-    for ch in text.chars() {
-        let glyph_id = match face.glyph_index(ch) {
-            Some(id) => id,
-            None => continue,
-        };
+pub fn measure_text_width(
+    font_data: &[u8],
+    text: &str,
+    scale: f32,
+) -> Result<f32, crate::error::Error> {
+    Ok(ScaledFace::parse(font_data, scale)?.width(text))
+}
 
-        let mut outline = GlyphOutlineCollector::new(scale_factor, cursor_x, 0.0);
-        if face.outline_glyph(glyph_id, &mut outline).is_some() {
-            let path = outline.build();
-            let mut geometry: VertexBuffers<PolygonVertex, u32> = VertexBuffers::new();
-            let mut tessellator = FillTessellator::new();
-            if tessellator
-                .tessellate_path(
-                    &path,
-                    &FillOptions::tolerance(0.01),
-                    &mut BuffersBuilder::new(&mut geometry, |vertex: FillVertex| PolygonVertex {
-                        position: [vertex.position().x, vertex.position().y],
-                    }),
-                )
-                .is_ok()
-            {
-                let base_index = all_vertices.len() as u32;
-                all_vertices.extend_from_slice(&geometry.vertices);
-                all_indices.extend(geometry.indices.iter().map(|i| i + base_index));
-            }
-        }
+pub fn font_metrics(font_data: &[u8], scale: f32) -> Result<FontMetrics, crate::error::Error> {
+    Ok(ScaledFace::parse(font_data, scale)?.metrics())
+}
 
-        let advance = face.glyph_hor_advance(glyph_id).unwrap_or(0) as f32 * scale_factor;
-        cursor_x += advance;
+struct ScaledFace<'a> {
+    face: ttf_parser::Face<'a>,
+    scale_factor: f32,
+}
+
+impl<'a> ScaledFace<'a> {
+    fn parse(font_data: &'a [u8], scale: f32) -> Result<Self, crate::error::Error> {
+        let face =
+            ttf_parser::Face::parse(font_data, 0).map_err(|_| crate::error::Error::FontParse)?;
+        let scale_factor = scale / face.units_per_em() as f32;
+        Ok(Self { face, scale_factor })
     }
 
-    Ok(TessellatedGeometry {
-        vertices: all_vertices,
-        indices: all_indices,
-    })
+    fn metrics(&self) -> FontMetrics {
+        let ascent = self.face.ascender() as f32 * self.scale_factor;
+        let descent = self.face.descender() as f32 * self.scale_factor;
+        let line_gap = self.face.line_gap() as f32 * self.scale_factor;
+        FontMetrics {
+            ascent,
+            descent,
+            line_height: ascent - descent + line_gap,
+        }
+    }
+
+    fn advance(&self, glyph_id: ttf_parser::GlyphId) -> f32 {
+        self.face.glyph_hor_advance(glyph_id).unwrap_or(0) as f32 * self.scale_factor
+    }
+
+    fn width(&self, text: &str) -> f32 {
+        text.chars()
+            .filter_map(|ch| self.face.glyph_index(ch))
+            .map(|glyph_id| self.advance(glyph_id))
+            .sum()
+    }
+
+    fn wrap_lines(&self, text: &str, max_width: f32) -> Vec<String> {
+        let space_width = self.width(" ");
+        let mut lines = Vec::new();
+        for paragraph in text.split('\n') {
+            let mut line = String::new();
+            let mut line_width = 0.0;
+            for word in paragraph.split_whitespace() {
+                let word_width = self.width(word);
+                if !line.is_empty() && line_width + space_width + word_width > max_width {
+                    lines.push(std::mem::take(&mut line));
+                    line_width = 0.0;
+                }
+                if !line.is_empty() {
+                    line.push(' ');
+                    line_width += space_width;
+                }
+                line.push_str(word);
+                line_width += word_width;
+            }
+            lines.push(line);
+        }
+        lines
+    }
+
+    fn tessellate_line(
+        &self,
+        line: &str,
+        baseline_y: f32,
+        geometry: &mut TessellatedGeometry,
+    ) -> f32 {
+        let mut cursor_x: f32 = 0.0;
+        for ch in line.chars() {
+            let Some(glyph_id) = self.face.glyph_index(ch) else {
+                continue;
+            };
+            let mut outline = GlyphOutlineCollector::new(self.scale_factor, cursor_x, baseline_y);
+            if self.face.outline_glyph(glyph_id, &mut outline).is_some() {
+                if let Ok(glyph) = tessellate_path(&outline.build()) {
+                    geometry.merge(&glyph);
+                }
+            }
+            cursor_x += self.advance(glyph_id);
+        }
+        cursor_x
+    }
 }
 
 pub fn tessellate_path(path: &Path) -> Result<TessellatedGeometry, crate::error::Error> {
@@ -204,5 +294,41 @@ impl ttf_parser::OutlineBuilder for GlyphOutlineCollector {
 
     fn close(&mut self) {
         self.builder.close();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn font() -> Vec<u8> {
+        egui::FontDefinitions::default().font_data["Ubuntu-Light"]
+            .font
+            .to_vec()
+    }
+
+    #[test]
+    fn wraps_at_word_boundaries() {
+        let font = font();
+        let face = ScaledFace::parse(&font, 1.0).unwrap();
+        let max_width = (face.width("one two") + face.width("one two three")) / 2.0;
+        assert_eq!(
+            face.wrap_lines("one  two three\n\nfour", max_width),
+            ["one two", "three", "", "four"]
+        );
+    }
+
+    #[test]
+    fn wrapped_text_fits_its_bounds() {
+        let font = font();
+        let line_height = font_metrics(&font, 2.0).unwrap().line_height;
+        let wrapped = tessellate_text_wrapped(&font, "Hello wrapped world", 2.0, 1.0).unwrap();
+        assert_eq!(wrapped.height, 3.0 * line_height);
+        assert!(!wrapped.geometry.indices.is_empty());
+        for vertex in &wrapped.geometry.vertices {
+            let [x, y] = vertex.position;
+            assert!((0.0..=wrapped.width).contains(&x));
+            assert!((-wrapped.height..=0.0).contains(&y));
+        }
     }
 }
