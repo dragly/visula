@@ -11,7 +11,7 @@ others find it useful too.
 Visula works natively in Linux, Windows or macOS,
 or can be used to target the web with WASM and WebGPU.
 
-![Showcase](screenshots/showcase.png)
+![Showcase](https://raw.githubusercontent.com/dragly/visula/main/screenshots/showcase.png)
 
 ## Python example
 
@@ -41,7 +41,7 @@ Here, `position`, `radius` and `color` are all expressions.
 Visula compiles these into the shader and evaluates them per instance on the GPU.
 This means that there is only one array `t` uploaded to the GPU.
 
-![Python spheres](screenshots/python_spheres.png)
+![Python spheres](https://raw.githubusercontent.com/dragly/visula/main/screenshots/python_spheres.png)
 
 ## Rust example
 
@@ -85,15 +85,15 @@ uv run visula_pyo3/examples/simple.py
 uv run visula_pyo3/examples/controls.py
 
 # Web (WebGPU/WebGL)
-./run-wasm.sh
+trunk serve --example molecular_dynamics
 ```
 
 Below is a screenshot of the molecular dynamics example:
 
-![Molecular dynamics](screenshots/molecular_dynamics.png)
+![Molecular dynamics](https://raw.githubusercontent.com/dragly/visula/main/screenshots/molecular_dynamics.png)
 
 See `visula/examples/` and `visula_pyo3/examples/` for more examples.
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE).
+Apache-2.0. See [LICENSE](https://github.com/dragly/visula/blob/main/LICENSE).

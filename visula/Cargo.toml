@@ -1,12 +1,20 @@
 [package]
 name = "visula"
-version = "0.1.0"
-authors = ["Svenn-Arne Dragly <s@dragly.com>"]
+description = "Visualization library based on wgpu"
+version.workspace = true
+authors.workspace = true
 edition = "2018"
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+readme = "../README.md"
+keywords = ["visualization", "wgpu", "webgpu", "graphics", "plotting"]
+categories = ["visualization", "graphics", "rendering", "wasm"]
+exclude = ["examples/*.blend"]
 
 [dependencies]
-visula-core = { path = "../visula_core" }
-visula-derive = { path = "../visula_derive" }
+visula-core = { workspace = true }
+visula-derive = { workspace = true }
 wgpu = {workspace = true}
 glam = {workspace = true}
 naga = {workspace = true}
