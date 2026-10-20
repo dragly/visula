@@ -24,6 +24,8 @@ use winit::window::Window;
 
 use winit::event::Event;
 
+extern crate self as visula;
+
 pub mod derive {
     pub use visula_derive::*;
 }
