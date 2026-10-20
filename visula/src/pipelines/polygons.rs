@@ -56,6 +56,21 @@ impl Polygons {
             None,
         )?))
     }
+
+    pub fn update_geometry(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        vertices: &[PolygonVertex],
+        indices: &[u32],
+    ) {
+        self.0.update_geometry(
+            device,
+            queue,
+            bytemuck::cast_slice(vertices),
+            bytemuck::cast_slice(indices),
+        );
+    }
 }
 
 impl Renderable for Polygons {
@@ -143,5 +158,17 @@ mod tests {
             ..Default::default()
         };
         gpu.polygons(&delegate, &TRIANGLE, &[0, 1, 2]);
+    }
+
+    #[test]
+    fn update_geometry() {
+        let gpu = Gpu::new();
+        let mut polygons = gpu.polygons(&PolygonDelegate::default(), &[], &[]);
+        let two_triangles = [TRIANGLE, TRIANGLE].concat();
+        polygons.update_geometry(&gpu.device, &gpu.queue, &TRIANGLE, &[0, 1, 2]);
+        polygons.update_geometry(&gpu.device, &gpu.queue, &two_triangles, &[0, 1, 2, 3, 4, 5]);
+        polygons.update_geometry(&gpu.device, &gpu.queue, &TRIANGLE, &[0, 1, 2]);
+        polygons.update_geometry(&gpu.device, &gpu.queue, &[], &[]);
+        gpu.queue.submit([]);
     }
 }
