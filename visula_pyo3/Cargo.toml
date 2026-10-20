@@ -9,7 +9,7 @@ name = "visula_pyo3"
 crate-type = ["cdylib"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-visula = { path = "../visula" }
+visula = { path = "../visula", features = ["python"] }
 visula-core = { path = "../visula_core" }
 visula-derive = { path = "../visula_derive" }
 byteorder = { version = "1.5.0" }
