@@ -67,3 +67,6 @@ jobs:
       - name: Trunk build (smoke test)
         if: matrix.target == 'wasm32-unknown-unknown'
         run: trunk build --example showcase
+      - name: Check packaging
+        if: matrix.rust == 'stable' && matrix.target == 'x86_64-unknown-linux-gnu'
+        run: cargo publish --workspace --dry-run
