@@ -43,6 +43,12 @@ pub enum Expression {
         z: ExpressionInner,
         w: ExpressionInner,
     },
+    Matrix4 {
+        x_axis: ExpressionInner,
+        y_axis: ExpressionInner,
+        z_axis: ExpressionInner,
+        w_axis: ExpressionInner,
+    },
     Math {
         function: naga::MathFunction,
         arguments: Vec<ExpressionInner>,
@@ -429,6 +435,39 @@ impl Expression {
                         ::naga::Span::default(),
                     )
             }
+            Expression::Matrix4 {
+                x_axis,
+                y_axis,
+                z_axis,
+                w_axis,
+            } => {
+                let naga_type = ::naga::Type {
+                    name: None,
+                    inner: ::naga::TypeInner::Matrix {
+                        columns: ::naga::VectorSize::Quad,
+                        rows: ::naga::VectorSize::Quad,
+                        scalar: ::naga::Scalar {
+                            kind: ::naga::ScalarKind::Float,
+                            width: 4,
+                        },
+                    },
+                };
+                let field_type = module.types.insert(naga_type, ::naga::Span::default());
+                let components_setup = [x_axis, y_axis, z_axis, w_axis]
+                    .iter()
+                    .map(|component| component.setup(module, binding_builder))
+                    .collect();
+                module.entry_points[binding_builder.entry_point_index]
+                    .function
+                    .expressions
+                    .append(
+                        ::naga::Expression::Compose {
+                            ty: field_type,
+                            components: components_setup,
+                        },
+                        ::naga::Span::default(),
+                    )
+            }
             Expression::BinaryOperator {
                 left,
                 right,
@@ -501,17 +540,31 @@ impl Expression {
                         binding_builder,
                     );
                 }
-                module.entry_points[binding_builder.entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::FunctionArgument(
-                            binding_builder.instances[&field.buffer_handle].fields
-                                [field.field_index]
-                                .function_argument,
-                        ),
-                        naga::Span::default(),
-                    )
+                let function = &mut module.entry_points[binding_builder.entry_point_index].function;
+                let components: Vec<_> = binding_builder.instances[&field.buffer_handle].fields
+                    [field.field_index]
+                    .function_arguments
+                    .iter()
+                    .map(|&argument| {
+                        function.expressions.append(
+                            naga::Expression::FunctionArgument(argument),
+                            naga::Span::default(),
+                        )
+                    })
+                    .collect();
+                match components[..] {
+                    [component] => component,
+                    _ => {
+                        let ty = module.types.insert(
+                            field.descriptor.fields[field.field_index].naga_type.clone(),
+                            naga::Span::default(),
+                        );
+                        function.expressions.append(
+                            naga::Expression::Compose { ty, components },
+                            naga::Span::default(),
+                        )
+                    }
+                }
             }
             Expression::TextureField(field) => {
                 binding_builder
@@ -809,6 +862,9 @@ impl std::fmt::Debug for Expression {
             }
             Expression::Vector4 { .. } => {
                 write!(fmt, "Vector4")?;
+            }
+            Expression::Matrix4 { .. } => {
+                write!(fmt, "Matrix4")?;
             }
             Expression::Math { function, .. } => {
                 write!(fmt, "{function:?}")?;
@@ -1244,6 +1300,12 @@ impl From<glam::Quat> for Expression {
     }
 }
 
+impl From<glam::Mat4> for Expression {
+    fn from(value: glam::Mat4) -> Expression {
+        mat4(value.x_axis, value.y_axis, value.z_axis, value.w_axis)
+    }
+}
+
 impl From<[f32; 2]> for Expression {
     fn from(value: [f32; 2]) -> Expression {
         vec2(value[0], value[1])
@@ -1292,6 +1354,20 @@ pub fn vec4(
         y: y.into(),
         z: z.into(),
         w: w.into(),
+    }
+}
+
+pub fn mat4(
+    x_axis: impl Into<ExpressionInner>,
+    y_axis: impl Into<ExpressionInner>,
+    z_axis: impl Into<ExpressionInner>,
+    w_axis: impl Into<ExpressionInner>,
+) -> Expression {
+    Expression::Matrix4 {
+        x_axis: x_axis.into(),
+        y_axis: y_axis.into(),
+        z_axis: z_axis.into(),
+        w_axis: w_axis.into(),
     }
 }
 
@@ -1344,7 +1420,7 @@ pub fn step(edge: impl Into<ExpressionInner>, value: impl Into<ExpressionInner>)
 mod tests {
     use bytemuck::{Pod, Zeroable};
     use naga::ShaderStage;
-    use visula_derive::Uniform;
+    use visula_derive::{Instance, Uniform};
 
     use super::*;
     use crate::test_util::{device, lower_to_wgsl};
@@ -1360,6 +1436,48 @@ mod tests {
     #[test]
     fn literal() {
         let wgsl = lower_to_wgsl(ShaderStage::Vertex, &[("f32", 1.5.into())]);
+        insta::assert_snapshot!(wgsl);
+    }
+
+    #[test]
+    fn matrix4() {
+        let transform = glam::Mat4::from_translation(glam::Vec3::new(1.0, 2.0, 3.0));
+        let wgsl = lower_to_wgsl(ShaderStage::Vertex, &[("mat4x4<f32>", transform.into())]);
+        insta::assert_snapshot!(wgsl);
+    }
+
+    #[test]
+    fn mat4_from_expressions() {
+        let device = device();
+        let t = InstanceBuffer::<f32>::new(&device).instance();
+        let transform = mat4(
+            glam::Vec4::X,
+            glam::Vec4::Y,
+            glam::Vec4::Z,
+            vec4(&t, 0.0, 0.0, 1.0),
+        );
+        let wgsl = lower_to_wgsl(ShaderStage::Vertex, &[("mat4x4<f32>", transform)]);
+        insta::assert_snapshot!(wgsl);
+    }
+
+    #[repr(C)]
+    #[derive(Clone, Copy, Pod, Zeroable, Instance)]
+    struct Particle {
+        transform: glam::Mat4,
+        color: glam::Vec4,
+    }
+
+    #[test]
+    fn instance_field_mat4() {
+        let device = device();
+        let particle = InstanceBuffer::<Particle>::new(&device).instance();
+        let wgsl = lower_to_wgsl(
+            ShaderStage::Vertex,
+            &[
+                ("mat4x4<f32>", particle.transform),
+                ("vec4<f32>", particle.color),
+            ],
+        );
         insta::assert_snapshot!(wgsl);
     }
 

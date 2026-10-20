@@ -753,6 +753,18 @@ fn vec4(x: &PyExpression, y: &PyExpression, z: &PyExpression, w: &PyExpression) 
 }
 
 #[pyfunction]
+fn mat4(
+    x_axis: &PyExpression,
+    y_axis: &PyExpression,
+    z_axis: &PyExpression,
+    w_axis: &PyExpression,
+) -> PyExpression {
+    PyExpression {
+        inner: visula_core::mat4(&x_axis.inner, &y_axis.inner, &z_axis.inner, &w_axis.inner),
+    }
+}
+
+#[pyfunction]
 fn convert(py: Python, pyapplication: &PyApplication, obj: Py<PyAny>) -> PyResult<PyExpression> {
     let PyApplication { application, .. } = pyapplication;
     let Some(application) = application else {
@@ -964,6 +976,7 @@ fn visula_pyo3(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(vec2, m)?)?;
     m.add_function(wrap_pyfunction!(vec3, m)?)?;
     m.add_function(wrap_pyfunction!(vec4, m)?)?;
+    m.add_function(wrap_pyfunction!(mat4, m)?)?;
     m.add_class::<PySpheres>()?;
     m.add_class::<PyLines>()?;
     m.add_class::<PyExpression>()?;

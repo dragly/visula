@@ -1,0 +1,16 @@
+---
+source: visula_core/src/value.rs
+expression: wgsl
+---
+struct Fields {
+    a: mat4x4<f32>,
+}
+
+@vertex 
+fn vs_main(@location(0) value: f32) -> @builtin(position) vec4<f32> {
+    var fields: Fields;
+
+    fields.a = mat4x4<f32>(vec4<f32>(1f, 0f, 0f, 0f), vec4<f32>(0f, 1f, 0f, 0f), vec4<f32>(0f, 0f, 1f, 0f), vec4<f32>(value, 0f, 0f, 1f));
+    let output: Fields = fields;
+    return vec4(0f);
+}

@@ -1,6 +1,6 @@
 from ._visula_pyo3 import Lines, Spheres
 from .figure import Figure
-from .expression import Expression, ExpressionLike, vec2, vec3, vec4
+from .expression import Expression, ExpressionLike, mat4, vec2, vec3, vec4
 from .instance_buffer import InstanceBuffer
 from .math import (
     ColormapName,
@@ -58,6 +58,7 @@ __all__ = [
     "fract",
     "length",
     "log",
+    "mat4",
     "max",
     "min",
     "mix",

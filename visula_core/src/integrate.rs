@@ -14,6 +14,28 @@ pub struct InstanceFieldDescriptor {
     pub vertex_attr_format: wgpu::VertexFormat,
 }
 
+impl InstanceFieldDescriptor {
+    fn vertex_inputs(&self) -> Vec<(String, naga::Type)> {
+        match self.naga_type.inner {
+            naga::TypeInner::Matrix {
+                columns,
+                rows,
+                scalar,
+            } => {
+                let column = naga::Type {
+                    name: None,
+                    inner: naga::TypeInner::Vector { size: rows, scalar },
+                };
+                ["x_axis", "y_axis", "z_axis", "w_axis"][..columns as usize]
+                    .iter()
+                    .map(|axis| (format!("{}_{axis}", self.name), column.clone()))
+                    .collect()
+            }
+            _ => vec![(self.name.clone(), self.naga_type.clone())],
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct InstanceDescriptor {
     pub struct_size: u64,
@@ -28,51 +50,40 @@ pub fn integrate_instance(
     binding_builder: &mut BindingBuilder,
 ) {
     let entry_point_index = binding_builder.entry_point_index;
-    let previous_shader_location_offset = binding_builder.shader_location_offset;
-
-    let mut attributes = Vec::new();
+    let attributes =
+        build_vertex_attributes(&descriptor.fields, binding_builder.shader_location_offset);
+    let mut shader_location = binding_builder.shader_location_offset;
     let mut binding_fields = Vec::new();
-    let mut offset: u64 = 0;
 
-    for (i, field) in descriptor.fields.iter().enumerate() {
-        let shader_location = previous_shader_location_offset + i as u32;
-
-        let field_type = module
-            .types
-            .insert(field.naga_type.clone(), naga::Span::default());
-        module.entry_points[entry_point_index]
-            .function
-            .arguments
-            .push(naga::FunctionArgument {
-                name: Some(field.name.clone()),
-                ty: field_type,
-                binding: Some(naga::Binding::Location {
-                    location: shader_location,
-                    interpolation: if binding_builder.shader_stage == naga::ShaderStage::Fragment {
-                        Some(naga::Interpolation::Flat)
-                    } else {
-                        None
-                    },
-                    sampling: None,
-                    blend_src: None,
-                    per_primitive: false,
-                }),
-            });
-
-        attributes.push(wgpu::VertexAttribute {
-            format: field.vertex_attr_format,
-            offset,
-            shader_location,
-        });
-
-        binding_fields.push(BufferBindingField {
-            function_argument: shader_location,
-        });
-
-        offset += field.vertex_attr_format.size();
+    for field in &descriptor.fields {
+        let mut function_arguments = Vec::new();
+        for (name, naga_type) in field.vertex_inputs() {
+            let field_type = module.types.insert(naga_type, naga::Span::default());
+            module.entry_points[entry_point_index]
+                .function
+                .arguments
+                .push(naga::FunctionArgument {
+                    name: Some(name),
+                    ty: field_type,
+                    binding: Some(naga::Binding::Location {
+                        location: shader_location,
+                        interpolation: if binding_builder.shader_stage
+                            == naga::ShaderStage::Fragment
+                        {
+                            Some(naga::Interpolation::Flat)
+                        } else {
+                            None
+                        },
+                        sampling: None,
+                        blend_src: None,
+                        per_primitive: false,
+                    }),
+                });
+            function_arguments.push(shader_location);
+            shader_location += 1;
+        }
+        binding_fields.push(BufferBindingField { function_arguments });
     }
-
-    let field_count = descriptor.fields.len() as u32;
 
     binding_builder.instances.insert(
         *handle,
@@ -88,7 +99,7 @@ pub fn integrate_instance(
         },
     );
 
-    binding_builder.shader_location_offset += field_count;
+    binding_builder.shader_location_offset = shader_location;
     binding_builder.current_slot += 1;
 }
 
@@ -190,13 +201,15 @@ pub fn build_vertex_attributes(
     let mut attributes = Vec::new();
     let mut offset: u64 = 0;
 
-    for (i, field) in fields.iter().enumerate() {
-        attributes.push(wgpu::VertexAttribute {
-            format: field.vertex_attr_format,
-            offset,
-            shader_location: shader_location_offset + i as u32,
-        });
-        offset += field.vertex_attr_format.size();
+    for field in fields {
+        for _ in field.vertex_inputs() {
+            attributes.push(wgpu::VertexAttribute {
+                format: field.vertex_attr_format,
+                offset,
+                shader_location: shader_location_offset + attributes.len() as u32,
+            });
+            offset += field.vertex_attr_format.size();
+        }
     }
 
     attributes
@@ -247,5 +260,37 @@ mod tests {
         assert_eq!(attrs[1].shader_location, 6);
         assert_eq!(attrs[1].offset, 12); // 3 * 4 bytes
         assert_eq!(attrs[1].format, wgpu::VertexFormat::Float32x4);
+    }
+
+    #[test]
+    fn test_build_vertex_attributes_for_matrix() {
+        let fields = vec![
+            InstanceFieldDescriptor {
+                name: "transform".to_string(),
+                naga_type: <glam::Mat4 as crate::NagaType>::naga_type(),
+                vertex_attr_format: wgpu::VertexFormat::Float32x4,
+            },
+            InstanceFieldDescriptor {
+                name: "radius".to_string(),
+                naga_type: <f32 as crate::NagaType>::naga_type(),
+                vertex_attr_format: wgpu::VertexFormat::Float32,
+            },
+        ];
+
+        let attrs = build_vertex_attributes(&fields, 1);
+        let layout: Vec<_> = attrs
+            .iter()
+            .map(|attr| (attr.shader_location, attr.offset, attr.format))
+            .collect();
+        assert_eq!(
+            layout,
+            [
+                (1, 0, wgpu::VertexFormat::Float32x4),
+                (2, 16, wgpu::VertexFormat::Float32x4),
+                (3, 32, wgpu::VertexFormat::Float32x4),
+                (4, 48, wgpu::VertexFormat::Float32x4),
+                (5, 64, wgpu::VertexFormat::Float32),
+            ]
+        );
     }
 }
