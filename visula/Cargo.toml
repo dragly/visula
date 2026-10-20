@@ -25,7 +25,6 @@ wasm-bindgen = "0.2.104"
 cgmath = "0.17.0"
 thiserror = {workspace = true}
 js-sys = "0.3"
-ndarray = "0.15.6"
 num = "0.3"
 gltf = "0.15.2"
 image = { version = "0.23", default-features = false, features = ["jpeg", "png"] }
@@ -37,7 +36,6 @@ hecs = "0.10.5"
 strum = { version = "0.25.0", features = ["derive"] }
 rand = "0.9"
 chrono = "0.4.42"
-oxifive = { git = "https://github.com/dragly/oxifive", rev = "552366bd4d65c0fb09582517a9bfe5300ce84e22" }
 web-time = "1.1.0"
 catppuccin = "2.6.0"
 lyon = "1.0.16"

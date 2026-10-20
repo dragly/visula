@@ -19,7 +19,6 @@ EXAMPLES=(
   svg_icons
   texture
   toon_neurons
-  viewer
 )
 
 PROFILE_FLAG=""
