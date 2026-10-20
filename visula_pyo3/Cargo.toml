@@ -10,8 +10,8 @@ crate-type = ["cdylib"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 visula = { path = "../visula" }
-visula_core = { path = "../visula_core" }
-visula_derive = { path = "../visula_derive" }
+visula-core = { path = "../visula_core" }
+visula-derive = { path = "../visula_derive" }
 byteorder = { version = "1.5.0" }
 bytemuck = { workspace = true }
 wgpu = { workspace = true }

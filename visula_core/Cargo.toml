@@ -1,5 +1,5 @@
 [package]
-name = "visula_core"
+name = "visula-core"
 version = "0.1.0"
 edition = "2021"
 
@@ -18,5 +18,5 @@ thiserror = {workspace = true}
 [dev-dependencies]
 env_logger = {workspace = true}
 insta = "1"
-visula_derive = {path = "../visula_derive"}
+visula-derive = {path = "../visula_derive"}
 wgpu = {workspace = true, features = ["noop"]}
