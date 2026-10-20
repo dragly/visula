@@ -48,7 +48,10 @@ usvg = "0.47.0"
 wgpu = {workspace = true, features = ["noop"]}
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
-pyo3-build-config = { workspace = true }
+pyo3-build-config = { workspace = true, optional = true }
+
+[features]
+python = ["visula-core/python", "dep:pyo3", "dep:pyo3-build-config"]
 
 [dependencies.web-sys]
 version = "0.3"
@@ -63,8 +66,7 @@ features = [
 ]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-pyo3 = {workspace = true}
-numpy = {workspace = true}
+pyo3 = { workspace = true, optional = true }
 env_logger = {workspace = true}
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

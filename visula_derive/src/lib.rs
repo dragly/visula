@@ -46,10 +46,10 @@ pub fn delegate(input: TokenStream) -> TokenStream {
 
                         pyo3_fields.push(quote! {
                             #[pyo3(get, set)]
-                            pub #ident : ::pyo3::Py<::pyo3::PyAny>,
+                            pub #ident : #core::pyo3::Py<#core::pyo3::PyAny>,
                         });
                         pyo3_attributes.push(quote! {
-                            #ident : ::pyo3::Py<::pyo3::PyAny>,
+                            #ident : #core::pyo3::Py<#core::pyo3::PyAny>,
                         });
                         pyo3_field_names.push(quote! {
                             #ident,
@@ -59,27 +59,25 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                 _ => unimplemented!(),
             };
             let pyclass_struct_name = format_ident!("Py{}", struct_ident);
-            let pyclass_attribute: TokenStream2 = format!(
-                "#[::pyo3::pyclass(name = \"{struct_ident}\", unsendable, skip_from_py_object)]"
-            )
-            .parse()
-            .unwrap();
+            let pyclass_name = struct_ident.to_string();
+            let pyo3_path = format!("{core}::pyo3");
             quote! {
-                #[cfg(not(target_arch = "wasm32"))]
-                #pyclass_attribute
-                #[derive(Clone)]
-                pub struct #pyclass_struct_name {
-                    #(#pyo3_fields)*
-                }
+                #core::__if_python! {
+                    #[#core::pyo3::pyclass(name = #pyclass_name, unsendable, skip_from_py_object)]
+                    #[pyo3(crate = #pyo3_path)]
+                    #[derive(Clone)]
+                    pub struct #pyclass_struct_name {
+                        #(#pyo3_fields)*
+                    }
 
-
-                #[cfg(not(target_arch = "wasm32"))]
-                #[::pyo3::pymethods]
-                impl #pyclass_struct_name {
-                    #[new]
-                    fn new(py: ::pyo3::Python, #(#pyo3_attributes)*) -> Self {
-                        Self {
-                            #(#pyo3_field_names)*
+                    #[#core::pyo3::pymethods]
+                    #[pyo3(crate = #pyo3_path)]
+                    impl #pyclass_struct_name {
+                        #[new]
+                        fn new(py: #core::pyo3::Python, #(#pyo3_attributes)*) -> Self {
+                            Self {
+                                #(#pyo3_field_names)*
+                            }
                         }
                     }
                 }

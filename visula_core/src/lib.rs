@@ -41,7 +41,23 @@ pub use vertex_attr_format::VertexAttrFormat;
 
 pub use glam;
 pub use naga;
+#[cfg(all(feature = "python", not(target_arch = "wasm32")))]
+pub use pyo3;
 pub use uuid;
 pub use wgpu;
+
+#[cfg(all(feature = "python", not(target_arch = "wasm32")))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __if_python {
+    ($($tokens:tt)*) => { $($tokens)* };
+}
+
+#[cfg(not(all(feature = "python", not(target_arch = "wasm32"))))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __if_python {
+    ($($tokens:tt)*) => {};
+}
 
 pub const LIGHTING_WGSL: &str = include_str!("shaders/lighting.wgsl");
