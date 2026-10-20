@@ -1,4 +1,4 @@
-use glam::{Quat, Vec2, Vec3, Vec4};
+use glam::{Mat4, Quat, Vec2, Vec3, Vec4};
 
 pub trait VertexAttrFormat {
     fn vertex_attr_format() -> wgpu::VertexFormat;
@@ -47,6 +47,12 @@ impl VertexAttrFormat for Vec4 {
 }
 
 impl VertexAttrFormat for Quat {
+    fn vertex_attr_format() -> wgpu::VertexFormat {
+        wgpu::VertexFormat::Float32x4
+    }
+}
+
+impl VertexAttrFormat for Mat4 {
     fn vertex_attr_format() -> wgpu::VertexFormat {
         wgpu::VertexFormat::Float32x4
     }

@@ -10,6 +10,7 @@ from ._visula_pyo3 import (
     vec2 as _vec2,
     vec3 as _vec3,
     vec4 as _vec4,
+    mat4 as _mat4,
     Expression as _Expression,
 )
 
@@ -98,5 +99,21 @@ def vec4(
             _ensure_expression(y),
             _ensure_expression(z),
             _ensure_expression(w),
+        )
+    )
+
+
+def mat4(
+    x_axis: ExpressionLike,
+    y_axis: ExpressionLike,
+    z_axis: ExpressionLike,
+    w_axis: ExpressionLike,
+) -> Expression:
+    return Expression(
+        _mat4(
+            _ensure_expression(x_axis),
+            _ensure_expression(y_axis),
+            _ensure_expression(z_axis),
+            _ensure_expression(w_axis),
         )
     )

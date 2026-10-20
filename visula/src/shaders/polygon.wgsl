@@ -22,13 +22,13 @@ struct VertexOutput {
 
 struct Polygon {
     color: vec4<f32>,
-    position: vec3<f32>,
+    transform: mat4x4<f32>,
 };
 
 fn polygon_vertex(vertex_position: vec2<f32>, polygon: Polygon) -> VertexOutput {
     var output: VertexOutput;
-    let world_pos = polygon.position + vec3<f32>(vertex_position.x, vertex_position.y, 0.0);
-    output.proj_position = u_globals.transform * vec4<f32>(world_pos, 1.0);
+    let world_position = polygon.transform * vec4<f32>(vertex_position, 0.0, 1.0);
+    output.proj_position = u_globals.transform * world_position;
     output.color = polygon.color;
     return output;
 }

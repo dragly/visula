@@ -3,7 +3,7 @@ use crate::rendering_descriptor::RenderingDescriptor;
 use crate::simulation::RenderData;
 use crate::Renderable;
 use bytemuck::{Pod, Zeroable};
-use glam::{Vec3, Vec4};
+use glam::{Mat4, Vec4};
 use std::mem::size_of;
 use visula_core::Expression;
 use visula_derive::Delegate;
@@ -19,14 +19,14 @@ pub struct Polygons(QuadPipeline);
 #[derive(Delegate)]
 pub struct PolygonDelegate {
     pub color: Expression,
-    pub position: Expression,
+    pub transform: Expression,
 }
 
 impl Default for PolygonDelegate {
     fn default() -> Self {
         PolygonDelegate {
             color: Vec4::new(1.0, 1.0, 1.0, 1.0).into(),
-            position: Vec3::ZERO.into(),
+            transform: Mat4::IDENTITY.into(),
         }
     }
 }
@@ -61,5 +61,87 @@ impl Polygons {
 impl Renderable for Polygons {
     fn render(&self, render_data: &mut RenderData) {
         self.0.render(render_data);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::camera::Camera;
+    use crate::light::DirectionalLight;
+    use visula_core::InstanceBuffer;
+
+    const TRIANGLE: [PolygonVertex; 3] = [
+        PolygonVertex {
+            position: [0.0, 0.0],
+        },
+        PolygonVertex {
+            position: [1.0, 0.0],
+        },
+        PolygonVertex {
+            position: [0.0, 1.0],
+        },
+    ];
+
+    struct Gpu {
+        device: wgpu::Device,
+        queue: wgpu::Queue,
+        camera: Camera,
+        light: DirectionalLight,
+    }
+
+    impl Gpu {
+        fn new() -> Self {
+            let (device, queue) = wgpu::Device::noop(&wgpu::DeviceDescriptor::default());
+            let camera = Camera::new(&device);
+            let light = DirectionalLight::new(&device);
+            Gpu {
+                device,
+                queue,
+                camera,
+                light,
+            }
+        }
+
+        fn polygons(
+            &self,
+            delegate: &PolygonDelegate,
+            vertices: &[PolygonVertex],
+            indices: &[u32],
+        ) -> Polygons {
+            let rendering_descriptor = RenderingDescriptor {
+                device: &self.device,
+                format: wgpu::TextureFormat::Bgra8UnormSrgb,
+                camera: &self.camera,
+                light: &self.light,
+                sample_count: 1,
+            };
+            Polygons::new(&rendering_descriptor, delegate, vertices, indices).unwrap()
+        }
+    }
+
+    #[test]
+    fn transform() {
+        let delegate = PolygonDelegate {
+            transform: Mat4::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
+            ..Default::default()
+        };
+        Gpu::new().polygons(&delegate, &TRIANGLE, &[0, 1, 2]);
+    }
+
+    #[test]
+    fn instanced_transform() {
+        let gpu = Gpu::new();
+        let transforms = InstanceBuffer::<Mat4>::new(&gpu.device);
+        transforms.update(
+            &gpu.device,
+            &gpu.queue,
+            &[Mat4::IDENTITY, Mat4::from_rotation_z(1.0)],
+        );
+        let delegate = PolygonDelegate {
+            transform: transforms.instance(),
+            ..Default::default()
+        };
+        gpu.polygons(&delegate, &TRIANGLE, &[0, 1, 2]);
     }
 }

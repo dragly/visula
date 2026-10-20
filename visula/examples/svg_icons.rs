@@ -1,5 +1,5 @@
 use clap::Parser;
-use glam::{Vec3, Vec4};
+use glam::{Mat4, Vec3, Vec4};
 use lyon::math::point;
 use lyon::path::Path as LyonPath;
 use lyon::tessellation::{
@@ -192,7 +192,7 @@ fn process_node_with_scale(
                         &application.rendering_descriptor(),
                         &PolygonDelegate {
                             color: Expression::from(color),
-                            position: Vec3::new(0.0, 0.0, z).into(),
+                            transform: Mat4::from_translation(Vec3::new(0.0, 0.0, z)).into(),
                         },
                         &vertices,
                         &indices,
@@ -215,7 +215,7 @@ fn process_node_with_scale(
                         &application.rendering_descriptor(),
                         &PolygonDelegate {
                             color: Expression::from(color),
-                            position: Vec3::new(0.0, 0.0, z).into(),
+                            transform: Mat4::from_translation(Vec3::new(0.0, 0.0, z)).into(),
                         },
                         &vertices,
                         &indices,

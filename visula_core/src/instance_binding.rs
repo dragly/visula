@@ -59,4 +59,5 @@ impl_instance_for_plain!(
     glam::Vec2,
     glam::Vec3,
     glam::Vec4,
+    glam::Mat4,
 );

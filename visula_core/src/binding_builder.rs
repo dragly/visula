@@ -29,7 +29,7 @@ impl VertexBufferLayoutBuilder {
 
 #[derive(Clone, Debug)]
 pub struct BufferBindingField {
-    pub function_argument: u32,
+    pub function_arguments: Vec<u32>,
 }
 
 #[derive(Clone, Debug)]
