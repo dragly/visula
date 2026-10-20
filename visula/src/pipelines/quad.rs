@@ -3,6 +3,7 @@ use crate::simulation::{RenderData, ShadowRenderData};
 use crate::{DefaultRenderPassDescriptor, Renderable};
 use itertools::Itertools;
 use naga::{back::wgsl::WriterFlags, valid::ValidationFlags};
+use std::borrow::Cow;
 use std::cell::Ref;
 use visula_core::{BindingBuilder, Delegate, InstanceBinding};
 use wgpu::util::DeviceExt;
@@ -74,10 +75,7 @@ impl QuadPipeline {
             _ => None,
         };
 
-        let index_count = match descriptor.index_format {
-            wgpu::IndexFormat::Uint16 => descriptor.index_data.len() / 2,
-            wgpu::IndexFormat::Uint32 => descriptor.index_data.len() / 4,
-        };
+        let index_count = descriptor.index_data.len() / descriptor.index_format.byte_size();
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(&format!("{} vertex buffer", descriptor.label)),
@@ -354,6 +352,71 @@ impl QuadPipeline {
             fragment_binding_builder,
         })
     }
+
+    pub fn update_geometry(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        vertex_data: &[u8],
+        index_data: &[u8],
+    ) {
+        write_or_replace(
+            device,
+            queue,
+            &mut self.vertex_buffer,
+            &format!("{} vertex buffer", self.label),
+            vertex_data,
+        );
+        write_or_replace(
+            device,
+            queue,
+            &mut self.index_buffer,
+            &format!("{} index buffer", self.label),
+            index_data,
+        );
+        self.index_count = index_data.len() / self.index_format.byte_size();
+    }
+}
+
+const MEBIBYTE: wgpu::BufferAddress = 1024 * 1024;
+
+fn grown_size(size: wgpu::BufferAddress) -> wgpu::BufferAddress {
+    if size <= MEBIBYTE {
+        size.next_power_of_two()
+    } else {
+        size.next_multiple_of(MEBIBYTE)
+    }
+}
+
+fn write_or_replace(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    buffer: &mut wgpu::Buffer,
+    label: &str,
+    data: &[u8],
+) {
+    let data = padded_to_copy_alignment(data);
+    let size = data.len() as wgpu::BufferAddress;
+    if size > buffer.size() {
+        *buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some(label),
+            size: grown_size(size),
+            usage: buffer.usage(),
+            mapped_at_creation: false,
+        });
+    }
+    queue.write_buffer(buffer, 0, &data);
+}
+
+fn padded_to_copy_alignment(data: &[u8]) -> Cow<'_, [u8]> {
+    let alignment = wgpu::COPY_BUFFER_ALIGNMENT as usize;
+    if data.len().is_multiple_of(alignment) {
+        Cow::Borrowed(data)
+    } else {
+        let mut padded = data.to_vec();
+        padded.resize(data.len().next_multiple_of(alignment), 0);
+        Cow::Owned(padded)
+    }
 }
 
 impl Renderable for QuadPipeline {
@@ -564,5 +627,40 @@ impl Renderable for QuadPipeline {
 
             render_pass.draw_indexed(0..self.index_count as u32, 0, 0..instance_count as u32);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn grown_size_doubles_then_steps_by_mebibyte() {
+        assert_eq!(grown_size(24), 32);
+        assert_eq!(grown_size(MEBIBYTE - 4), MEBIBYTE);
+        assert_eq!(grown_size(MEBIBYTE), MEBIBYTE);
+        assert_eq!(grown_size(MEBIBYTE + 4), 2 * MEBIBYTE);
+        assert_eq!(grown_size(5 * MEBIBYTE + MEBIBYTE / 2), 6 * MEBIBYTE);
+    }
+
+    #[test]
+    fn write_or_replace_pads_odd_uint16_indices() {
+        let (device, queue) = wgpu::Device::noop(&wgpu::DeviceDescriptor::default());
+        let mut buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: 0,
+            usage: BufferUsages::INDEX | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let indices: [u16; 3] = [0, 1, 2];
+        write_or_replace(
+            &device,
+            &queue,
+            &mut buffer,
+            "indices",
+            bytemuck::cast_slice(&indices),
+        );
+        assert_eq!(buffer.size(), 8);
+        queue.submit([]);
     }
 }
