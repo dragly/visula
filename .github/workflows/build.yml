@@ -66,4 +66,4 @@ jobs:
           version: 'v0.21.14'
       - name: Trunk build (smoke test)
         if: matrix.target == 'wasm32-unknown-unknown'
-        run: trunk build --example viewer
+        run: trunk build --example showcase

@@ -22,8 +22,6 @@ pub enum Error {
     Gltf(#[from] gltf::Error),
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
-    #[error("ZDF read error: {0}")]
-    Zdf(String),
     #[error("window creation failed: {0}")]
     WindowCreation(#[from] winit::error::OsError),
     #[error("event loop error: {0}")]
