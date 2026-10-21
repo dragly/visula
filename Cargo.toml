@@ -3,16 +3,16 @@ members = ["visula", "visula_derive", "visula_core", "visula_pyo3"]
 resolver = "2"
 
 [workspace.package]
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Svenn-Arne Dragly <s@dragly.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/dragly/visula"
 rust-version = "1.92"
 
 [workspace.dependencies]
-visula = { path = "visula", version = "0.2.0" }
-visula-core = { path = "visula_core", version = "0.2.0" }
-visula-derive = { path = "visula_derive", version = "0.2.0" }
+visula = { path = "visula", version = "0.2.1" }
+visula-core = { path = "visula_core", version = "0.2.1" }
+visula-derive = { path = "visula_derive", version = "0.2.1" }
 wgpu = { version = "29", features = ["webgl"] }
 naga = { version = "29", features = ["wgsl-in", "wgsl-out"] }
 glam = { version = "0.30", features = ["bytemuck"] }
