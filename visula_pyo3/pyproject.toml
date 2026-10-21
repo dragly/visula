@@ -16,6 +16,7 @@ dependencies = ["numpy>2"]
 features = ["pyo3/extension-module"]
 python-source = "python"
 module-name = "visula._visula_pyo3"
+strip = true
 
 [dependency-groups]
 dev = [
