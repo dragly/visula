@@ -2,7 +2,7 @@
 name = "visula-workspace"
 version = "0.1.0"
 description = "Visula workspace root"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = ["visula"]
 
 [tool.uv]

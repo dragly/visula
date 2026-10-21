@@ -24,7 +24,7 @@ winit = { workspace = true }
 egui = { workspace = true }
 egui-winit = { workspace = true }
 egui-wgpu = { workspace = true }
-pyo3 = { workspace = true }
+pyo3 = { workspace = true, features = ["abi3-py311"] }
 numpy = { workspace = true }
 pollster = { workspace = true }
 itertools = { workspace = true }
