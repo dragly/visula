@@ -732,6 +732,23 @@ fn colormap(value: &PyExpression, name: &str) -> PyResult<PyExpression> {
 }
 
 #[pyfunction]
+fn srgb(hex: u32) -> (f32, f32, f32) {
+    visula_core::srgb(hex).into()
+}
+
+#[pyfunction]
+fn srgb_u8(r: u8, g: u8, b: u8) -> (f32, f32, f32) {
+    visula_core::srgb_u8(r, g, b).into()
+}
+
+#[pyfunction]
+fn srgb_to_linear(value: &PyExpression) -> PyExpression {
+    PyExpression {
+        inner: visula_core::srgb_to_linear(&value.inner),
+    }
+}
+
+#[pyfunction]
 fn vec2(x: &PyExpression, y: &PyExpression) -> PyExpression {
     PyExpression {
         inner: visula_core::vec2(&x.inner, &y.inner),
@@ -973,6 +990,9 @@ fn visula_pyo3(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(show, m)?)?;
     m.add_function(wrap_pyfunction!(convert, m)?)?;
     m.add_function(wrap_pyfunction!(colormap, m)?)?;
+    m.add_function(wrap_pyfunction!(srgb, m)?)?;
+    m.add_function(wrap_pyfunction!(srgb_u8, m)?)?;
+    m.add_function(wrap_pyfunction!(srgb_to_linear, m)?)?;
     m.add_function(wrap_pyfunction!(vec2, m)?)?;
     m.add_function(wrap_pyfunction!(vec3, m)?)?;
     m.add_function(wrap_pyfunction!(vec4, m)?)?;
