@@ -5,9 +5,9 @@ use rand::{Rng, SeedableRng};
 
 use visula::{
     primitives::{generate_plane, generate_sphere, generate_torus},
-    CylinderGeometry, CylinderMaterial, Cylinders, Expression, InstanceBuffer, InstanceDeviceExt,
-    MeshGeometry, MeshMaterial, MeshPipeline, RenderData, Renderable, RenderingControls,
-    ShadowRenderData, SphereGeometry, SphereMaterial, SpherePrimitive, Spheres,
+    srgb, CylinderGeometry, CylinderMaterial, Cylinders, Expression, InstanceBuffer,
+    InstanceDeviceExt, MeshGeometry, MeshMaterial, MeshPipeline, RenderData, Renderable,
+    RenderingControls, ShadowRenderData, SphereGeometry, SphereMaterial, SpherePrimitive, Spheres,
 };
 use visula_derive::Instance;
 
@@ -102,21 +102,9 @@ impl GenerationSettings {
     }
 }
 
-fn hex_to_rgb(hex: u32) -> [f32; 3] {
-    [
-        ((hex >> 16) & 0xFF) as f32 / 255.0,
-        ((hex >> 8) & 0xFF) as f32 / 255.0,
-        (hex & 0xFF) as f32 / 255.0,
-    ]
-}
-
-fn hex_to_rgba(hex: u32) -> [u8; 4] {
-    [
-        ((hex >> 16) & 0xFF) as u8,
-        ((hex >> 8) & 0xFF) as u8,
-        (hex & 0xFF) as u8,
-        255,
-    ]
+fn vertex_color(hex: u32) -> [u8; 4] {
+    let [r, g, b] = (srgb(hex) * 255.0).round().to_array();
+    [r as u8, g as u8, b as u8, 255]
 }
 
 struct DendriteResult {
@@ -363,22 +351,22 @@ fn green_neurons() -> [NeuronConfig; 4] {
         NeuronConfig {
             position: Vec3::new(-5.0, 0.0, -3.0),
             scale: 1.0,
-            color: hex_to_rgb(0x7cb83c),
+            color: srgb(0x7cb83c).to_array(),
         },
         NeuronConfig {
             position: Vec3::new(-3.0, 0.0, 2.5),
             scale: 1.1,
-            color: hex_to_rgb(0x8acc4a),
+            color: srgb(0x8acc4a).to_array(),
         },
         NeuronConfig {
             position: Vec3::new(-7.0, 0.0, 1.5),
             scale: 0.95,
-            color: hex_to_rgb(0x6aaa34),
+            color: srgb(0x6aaa34).to_array(),
         },
         NeuronConfig {
             position: Vec3::new(-4.0, 0.0, -6.5),
             scale: 1.05,
-            color: hex_to_rgb(0x90d84e),
+            color: srgb(0x90d84e).to_array(),
         },
     ]
 }
@@ -388,17 +376,17 @@ fn blue_neurons() -> [NeuronConfig; 3] {
         NeuronConfig {
             position: Vec3::new(4.0, 0.0, 3.0),
             scale: 0.9,
-            color: hex_to_rgb(0x3898cc),
+            color: srgb(0x3898cc).to_array(),
         },
         NeuronConfig {
             position: Vec3::new(6.0, 0.0, -2.0),
             scale: 0.95,
-            color: hex_to_rgb(0x2a80b8),
+            color: srgb(0x2a80b8).to_array(),
         },
         NeuronConfig {
             position: Vec3::new(3.0, 0.0, -5.0),
             scale: 1.0,
-            color: hex_to_rgb(0x48a8dd),
+            color: srgb(0x48a8dd).to_array(),
         },
     ]
 }
@@ -429,14 +417,14 @@ fn generate_all(settings: &GenerationSettings) -> GeneratedBufferData {
 
     let mut axons = Vec::new();
     let axon_connections = [
-        (gp[0], gp[1], hex_to_rgb(0x80cc38)),
-        (gp[1], gp[2], hex_to_rgb(0x70bb28)),
-        (gp[0], gp[3], hex_to_rgb(0x90dd48)),
-        (gp[2], gp[3], hex_to_rgb(0x80cc38)),
-        (bp[0], bp[1], hex_to_rgb(0x3898cc)),
-        (bp[1], bp[2], hex_to_rgb(0x2a88bb)),
-        (bp[0], bp[2], hex_to_rgb(0x48aadd)),
-        (gp[1], bp[0], hex_to_rgb(0xee9933)),
+        (gp[0], gp[1], srgb(0x80cc38).to_array()),
+        (gp[1], gp[2], srgb(0x70bb28).to_array()),
+        (gp[0], gp[3], srgb(0x90dd48).to_array()),
+        (gp[2], gp[3], srgb(0x80cc38).to_array()),
+        (bp[0], bp[1], srgb(0x3898cc).to_array()),
+        (bp[1], bp[2], srgb(0x2a88bb).to_array()),
+        (bp[0], bp[2], srgb(0x48aadd).to_array()),
+        (gp[1], bp[0], srgb(0xee9933).to_array()),
     ];
     for (start, end, color) in &axon_connections {
         axons.extend(generate_axon_cylinders(
@@ -573,10 +561,22 @@ impl ToonNeurons {
         let bp: Vec<Vec3> = blues.iter().map(|n| n.position).collect();
 
         let synapse_positions = [
-            ((gp[0] + gp[1]) * 0.5 + Vec3::Y * 0.9, hex_to_rgba(0xccff44)),
-            ((gp[1] + gp[2]) * 0.5 + Vec3::Y * 0.9, hex_to_rgba(0xbbee33)),
-            ((bp[0] + bp[1]) * 0.5 + Vec3::Y * 0.9, hex_to_rgba(0x66ccff)),
-            ((gp[1] + bp[0]) * 0.5 + Vec3::Y * 0.9, hex_to_rgba(0xffbb44)),
+            (
+                (gp[0] + gp[1]) * 0.5 + Vec3::Y * 0.9,
+                vertex_color(0xccff44),
+            ),
+            (
+                (gp[1] + gp[2]) * 0.5 + Vec3::Y * 0.9,
+                vertex_color(0xbbee33),
+            ),
+            (
+                (bp[0] + bp[1]) * 0.5 + Vec3::Y * 0.9,
+                vertex_color(0x66ccff),
+            ),
+            (
+                (gp[1] + bp[0]) * 0.5 + Vec3::Y * 0.9,
+                vertex_color(0xffbb44),
+            ),
         ];
 
         let mut synapse_meshes = Vec::new();
@@ -597,7 +597,7 @@ impl ToonNeurons {
             synapse_meshes.push(mesh);
         }
 
-        let floor_color = hex_to_rgba(0x1a3318);
+        let floor_color = vertex_color(0x1a3318);
         let (floor_verts, floor_indices) = generate_plane(30.0, 30.0, floor_color);
 
         let mut dish_floor = MeshPipeline::new(
@@ -613,7 +613,7 @@ impl ToonNeurons {
         .unwrap();
         dish_floor.set_mesh_data(device, &floor_verts, &floor_indices);
 
-        let rim_color = hex_to_rgba(0x5a7a50);
+        let rim_color = vertex_color(0x5a7a50);
         let (rim_verts, rim_indices) = generate_torus(14.0, 0.4, 64, 16, rim_color);
 
         let mut dish_rim = MeshPipeline::new(
