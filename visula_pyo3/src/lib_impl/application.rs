@@ -43,9 +43,14 @@ impl AutoScreenshot {
 struct PySimulation<'a> {
     renderables: &'a [Box<dyn Renderable>],
     controls: &'a mut Vec<Py<PySlider>>,
+    clear_color: wgpu::Color,
 }
 
 impl Simulation for PySimulation<'_> {
+    fn clear_color(&self) -> wgpu::Color {
+        self.clear_color
+    }
+
     fn render(&mut self, data: &mut RenderData) {
         for renderable in self.renderables {
             renderable.render(data);
@@ -92,6 +97,7 @@ pub struct PyApplication {
     pub controls: Vec<Py<PySlider>>,
     pub update: Option<Py<PyFunction>>,
     pub slider_bank: Option<SliderBank>,
+    pub clear_color: wgpu::Color,
     auto_screenshot: Option<AutoScreenshot>,
 }
 
@@ -105,6 +111,7 @@ impl PyApplication {
             controls: Vec::new(),
             update: None,
             slider_bank: None,
+            clear_color: wgpu::Color::BLACK,
             event_loop_proxy: event_loop
                 .event_loop
                 .as_ref()
@@ -152,6 +159,7 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
                 let mut sim = PySimulation {
                     renderables: &self.renderables,
                     controls: &mut self.controls,
+                    clear_color: self.clear_color,
                 };
                 application.render(&mut sim);
                 application.window.request_redraw();
@@ -177,6 +185,7 @@ impl ApplicationHandler<CustomEvent> for PyApplication {
                 let mut sim = PySimulation {
                     renderables: &self.renderables,
                     controls: &mut self.controls,
+                    clear_color: self.clear_color,
                 };
                 application.render(&mut sim);
             }
