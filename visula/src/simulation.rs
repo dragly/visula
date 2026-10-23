@@ -31,6 +31,7 @@ pub trait Simulation {
     fn render(&mut self, _data: &mut RenderData) {}
     fn render_shadow(&mut self, _data: &mut ShadowRenderData) {}
     fn gui(&mut self, _application: &Application, _context: &Context) {}
+    /// The background color in linear RGB. Convert hex colors with [`crate::srgb`].
     fn clear_color(&self) -> wgpu::Color {
         wgpu::Color {
             r: 0.1,
