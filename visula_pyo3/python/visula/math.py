@@ -1,6 +1,11 @@
-from typing import Literal
+from typing import Literal, Tuple
 
-from ._visula_pyo3 import colormap as _colormap
+from ._visula_pyo3 import (
+    colormap as _colormap,
+    srgb as _srgb,
+    srgb_to_linear as _srgb_to_linear,
+    srgb_u8 as _srgb_u8,
+)
 from .expression import Expression, ExpressionLike, _ensure_expression
 
 ColormapName = Literal["viridis", "plasma", "magma", "inferno"]
@@ -8,6 +13,21 @@ ColormapName = Literal["viridis", "plasma", "magma", "inferno"]
 
 def colormap(value: ExpressionLike, name: ColormapName = "viridis") -> Expression:
     return Expression(_colormap(_ensure_expression(value), name))
+
+
+def srgb(hex: int) -> Tuple[float, float, float]:
+    """Converts an sRGB hex color, like 0x6E8FC9, to the linear values that Visula expects."""
+    return _srgb(hex)
+
+
+def srgb_u8(r: int, g: int, b: int) -> Tuple[float, float, float]:
+    """Converts 8-bit sRGB channels to the linear values that Visula expects."""
+    return _srgb_u8(r, g, b)
+
+
+def srgb_to_linear(value: ExpressionLike) -> Expression:
+    """Converts an sRGB-encoded vec3 expression to linear values on the GPU."""
+    return Expression(_srgb_to_linear(_ensure_expression(value)))
 
 
 def cos(value: ExpressionLike) -> Expression:

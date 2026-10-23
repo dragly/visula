@@ -1,4 +1,5 @@
 pub mod binding_builder;
+pub mod color;
 pub mod colormap;
 pub mod inject;
 pub mod input;
@@ -23,6 +24,7 @@ extern crate self as visula_core;
 pub mod test_util;
 
 pub use binding_builder::*;
+pub use color::*;
 pub use colormap::*;
 pub use delegate::*;
 pub use error::*;
