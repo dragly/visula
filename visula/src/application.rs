@@ -20,7 +20,11 @@ use wgpu::{
     GlBackendOptions, InstanceDescriptor, SurfaceTexture, TextureFormat, TextureView,
     TextureViewDescriptor,
 };
-use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
+use winit::{
+    dpi::PhysicalSize,
+    event::{Touch, TouchPhase, WindowEvent},
+    window::Window,
+};
 
 #[derive(Debug)]
 pub struct Application {
@@ -305,9 +309,6 @@ impl Application {
                 | WindowEvent::HoveredFile(_)
                 | WindowEvent::HoveredFileCancelled
         );
-        if response.consumed && !is_file_drop {
-            return true;
-        }
         let egui_ctx = self.egui_renderer.state.egui_ctx().clone();
         let is_pointer_event = matches!(
             event,
@@ -320,9 +321,18 @@ impl Application {
             event,
             WindowEvent::KeyboardInput { .. } | WindowEvent::Ime(_)
         );
-        if (is_pointer_event && egui_ctx.egui_wants_pointer_input())
-            || (is_keyboard_event && egui_ctx.egui_wants_keyboard_input())
-        {
+        let egui_consumed = (response.consumed && !is_file_drop)
+            || (is_pointer_event && egui_ctx.egui_wants_pointer_input())
+            || (is_keyboard_event && egui_ctx.egui_wants_keyboard_input());
+        // Let the camera forget lifted fingers even when egui consumed the touch end.
+        let is_touch_end = matches!(
+            event,
+            WindowEvent::Touch(Touch {
+                phase: TouchPhase::Ended | TouchPhase::Cancelled,
+                ..
+            })
+        );
+        if egui_consumed && !is_touch_end {
             return true;
         }
         let CameraControllerResponse {
@@ -332,7 +342,7 @@ impl Application {
         if needs_redraw {
             self.window.request_redraw();
         }
-        if captured_event {
+        if captured_event || egui_consumed {
             return true;
         }
         if let WindowEvent::Resized(size) = event {
