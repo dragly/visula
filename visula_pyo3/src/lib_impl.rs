@@ -16,6 +16,7 @@ use pyo3::exceptions::PyRuntimeError;
 use pyo3::types::PyFunction;
 use pyo3::{buffer::PyBuffer, prelude::*};
 
+use visula::post_process::config::{SkyMode, Tonemapping};
 use visula::{
     Expression, InstanceBuffer, LineGeometry, LineMaterial, Lines, Renderable, SphereGeometry,
     SphereMaterial, Spheres,
@@ -898,16 +899,30 @@ fn convert_or(
     }
 }
 
+fn tonemapping(name: &str) -> PyResult<Tonemapping> {
+    match name {
+        "aces" => Ok(Tonemapping::AcesFilmic),
+        "reinhard" => Ok(Tonemapping::Reinhard),
+        "none" => Ok(Tonemapping::None),
+        _ => Err(PyRuntimeError::new_err(format!(
+            "Unknown tonemapping '{name}', expected one of: aces, reinhard, none"
+        ))),
+    }
+}
+
 #[pyfunction]
-#[pyo3(signature = (py_application, py_renderables, update=None, controls=Vec::new()))]
+#[pyo3(signature = (py_application, py_renderables, clear_color, tonemapping, update=None, controls=Vec::new()))]
 fn show(
     py: Python,
     py_application: &Bound<PyApplication>,
     py_renderables: Vec<Py<PyAny>>,
+    clear_color: Option<[f64; 3]>,
+    tonemapping: &str,
     update: Option<Py<PyFunction>>,
     controls: Vec<Py<PySlider>>,
 ) -> PyResult<()> {
     {
+        let tonemapping = self::tonemapping(tonemapping)?;
         let mut py_application_mut = py_application.borrow_mut();
         let Some(ref application) = py_application_mut.application else {
             return Err(PyRuntimeError::new_err("Application not yet initialized"));
@@ -979,6 +994,15 @@ fn show(
         py_application_mut.renderables = renderables;
         py_application_mut.update = update;
         py_application_mut.controls = controls;
+        if let Some([r, g, b]) = clear_color {
+            py_application_mut.clear_color = wgpu::Color { r, g, b, a: 1.0 };
+        }
+        if let Some(application) = py_application_mut.application.as_mut() {
+            application.post_processor.config.tonemapping = tonemapping;
+            if clear_color.is_some() {
+                application.post_processor.config.sky.mode = SkyMode::Off;
+            }
+        }
     }
 
     Ok(())

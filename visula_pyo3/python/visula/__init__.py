@@ -1,5 +1,5 @@
 from ._visula_pyo3 import Lines, Spheres
-from .figure import Figure
+from .figure import Figure, TonemappingName
 from .expression import Expression, ExpressionLike, mat4, vec2, vec3, vec4
 from .instance_buffer import InstanceBuffer
 from .math import (
@@ -44,6 +44,7 @@ __all__ = [
     "Expression",
     "ExpressionLike",
     "ColormapName",
+    "TonemappingName",
     "InstanceBuffer",
     "Uniform",
     "Slider",
