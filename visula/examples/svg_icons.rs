@@ -9,7 +9,8 @@ use lyon::tessellation::{
 use std::path::PathBuf;
 use usvg::{Node, Paint, Tree};
 use visula::{
-    CustomEvent, Expression, PolygonDelegate, PolygonVertex, Polygons, RenderData, Renderable,
+    srgb_u8, CustomEvent, Expression, PolygonDelegate, PolygonVertex, Polygons, RenderData,
+    Renderable,
 };
 use winit::event::Event;
 
@@ -25,12 +26,7 @@ struct RenderedPath {
 }
 
 fn usvg_color_to_vec4(color: &usvg::Color, opacity: f32) -> Vec4 {
-    Vec4::new(
-        color.red as f32 / 255.0,
-        color.green as f32 / 255.0,
-        color.blue as f32 / 255.0,
-        opacity,
-    )
+    srgb_u8(color.red, color.green, color.blue).extend(opacity)
 }
 
 fn tiny_skia_path_to_lyon(
