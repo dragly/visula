@@ -64,7 +64,7 @@ pub struct CameraController {
     pub current_transform: CameraTransform,
     pub target_transform: CameraTransform,
     pub smoothing: f32,
-    active_touch: Option<ActiveTouch>,
+    touches: Vec<ActiveTouch>,
     last_cursor_position: Option<PhysicalPosition<f64>>,
     window_size: PhysicalSize<u32>,
     first_intersection: Option<Vec3>,
@@ -120,7 +120,7 @@ impl CameraController {
             target_transform: transform.clone(),
             previous_time: Instant::now(),
             smoothing: 0.8,
-            active_touch: None,
+            touches: Vec::new(),
             last_cursor_position: None,
             window_size: window.inner_size(),
             first_intersection: None,
@@ -189,10 +189,26 @@ impl CameraController {
         }
     }
 
-    fn pan(&mut self, position: PhysicalPosition<f64>) {
+    fn finger_pair(&self) -> Option<(f32, Vec2)> {
+        match self.touches.as_slice() {
+            [first, second] => Some((
+                first.position.distance(second.position),
+                (first.position + second.position) / 2.0,
+            )),
+            _ => None,
+        }
+    }
+
+    fn pinch(&mut self, previous_gap: f32, gap: f32) {
+        if previous_gap > 0.0 && gap > 0.0 {
+            self.target_transform.distance *= previous_gap / gap;
+        }
+    }
+
+    fn pan(&mut self, position: Vec2) {
         let ndc_ray = Vec4::new(
-            2.0 * position.x as f32 / self.window_size.width as f32 - 1.0,
-            1.0 - 2.0 * position.y as f32 / self.window_size.height as f32,
+            2.0 * position.x / self.window_size.width as f32 - 1.0,
+            1.0 - 2.0 * position.y / self.window_size.height as f32,
             0.0,
             1.0,
         );
@@ -272,7 +288,7 @@ impl CameraController {
             WindowEvent::CursorMoved { position, .. } => {
                 let previous_position = self.last_cursor_position.replace(*position);
                 if self.right_pressed || (self.left_pressed && self.shift_pressed) {
-                    self.pan(*position);
+                    self.pan(Vec2::new(position.x as f32, position.y as f32));
                 } else if self.left_pressed {
                     if let Some(previous_position) = previous_position {
                         let position_diff = Vec2 {
@@ -317,19 +333,26 @@ impl CameraController {
             },
             WindowEvent::Touch(touch) => match touch.phase {
                 TouchPhase::Started => {
-                    if self.active_touch.is_none() {
-                        self.active_touch = Some(ActiveTouch {
+                    if self.touches.len() < 2 {
+                        if self.touches.is_empty() {
+                            self.state = State::PressedWaiting;
+                        }
+                        self.touches.push(ActiveTouch {
                             id: touch.id,
                             position: Vec2::new(touch.location.x as f32, touch.location.y as f32),
                         });
-                        self.state = State::PressedWaiting;
+                        if let Some((_, midpoint)) = self.finger_pair() {
+                            self.first_intersection = None;
+                            self.pan(midpoint);
+                        }
                     }
                 }
                 TouchPhase::Moved => {
+                    let previous_pair = self.finger_pair();
                     let Some(active_touch) = self
-                        .active_touch
-                        .as_mut()
-                        .filter(|active_touch| active_touch.id == touch.id)
+                        .touches
+                        .iter_mut()
+                        .find(|active_touch| active_touch.id == touch.id)
                     else {
                         return response;
                     };
@@ -339,16 +362,29 @@ impl CameraController {
                         return response;
                     }
                     active_touch.position = position;
-                    self.rotate(position_diff);
+                    match (previous_pair, self.finger_pair()) {
+                        (Some((previous_gap, _)), Some((gap, midpoint))) => {
+                            if self.zoom_enabled {
+                                self.pinch(previous_gap, gap);
+                            }
+                            self.pan(midpoint);
+                        }
+                        _ => self.rotate(position_diff),
+                    }
                     response.needs_redraw = true;
                     self.state = State::Moving;
                 }
                 TouchPhase::Ended | TouchPhase::Cancelled => {
-                    if self
-                        .active_touch
-                        .is_some_and(|active_touch| active_touch.id == touch.id)
-                    {
-                        self.active_touch = None;
+                    let Some(index) = self
+                        .touches
+                        .iter()
+                        .position(|active_touch| active_touch.id == touch.id)
+                    else {
+                        return response;
+                    };
+                    self.touches.remove(index);
+                    self.first_intersection = None;
+                    if self.touches.is_empty() {
                         response.captured_event = self.state == State::Moving;
                         self.state = State::Released;
                     }
