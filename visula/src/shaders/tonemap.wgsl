@@ -35,6 +35,8 @@ var ssao_texture: texture_2d<f32>;
 @group(0) @binding(4)
 var bloom_texture: texture_2d<f32>;
 
+override encode_srgb: bool;
+
 fn aces_filmic(x: vec3<f32>) -> vec3<f32> {
     let a = 2.51;
     let b = 0.03;
@@ -46,6 +48,13 @@ fn aces_filmic(x: vec3<f32>) -> vec3<f32> {
 
 fn reinhard(x: vec3<f32>) -> vec3<f32> {
     return x / (x + vec3<f32>(1.0));
+}
+
+fn linear_to_srgb(x: vec3<f32>) -> vec3<f32> {
+    let c = clamp(x, vec3<f32>(0.0), vec3<f32>(1.0));
+    let low = c * 12.92;
+    let high = 1.055 * pow(c, vec3<f32>(1.0 / 2.4)) - 0.055;
+    return select(high, low, c <= vec3<f32>(0.0031308));
 }
 
 @fragment
@@ -67,6 +76,10 @@ fn fs_main(in: FullscreenOutput) -> @location(0) vec4<f32> {
         color = reinhard(color);
     } else if params.mode == 2u {
         color = aces_filmic(color);
+    }
+
+    if encode_srgb {
+        color = linear_to_srgb(color);
     }
 
     return vec4<f32>(color, 1.0);

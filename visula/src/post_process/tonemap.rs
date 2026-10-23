@@ -140,7 +140,13 @@ impl TonemapPass {
                     blend: None,
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                compilation_options: wgpu::PipelineCompilationOptions {
+                    constants: &[(
+                        "encode_srgb",
+                        if output_format.is_srgb() { 0.0 } else { 1.0 },
+                    )],
+                    ..Default::default()
+                },
             }),
             primitive: wgpu::PrimitiveState::default(),
             depth_stencil: None,
