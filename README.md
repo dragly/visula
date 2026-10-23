@@ -69,7 +69,32 @@ fn main() {
 }
 ```
 
+## Colors
 
+Color values in Visula are linear RGB.
+That goes for instance data, uniforms, `clear_color()`, mesh vertex colors
+and the post-processing config.
+Lighting, blending and post-processing happen in linear space,
+and the final pass encodes the result to sRGB.
+
+Hex and CSS colors are sRGB-encoded,
+so they need to be converted before they are passed in:
+
+```rust
+use visula::{srgb, srgb_u8};
+
+let cold = srgb(0x6E8FC9); // linear (0.156, 0.275, 0.584)
+let hot = srgb_u8(216, 134, 90);
+```
+
+To mix colors in sRGB space instead (as many web designs do),
+mix the encoded values and decode the result on the GPU with `srgb_to_linear`:
+
+```python
+cold = (110 / 255, 143 / 255, 201 / 255)
+hot = (216 / 255, 134 / 255, 90 / 255)
+color = vl.srgb_to_linear(vl.mix(cold, hot, t))
+```
 
 ## Run the examples
 
