@@ -5,6 +5,7 @@ cd "$(dirname "$0")/.."
 
 EXAMPLES=(
   clay
+  colors
   debug_cylinder
   gltf_viewer
   grid
