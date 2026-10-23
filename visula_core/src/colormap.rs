@@ -1,4 +1,5 @@
-use crate::value::{clamp, vec3, Expression};
+use crate::color::srgb_to_linear;
+use crate::value::{clamp, Expression};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Colormap {
@@ -74,7 +75,5 @@ pub fn colormap(value: impl Into<Expression>, map: Colormap) -> Expression {
     for c in coefficients[..6].iter().rev() {
         color = Expression::from(glam::Vec3::from_array(*c)) + t.clone() * color;
     }
-    // The fits produce sRGB-encoded values, while the shaders work in
-    // linear color, so decode with the common gamma approximation.
-    clamp(color, glam::Vec3::ZERO, glam::Vec3::ONE).pow(vec3(2.2, 2.2, 2.2))
+    srgb_to_linear(clamp(color, glam::Vec3::ZERO, glam::Vec3::ONE))
 }
