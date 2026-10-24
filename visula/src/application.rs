@@ -1,3 +1,4 @@
+use crate::activation::{self, Activation};
 use crate::camera::Camera;
 use crate::light::DirectionalLight;
 use crate::post_process::PostProcessor;
@@ -45,6 +46,7 @@ pub struct Application {
     pub sample_count: u32,
     pending_screenshot: Option<PathBuf>,
     surface_supports_copy_src: bool,
+    activation: Option<Activation>,
 }
 
 fn create_egui_context() -> egui::Context {
@@ -245,6 +247,7 @@ impl Application {
             sample_count,
             pending_screenshot: None,
             surface_supports_copy_src,
+            activation: None,
         })
     }
 
@@ -298,6 +301,25 @@ impl Application {
         if window_id != self.window.id() {
             return false;
         }
+        let is_pointer_event = matches!(
+            event,
+            WindowEvent::MouseInput { .. }
+                | WindowEvent::MouseWheel { .. }
+                | WindowEvent::CursorMoved { .. }
+                | WindowEvent::Touch(_)
+        );
+        if is_pointer_event {
+            if let Some(activation) = self
+                .activation
+                .as_mut()
+                .filter(|activation| !activation.active)
+            {
+                if activation.is_tap(event, 10.0 * self.window.scale_factor()) {
+                    self.set_active(true);
+                }
+                return true;
+            }
+        }
         let response = self
             .egui_renderer
             .state
@@ -310,13 +332,6 @@ impl Application {
                 | WindowEvent::HoveredFileCancelled
         );
         let egui_ctx = self.egui_renderer.state.egui_ctx().clone();
-        let is_pointer_event = matches!(
-            event,
-            WindowEvent::MouseInput { .. }
-                | WindowEvent::MouseWheel { .. }
-                | WindowEvent::CursorMoved { .. }
-                | WindowEvent::Touch(_)
-        );
         let is_keyboard_event = matches!(
             event,
             WindowEvent::KeyboardInput { .. } | WindowEvent::Ime(_)
@@ -349,6 +364,18 @@ impl Application {
             self.resize(*size);
         }
         false
+    }
+
+    pub(crate) fn enable_click_to_activate(&mut self) {
+        self.activation = Some(Activation::default());
+        activation::capture_page_input(&self.window, false);
+    }
+
+    fn set_active(&mut self, active: bool) {
+        if let Some(activation) = &mut self.activation {
+            activation.active = active;
+        }
+        activation::capture_page_input(&self.window, active);
     }
 
     pub fn resize(&mut self, size: PhysicalSize<u32>) {
@@ -581,10 +608,20 @@ impl Application {
             .render_tonemap(&mut encoder, &self.queue, &view);
 
         let raw_input = self.egui_renderer.state.take_egui_input(&self.window);
+        let active = self.activation.as_ref().map(|activation| activation.active);
+        let mut done = false;
         #[allow(deprecated)]
         let full_output = self.egui_renderer.state.egui_ctx().run(raw_input, |ui| {
             simulation.gui(self, ui);
+            match active {
+                Some(false) => activation::show_hint(ui),
+                Some(true) => done = activation::show_done_button(ui),
+                None => {}
+            }
         });
+        if done {
+            self.set_active(false);
+        }
 
         self.egui_renderer
             .state

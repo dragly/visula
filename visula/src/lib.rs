@@ -39,6 +39,7 @@ pub use visula_core::{
     TextureInput, UniformBuffer,
 };
 
+mod activation;
 pub mod application;
 pub mod camera;
 pub mod custom_event;
@@ -83,6 +84,7 @@ pub type Point3 = cgmath::Point3<f32>;
 
 pub struct RunConfig {
     pub canvas_name: String,
+    pub click_to_activate: bool,
 }
 
 struct App<F, S> {
@@ -195,6 +197,9 @@ where
     fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: CustomEvent) {
         match event {
             CustomEvent::Application(mut application) => {
+                if cfg!(target_arch = "wasm32") && self.config.click_to_activate {
+                    application.enable_click_to_activate();
+                }
                 application.resize(application.window.inner_size());
                 application.window.request_redraw();
                 self.application = Some(*application);
@@ -212,6 +217,7 @@ where
     run_with_config(
         RunConfig {
             canvas_name: "glcanvas".to_string(),
+            click_to_activate: false,
         },
         init,
     )
@@ -293,6 +299,7 @@ pub fn create_window(event_loop: &ActiveEventLoop) -> Result<Arc<Window>, error:
     create_window_with_config(
         &RunConfig {
             canvas_name: "glcanvas".to_owned(),
+            click_to_activate: false,
         },
         event_loop,
     )

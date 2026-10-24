@@ -57,11 +57,13 @@ python = ["visula-core/python", "dep:pyo3", "dep:pyo3-build-config"]
 version = "0.3"
 features = [
   "Blob",
+  "CssStyleDeclaration",
   "DataTransfer",
   "File",
   "FileList",
   "DataTransferItemList",
   "DragEvent",
+  "HtmlElement",
   "Window",
 ]
 
