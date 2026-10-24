@@ -36,6 +36,12 @@ impl CameraTransform {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+struct ActiveTouch {
+    id: u64,
+    position: Vec2,
+}
+
 #[derive(Clone, Debug)]
 pub enum DragPlane {
     Z,
@@ -58,7 +64,7 @@ pub struct CameraController {
     pub current_transform: CameraTransform,
     pub target_transform: CameraTransform,
     pub smoothing: f32,
-    last_screen_position: Option<PhysicalPosition<f64>>,
+    touches: Vec<ActiveTouch>,
     last_cursor_position: Option<PhysicalPosition<f64>>,
     window_size: PhysicalSize<u32>,
     first_intersection: Option<Vec3>,
@@ -114,7 +120,7 @@ impl CameraController {
             target_transform: transform.clone(),
             previous_time: Instant::now(),
             smoothing: 0.8,
-            last_screen_position: None,
+            touches: Vec::new(),
             last_cursor_position: None,
             window_size: window.inner_size(),
             first_intersection: None,
@@ -183,10 +189,26 @@ impl CameraController {
         }
     }
 
-    fn pan(&mut self, position: PhysicalPosition<f64>) {
+    fn finger_pair(&self) -> Option<(f32, Vec2)> {
+        match self.touches.as_slice() {
+            [first, second] => Some((
+                first.position.distance(second.position),
+                (first.position + second.position) / 2.0,
+            )),
+            _ => None,
+        }
+    }
+
+    fn pinch(&mut self, previous_gap: f32, gap: f32) {
+        if previous_gap > 0.0 && gap > 0.0 {
+            self.target_transform.distance *= previous_gap / gap;
+        }
+    }
+
+    fn pan(&mut self, position: Vec2) {
         let ndc_ray = Vec4::new(
-            2.0 * position.x as f32 / self.window_size.width as f32 - 1.0,
-            1.0 - 2.0 * position.y as f32 / self.window_size.height as f32,
+            2.0 * position.x / self.window_size.width as f32 - 1.0,
+            1.0 - 2.0 * position.y / self.window_size.height as f32,
             0.0,
             1.0,
         );
@@ -266,7 +288,7 @@ impl CameraController {
             WindowEvent::CursorMoved { position, .. } => {
                 let previous_position = self.last_cursor_position.replace(*position);
                 if self.right_pressed || (self.left_pressed && self.shift_pressed) {
-                    self.pan(*position);
+                    self.pan(Vec2::new(position.x as f32, position.y as f32));
                 } else if self.left_pressed {
                     if let Some(previous_position) = previous_position {
                         let position_diff = Vec2 {
@@ -311,46 +333,61 @@ impl CameraController {
             },
             WindowEvent::Touch(touch) => match touch.phase {
                 TouchPhase::Started => {
-                    self.left_pressed = true;
-                    self.state = State::PressedWaiting;
-                }
-                TouchPhase::Ended => {
-                    self.left_pressed = false;
-                    self.state = State::Released;
+                    if self.touches.len() < 2 {
+                        if self.touches.is_empty() {
+                            self.state = State::PressedWaiting;
+                        }
+                        self.touches.push(ActiveTouch {
+                            id: touch.id,
+                            position: Vec2::new(touch.location.x as f32, touch.location.y as f32),
+                        });
+                        if let Some((_, midpoint)) = self.finger_pair() {
+                            self.first_intersection = None;
+                            self.pan(midpoint);
+                        }
+                    }
                 }
                 TouchPhase::Moved => {
-                    let up = self.target_transform.up.normalize();
-                    let forward = self.target_transform.forward.normalize();
-                    let right = Vec3::cross(forward, up).normalize();
-
-                    let position_diff = match self.last_screen_position {
-                        None => Vec2::ZERO,
-                        Some(last) => Vec2 {
-                            x: (touch.location.x - last.x) as f32,
-                            y: (touch.location.y - last.y) as f32,
-                        },
+                    let previous_pair = self.finger_pair();
+                    let Some(active_touch) = self
+                        .touches
+                        .iter_mut()
+                        .find(|active_touch| active_touch.id == touch.id)
+                    else {
+                        return response;
                     };
-                    if (position_diff.x + position_diff.y).abs() < 0.000001 {
-                        return CameraControllerResponse {
-                            needs_redraw: false,
-                            captured_event: false,
-                        };
+                    let position = Vec2::new(touch.location.x as f32, touch.location.y as f32);
+                    let position_diff = position - active_touch.position;
+                    if position_diff.length_squared() < 0.000001 {
+                        return response;
                     }
-                    let rotation_x = Quat::from_axis_angle(
-                        self.target_transform.true_up,
-                        -self.rotational_speed * position_diff.x,
-                    );
-                    let rotation_y =
-                        Quat::from_axis_angle(right, -self.rotational_speed * position_diff.y);
-                    self.target_transform.forward =
-                        (rotation_x * rotation_y * self.target_transform.forward).normalize();
-                    self.target_transform.up =
-                        (rotation_x * rotation_y * self.target_transform.up).normalize();
-                    self.last_screen_position = Some(touch.location);
+                    active_touch.position = position;
+                    match (previous_pair, self.finger_pair()) {
+                        (Some((previous_gap, _)), Some((gap, midpoint))) => {
+                            if self.zoom_enabled {
+                                self.pinch(previous_gap, gap);
+                            }
+                            self.pan(midpoint);
+                        }
+                        _ => self.rotate(position_diff),
+                    }
+                    response.needs_redraw = true;
+                    self.state = State::Moving;
                 }
-                TouchPhase::Cancelled => {
-                    self.left_pressed = false;
-                    self.state = State::Released;
+                TouchPhase::Ended | TouchPhase::Cancelled => {
+                    let Some(index) = self
+                        .touches
+                        .iter()
+                        .position(|active_touch| active_touch.id == touch.id)
+                    else {
+                        return response;
+                    };
+                    self.touches.remove(index);
+                    self.first_intersection = None;
+                    if self.touches.is_empty() {
+                        response.captured_event = self.state == State::Moving;
+                        self.state = State::Released;
+                    }
                 }
             },
             _ => {}
