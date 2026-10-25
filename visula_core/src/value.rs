@@ -6,7 +6,7 @@ use std::{
 
 use naga::{GlobalVariable, ResourceBinding, Span};
 
-use crate::{BindingBuilder, InstanceField, TextureField, UniformField};
+use crate::{BindingBuilder, InstanceField, ShaderError, TextureField, UniformField};
 
 #[derive(Clone)]
 pub struct ExpressionInner {
@@ -258,13 +258,13 @@ fn load_local_variable(
     name: &str,
     module: &mut naga::Module,
     binding_builder: &BindingBuilder,
-) -> naga::Handle<naga::Expression> {
+) -> Result<naga::Handle<naga::Expression>, ShaderError> {
     let entry_point = &mut module.entry_points[binding_builder.entry_point_index];
     let variable = entry_point
         .function
         .local_variables
         .fetch_if(|variable| variable.name == Some(name.into()))
-        .unwrap_or_else(|| panic!("Local variable '{}' not found in shader", name));
+        .ok_or_else(|| ShaderError::VariableNotFound(name.to_string()))?;
     let variable_expression = entry_point
         .function
         .expressions
@@ -272,13 +272,13 @@ fn load_local_variable(
             naga::Expression::LocalVariable(v) => v == &variable,
             _ => false,
         })
-        .unwrap_or_else(|| panic!("Expression for local variable '{}' not found", name));
-    entry_point.function.expressions.append(
+        .ok_or_else(|| ShaderError::VariableNotFound(name.to_string()))?;
+    Ok(entry_point.function.expressions.append(
         naga::Expression::Load {
             pointer: variable_expression,
         },
         Span::default(),
-    )
+    ))
 }
 
 fn is_expression_vec4(
@@ -332,13 +332,16 @@ fn is_expression_vec4(
     }
 }
 
-fn find_function(module: &naga::Module, name: &str) -> naga::Handle<naga::Function> {
+fn find_function(
+    module: &naga::Module,
+    name: &str,
+) -> Result<naga::Handle<naga::Function>, ShaderError> {
     module
         .functions
         .iter()
         .find(|(_, f)| f.name.as_deref() == Some(name))
         .map(|(handle, _)| handle)
-        .unwrap_or_else(|| panic!("Function '{}' not found in shader", name))
+        .ok_or_else(|| ShaderError::FunctionNotFound(name.to_string()))
 }
 
 impl Expression {
@@ -346,10 +349,10 @@ impl Expression {
         &self,
         module: &mut naga::Module,
         binding_builder: &mut BindingBuilder,
-    ) -> naga::Handle<naga::Expression> {
+    ) -> Result<naga::Handle<naga::Expression>, ShaderError> {
         let val = self.clone();
 
-        match val {
+        Ok(match val {
             Expression::Literal(inner) => module.entry_points[binding_builder.entry_point_index]
                 .function
                 .expressions
@@ -369,7 +372,7 @@ impl Expression {
                 let components_setup = [x, y]
                     .iter()
                     .map(|component| component.setup(module, binding_builder))
-                    .collect();
+                    .collect::<Result<_, _>>()?;
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -396,7 +399,7 @@ impl Expression {
                 let components_setup = [x, y, z]
                     .iter()
                     .map(|component| component.setup(module, binding_builder))
-                    .collect();
+                    .collect::<Result<_, _>>()?;
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -423,7 +426,7 @@ impl Expression {
                 let components_setup = [x, y, z, w]
                     .iter()
                     .map(|component| component.setup(module, binding_builder))
-                    .collect();
+                    .collect::<Result<_, _>>()?;
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -456,7 +459,7 @@ impl Expression {
                 let components_setup = [x_axis, y_axis, z_axis, w_axis]
                     .iter()
                     .map(|component| component.setup(module, binding_builder))
-                    .collect();
+                    .collect::<Result<_, _>>()?;
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -473,8 +476,8 @@ impl Expression {
                 right,
                 operator,
             } => {
-                let left_setup = left.setup(module, binding_builder);
-                let right_setup = right.setup(module, binding_builder);
+                let left_setup = left.setup(module, binding_builder)?;
+                let right_setup = right.setup(module, binding_builder)?;
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -488,7 +491,7 @@ impl Expression {
                     )
             }
             Expression::UnaryOperator { value, operator } => {
-                let value_setup = value.setup(module, binding_builder);
+                let value_setup = value.setup(module, binding_builder)?;
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -506,7 +509,9 @@ impl Expression {
             } => {
                 let mut handles = arguments
                     .iter()
-                    .map(|argument| argument.setup(module, binding_builder));
+                    .map(|argument| argument.setup(module, binding_builder))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter();
                 let arg = handles.next().expect("Math expression without arguments");
                 let arg1 = handles.next();
                 let arg2 = handles.next();
@@ -635,7 +640,7 @@ impl Expression {
                         naga::Expression::GlobalVariable(sampler_variable),
                         Span::default(),
                     );
-                let coordinate = field.coordinate.setup(module, binding_builder);
+                let coordinate = field.coordinate.setup(module, binding_builder)?;
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -702,32 +707,32 @@ impl Expression {
                         Span::default(),
                     )
             }
-            Expression::Normal => load_local_variable("_visula_normal", module, binding_builder),
+            Expression::Normal => load_local_variable("_visula_normal", module, binding_builder)?,
             Expression::Position => {
-                load_local_variable("_visula_position", module, binding_builder)
+                load_local_variable("_visula_position", module, binding_builder)?
             }
             Expression::ViewDirection => {
-                load_local_variable("_visula_view_direction", module, binding_builder)
+                load_local_variable("_visula_view_direction", module, binding_builder)?
             }
             Expression::InputColor => {
-                load_local_variable("_visula_input_color", module, binding_builder)
+                load_local_variable("_visula_input_color", module, binding_builder)?
             }
             Expression::Lit(color) => {
-                let color_handle = color.setup(module, binding_builder);
+                let color_handle = color.setup(module, binding_builder)?;
                 let is_vec4 =
                     is_expression_vec4(color_handle, module, binding_builder.entry_point_index);
-                let normal_handle = load_local_variable("_visula_normal", module, binding_builder);
+                let normal_handle = load_local_variable("_visula_normal", module, binding_builder)?;
                 let view_handle =
-                    load_local_variable("_visula_view_direction", module, binding_builder);
+                    load_local_variable("_visula_view_direction", module, binding_builder)?;
                 let position_handle =
-                    load_local_variable("_visula_position", module, binding_builder);
+                    load_local_variable("_visula_position", module, binding_builder)?;
 
                 let fname = if is_vec4 {
                     "visula_lit_vec4"
                 } else {
                     "visula_lit_vec3"
                 };
-                let function = find_function(module, fname);
+                let function = find_function(module, fname)?;
                 let ep = binding_builder.entry_point_index;
                 let result = module.entry_points[ep]
                     .function
@@ -743,21 +748,21 @@ impl Expression {
                 result
             }
             Expression::ToonLit(color) => {
-                let color_handle = color.setup(module, binding_builder);
+                let color_handle = color.setup(module, binding_builder)?;
                 let is_vec4 =
                     is_expression_vec4(color_handle, module, binding_builder.entry_point_index);
-                let normal_handle = load_local_variable("_visula_normal", module, binding_builder);
+                let normal_handle = load_local_variable("_visula_normal", module, binding_builder)?;
                 let view_handle =
-                    load_local_variable("_visula_view_direction", module, binding_builder);
+                    load_local_variable("_visula_view_direction", module, binding_builder)?;
                 let position_handle =
-                    load_local_variable("_visula_position", module, binding_builder);
+                    load_local_variable("_visula_position", module, binding_builder)?;
 
                 let fname = if is_vec4 {
                     "visula_toon_lit_vec4"
                 } else {
                     "visula_toon_lit_vec3"
                 };
-                let function = find_function(module, fname);
+                let function = find_function(module, fname)?;
                 let ep = binding_builder.entry_point_index;
                 let result = module.entry_points[ep]
                     .function
@@ -773,19 +778,19 @@ impl Expression {
                 result
             }
             Expression::DirectionalLit(color) => {
-                let color_handle = color.setup(module, binding_builder);
+                let color_handle = color.setup(module, binding_builder)?;
                 let is_vec4 =
                     is_expression_vec4(color_handle, module, binding_builder.entry_point_index);
-                let normal_handle = load_local_variable("_visula_normal", module, binding_builder);
+                let normal_handle = load_local_variable("_visula_normal", module, binding_builder)?;
                 let position_handle =
-                    load_local_variable("_visula_position", module, binding_builder);
+                    load_local_variable("_visula_position", module, binding_builder)?;
 
                 let fname = if is_vec4 {
                     "visula_directional_lit_vec4"
                 } else {
                     "visula_directional_lit_vec3"
                 };
-                let function = find_function(module, fname);
+                let function = find_function(module, fname)?;
                 let ep = binding_builder.entry_point_index;
                 let result = module.entry_points[ep]
                     .function
@@ -802,9 +807,9 @@ impl Expression {
             }
             Expression::Shared(shared) => {
                 if let Some(handle) = binding_builder.shared.get(&shared.id) {
-                    return *handle;
+                    return Ok(*handle);
                 }
-                let handle = shared.value.setup(module, binding_builder);
+                let handle = shared.value.setup(module, binding_builder)?;
                 let function = &mut module.entry_points[binding_builder.entry_point_index].function;
                 let expression = &function.expressions[handle];
                 let already_available = expression.needs_pre_emit()
@@ -822,7 +827,7 @@ impl Expression {
                 binding_builder.shared.insert(shared.id, handle);
                 handle
             }
-        }
+        })
     }
 }
 
@@ -1423,7 +1428,7 @@ mod tests {
     use visula_derive::{Instance, Uniform};
 
     use super::*;
-    use crate::test_util::{device, lower_to_wgsl};
+    use crate::test_util::{device, lower_to_module, lower_to_wgsl};
     use crate::{InstanceBuffer, UniformBuffer};
 
     #[repr(C)]
@@ -1581,5 +1586,15 @@ mod tests {
         );
         assert_eq!(wgsl.matches("let ").count(), 2);
         insta::assert_snapshot!(wgsl);
+    }
+
+    #[test]
+    fn missing_variable() {
+        let error =
+            lower_to_module(ShaderStage::Vertex, &[("vec3<f32>", Expression::Normal)]).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "variable '_visula_normal' not found in shader"
+        );
     }
 }
