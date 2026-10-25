@@ -332,6 +332,68 @@ fn is_expression_vec4(
     }
 }
 
+fn resolve_type(
+    handle: naga::Handle<naga::Expression>,
+    module: &naga::Module,
+    binding_builder: &mut BindingBuilder,
+) -> Result<naga::TypeInner, ShaderError> {
+    let function = &module.entry_points[binding_builder.entry_point_index].function;
+    let context = naga::proc::ResolveContext::with_locals(
+        module,
+        &function.local_variables,
+        &function.arguments,
+    );
+    binding_builder
+        .typifier
+        .grow(handle, &function.expressions, &context)?;
+    Ok(binding_builder.typifier.get(handle, &module.types).clone())
+}
+
+fn splat_scalar_operand(
+    operator: naga::BinaryOperator,
+    left: &mut naga::Handle<naga::Expression>,
+    right: &mut naga::Handle<naga::Expression>,
+    module: &mut naga::Module,
+    binding_builder: &mut BindingBuilder,
+) -> Result<(), ShaderError> {
+    if !matches!(
+        operator,
+        naga::BinaryOperator::Add
+            | naga::BinaryOperator::Subtract
+            | naga::BinaryOperator::Divide
+            | naga::BinaryOperator::Modulo
+    ) {
+        return Ok(());
+    }
+    let (scalar, size) = match (
+        resolve_type(*left, module, binding_builder)?,
+        resolve_type(*right, module, binding_builder)?,
+    ) {
+        (naga::TypeInner::Vector { size, scalar }, naga::TypeInner::Scalar(other))
+            if scalar == other =>
+        {
+            (right, size)
+        }
+        (naga::TypeInner::Scalar(other), naga::TypeInner::Vector { size, scalar })
+            if scalar == other =>
+        {
+            (left, size)
+        }
+        _ => return Ok(()),
+    };
+    *scalar = module.entry_points[binding_builder.entry_point_index]
+        .function
+        .expressions
+        .append(
+            naga::Expression::Splat {
+                size,
+                value: *scalar,
+            },
+            naga::Span::default(),
+        );
+    Ok(())
+}
+
 fn find_function(
     module: &naga::Module,
     name: &str,
@@ -476,8 +538,15 @@ impl Expression {
                 right,
                 operator,
             } => {
-                let left_setup = left.setup(module, binding_builder)?;
-                let right_setup = right.setup(module, binding_builder)?;
+                let mut left_setup = left.setup(module, binding_builder)?;
+                let mut right_setup = right.setup(module, binding_builder)?;
+                splat_scalar_operand(
+                    operator,
+                    &mut left_setup,
+                    &mut right_setup,
+                    module,
+                    binding_builder,
+                )?;
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -1596,5 +1665,40 @@ mod tests {
             error.to_string(),
             "variable '_visula_normal' not found in shader"
         );
+    }
+
+    #[repr(C)]
+    #[derive(Clone, Copy, Pod, Zeroable, Uniform)]
+    struct Background {
+        color: glam::Vec3,
+        _padding: f32,
+    }
+
+    #[test]
+    fn scalar_minus_vec3() {
+        let device = device();
+        let color = UniformBuffer::<Background>::new(&device).uniform().color;
+        let wgsl = lower_to_wgsl(
+            ShaderStage::Vertex,
+            &[("vec3<f32>", mix(&color, 1.0 - &color, 0.15))],
+        );
+        insta::assert_snapshot!(wgsl);
+    }
+
+    #[test]
+    fn scalar_and_vector_operands() {
+        let device = device();
+        let color = UniformBuffer::<Background>::new(&device).uniform().color;
+        let wgsl = lower_to_wgsl(
+            ShaderStage::Vertex,
+            &[
+                ("vec3<f32>", 0.5 + &color),
+                ("vec3<f32>", &color - 0.5),
+                ("vec3<f32>", 2.0 * &color),
+                ("vec3<f32>", 2.0 / &color),
+                ("vec3<f32>", &color % 2.0),
+            ],
+        );
+        insta::assert_snapshot!(wgsl);
     }
 }

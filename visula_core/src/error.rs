@@ -14,4 +14,6 @@ pub enum ShaderError {
     VariableNotFound(String),
     #[error("function '{0}' not found in shader")]
     FunctionNotFound(String),
+    #[error("failed to resolve the type of an expression: {0}")]
+    Resolve(#[from] naga::proc::ResolveError),
 }
