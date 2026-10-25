@@ -81,10 +81,12 @@ pub fn inject(
         .function
         .body = new_body;
 
-    let info =
-        naga::valid::Validator::new(ValidationFlags::empty(), naga::valid::Capabilities::all())
-            .validate(module)
-            .map_err(Box::new)?;
+    let info = naga::valid::Validator::new(
+        ValidationFlags::EXPRESSIONS,
+        naga::valid::Capabilities::all(),
+    )
+    .validate(module)
+    .map_err(Box::new)?;
     let output_str = naga::back::wgsl::write_string(module, &info, WriterFlags::all())?;
     log::debug!("Resulting shader code:\n{output_str}");
     Ok(())
@@ -325,10 +327,12 @@ pub fn inject_before_return(
         .function
         .body = new_body;
 
-    let info =
-        naga::valid::Validator::new(ValidationFlags::empty(), naga::valid::Capabilities::all())
-            .validate(module)
-            .map_err(Box::new)?;
+    let info = naga::valid::Validator::new(
+        ValidationFlags::EXPRESSIONS,
+        naga::valid::Capabilities::all(),
+    )
+    .validate(module)
+    .map_err(Box::new)?;
     let output_str = naga::back::wgsl::write_string(module, &info, WriterFlags::all())?;
     log::debug!("Resulting shader code (inject_before_return):\n{output_str}");
     Ok(())
