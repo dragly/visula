@@ -29,4 +29,10 @@ pub enum ShaderError {
     },
     #[error("unsupported argument types: {function}({arguments})")]
     UnsupportedArgumentTypes { function: String, arguments: String },
+    #[error("mismatched types for {field}: expected {expected}, found {found}")]
+    FieldTypeMismatch {
+        field: String,
+        expected: String,
+        found: String,
+    },
 }
