@@ -40,7 +40,7 @@ pub fn inject(
         .iter()
         .enumerate()
         .map(|(index, value)| {
-            let expression = value.setup(module, binding_builder);
+            let expression = value.setup(module, binding_builder)?;
             let access_index = entry_point!(module, binding_builder.shader_stage)
                 .function
                 .expressions
@@ -115,7 +115,7 @@ pub fn inject_before_return(
         .iter()
         .enumerate()
         .map(|(index, value)| {
-            let expression = value.setup(module, binding_builder);
+            let expression = value.setup(module, binding_builder)?;
             let access_index = entry_point!(module, binding_builder.shader_stage)
                 .function
                 .expressions

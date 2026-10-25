@@ -2,7 +2,7 @@ use naga::back::wgsl::WriterFlags;
 use naga::valid::{Capabilities, ValidationFlags, Validator};
 use naga::ShaderStage;
 
-use crate::{inject, BindingBuilder, Expression};
+use crate::{inject, BindingBuilder, Expression, ShaderError};
 
 pub fn device() -> wgpu::Device {
     let (device, _queue) = wgpu::Device::noop(&wgpu::DeviceDescriptor::default());
@@ -25,23 +25,34 @@ fn template(stage: ShaderStage, fields: &[(&str, Expression)]) -> String {
     )
 }
 
-pub fn lower_to_wgsl(stage: ShaderStage, fields: &[(&str, Expression)]) -> String {
+pub fn lower_to_module(
+    stage: ShaderStage,
+    fields: &[(&str, Expression)],
+) -> Result<naga::Module, ShaderError> {
     let source = template(stage, fields);
     let mut module = naga::front::wgsl::parse_str(&source)
         .unwrap_or_else(|error| panic!("{}", error.emit_to_string(&source)));
     let expressions: Vec<Expression> = fields.iter().map(|(_, value)| value.clone()).collect();
     match stage {
         ShaderStage::Vertex => {
-            let mut binding_builder = BindingBuilder::new(&module, "vs_main", 0).unwrap();
-            inject::inject(&mut module, &mut binding_builder, "fields", &expressions).unwrap();
+            let mut binding_builder = BindingBuilder::new(&module, "vs_main", 0)?;
+            inject::inject(&mut module, &mut binding_builder, "fields", &expressions)?;
         }
         _ => {
-            let mut binding_builder = BindingBuilder::new(&module, "fs_main", 0).unwrap();
-            inject::inject_before_return(&mut module, &mut binding_builder, "fields", &expressions)
-                .unwrap();
+            let mut binding_builder = BindingBuilder::new(&module, "fs_main", 0)?;
+            inject::inject_before_return(
+                &mut module,
+                &mut binding_builder,
+                "fields",
+                &expressions,
+            )?;
         }
     }
+    Ok(module)
+}
 
+pub fn lower_to_wgsl(stage: ShaderStage, fields: &[(&str, Expression)]) -> String {
+    let module = lower_to_module(stage, fields).unwrap();
     let info = Validator::new(ValidationFlags::empty(), Capabilities::all())
         .validate(&module)
         .unwrap();

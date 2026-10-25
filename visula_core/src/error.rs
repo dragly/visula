@@ -12,4 +12,6 @@ pub enum ShaderError {
     EntryPointNotFound(String),
     #[error("variable '{0}' not found in shader")]
     VariableNotFound(String),
+    #[error("function '{0}' not found in shader")]
+    FunctionNotFound(String),
 }
