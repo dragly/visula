@@ -53,7 +53,7 @@ pub fn lower_to_module(
 
 pub fn lower_to_wgsl(stage: ShaderStage, fields: &[(&str, Expression)]) -> String {
     let module = lower_to_module(stage, fields).unwrap();
-    let info = Validator::new(ValidationFlags::empty(), Capabilities::all())
+    let info = Validator::new(ValidationFlags::EXPRESSIONS, Capabilities::all())
         .validate(&module)
         .unwrap();
     let wgsl = naga::back::wgsl::write_string(&module, &info, WriterFlags::all()).unwrap();

@@ -67,6 +67,7 @@ pub struct BindingBuilder {
     pub current_bind_group: u32,
     pub shader_stage: ShaderStage,
     pub pending_statements: Vec<naga::Statement>,
+    pub typifier: naga::front::Typifier,
 }
 
 impl BindingBuilder {
@@ -119,6 +120,7 @@ impl BindingBuilder {
             current_bind_group,
             shader_stage,
             pending_statements: Vec::new(),
+            typifier: naga::front::Typifier::new(),
         })
     }
 
