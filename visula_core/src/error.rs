@@ -16,4 +16,17 @@ pub enum ShaderError {
     FunctionNotFound(String),
     #[error("failed to resolve the type of an expression: {0}")]
     Resolve(#[from] naga::proc::ResolveError),
+    #[error("unsupported operand types: {left} {operator} {right}")]
+    UnsupportedOperandTypes {
+        operator: &'static str,
+        left: String,
+        right: String,
+    },
+    #[error("unsupported operand type: {operator}{operand}")]
+    UnsupportedOperandType {
+        operator: &'static str,
+        operand: String,
+    },
+    #[error("unsupported argument types: {function}({arguments})")]
+    UnsupportedArgumentTypes { function: String, arguments: String },
 }

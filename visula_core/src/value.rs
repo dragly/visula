@@ -4,6 +4,9 @@ use std::{
     rc::Rc,
 };
 
+use itertools::Itertools;
+use naga::common::wgsl::{TryToWgsl, TypeContext};
+use naga::proc::OverloadSet;
 use naga::{GlobalVariable, ResourceBinding, Span};
 
 use crate::{BindingBuilder, InstanceField, ShaderError, TextureField, UniformField};
@@ -349,6 +352,173 @@ fn resolve_type(
     Ok(binding_builder.typifier.get(handle, &module.types).clone())
 }
 
+fn resolve_types(
+    handles: &[naga::Handle<naga::Expression>],
+    module: &naga::Module,
+    binding_builder: &mut BindingBuilder,
+) -> Result<Vec<naga::TypeInner>, ShaderError> {
+    handles
+        .iter()
+        .map(|&handle| resolve_type(handle, module, binding_builder))
+        .collect()
+}
+
+fn type_name(inner: &naga::TypeInner, module: &naga::Module) -> String {
+    module
+        .types
+        .type_resolution_to_string(&naga::proc::TypeResolution::Value(inner.clone()))
+}
+
+fn type_names(types: &[naga::TypeInner], module: &naga::Module) -> String {
+    types
+        .iter()
+        .map(|inner| type_name(inner, module))
+        .join(", ")
+}
+
+const F32: naga::TypeInner = naga::TypeInner::Scalar(naga::Scalar::F32);
+
+const fn vector(size: naga::VectorSize) -> naga::TypeInner {
+    naga::TypeInner::Vector {
+        size,
+        scalar: naga::Scalar::F32,
+    }
+}
+
+fn operands_match(
+    operator: naga::BinaryOperator,
+    left: &naga::TypeInner,
+    right: &naga::TypeInner,
+) -> bool {
+    use naga::TypeInner::{Matrix, Scalar, Vector};
+    let numeric = matches!(
+        left.scalar().map(|scalar| scalar.kind),
+        Some(naga::ScalarKind::Float | naga::ScalarKind::Sint | naga::ScalarKind::Uint)
+    );
+    match operator {
+        naga::BinaryOperator::Add | naga::BinaryOperator::Subtract => numeric && left == right,
+        naga::BinaryOperator::Divide | naga::BinaryOperator::Modulo => {
+            numeric && !matches!(left, Matrix { .. }) && left == right
+        }
+        naga::BinaryOperator::Multiply => {
+            numeric
+                && left.scalar() == right.scalar()
+                && match (left, right) {
+                    (Scalar(_), _) | (_, Scalar(_)) => true,
+                    (Vector { size: a, .. }, Vector { size: b, .. })
+                    | (Matrix { columns: a, .. }, Vector { size: b, .. })
+                    | (Vector { size: a, .. }, Matrix { rows: b, .. })
+                    | (Matrix { columns: a, .. }, Matrix { rows: b, .. }) => a == b,
+                    _ => false,
+                }
+        }
+        _ => true,
+    }
+}
+
+fn check_operands(
+    operator: naga::BinaryOperator,
+    left: naga::Handle<naga::Expression>,
+    right: naga::Handle<naga::Expression>,
+    module: &naga::Module,
+    binding_builder: &mut BindingBuilder,
+) -> Result<(), ShaderError> {
+    let left = resolve_type(left, module, binding_builder)?;
+    let right = resolve_type(right, module, binding_builder)?;
+    if operands_match(operator, &left, &right) {
+        return Ok(());
+    }
+    Err(ShaderError::UnsupportedOperandTypes {
+        operator: naga::back::binary_operation_str(operator),
+        left: type_name(&left, module),
+        right: type_name(&right, module),
+    })
+}
+
+fn check_operand(
+    operator: naga::UnaryOperator,
+    operand: naga::Handle<naga::Expression>,
+    module: &naga::Module,
+    binding_builder: &mut BindingBuilder,
+) -> Result<(), ShaderError> {
+    let operand = resolve_type(operand, module, binding_builder)?;
+    let kind = match operand {
+        naga::TypeInner::Scalar(scalar) | naga::TypeInner::Vector { scalar, .. } => {
+            Some(scalar.kind)
+        }
+        _ => None,
+    };
+    let (symbol, supported) = match operator {
+        naga::UnaryOperator::Negate => (
+            "-",
+            matches!(kind, Some(naga::ScalarKind::Float | naga::ScalarKind::Sint)),
+        ),
+        naga::UnaryOperator::LogicalNot => ("!", kind == Some(naga::ScalarKind::Bool)),
+        naga::UnaryOperator::BitwiseNot => (
+            "~",
+            matches!(kind, Some(naga::ScalarKind::Sint | naga::ScalarKind::Uint)),
+        ),
+    };
+    if supported {
+        return Ok(());
+    }
+    Err(ShaderError::UnsupportedOperandType {
+        operator: symbol,
+        operand: type_name(&operand, module),
+    })
+}
+
+fn arguments_match(
+    function: naga::MathFunction,
+    arguments: &[naga::TypeInner],
+    module: &naga::Module,
+) -> bool {
+    let overloads = arguments
+        .iter()
+        .enumerate()
+        .fold(function.overloads(), |overloads, (index, argument)| {
+            overloads.arg(index, argument, &module.types)
+        });
+    !overloads.is_empty() && arguments.len() >= overloads.min_arguments()
+}
+
+fn compose(
+    ty: naga::TypeInner,
+    component: naga::TypeInner,
+    components: &[ExpressionInner],
+    module: &mut naga::Module,
+    binding_builder: &mut BindingBuilder,
+) -> Result<naga::Handle<naga::Expression>, ShaderError> {
+    let handles = components
+        .iter()
+        .map(|component| component.setup(module, binding_builder))
+        .collect::<Result<Vec<_>, _>>()?;
+    let types = resolve_types(&handles, module, binding_builder)?;
+    if types.iter().any(|inner| *inner != component) {
+        return Err(ShaderError::UnsupportedArgumentTypes {
+            function: type_name(&ty, module),
+            arguments: type_names(&types, module),
+        });
+    }
+    let ty = module.types.insert(
+        naga::Type {
+            name: None,
+            inner: ty,
+        },
+        naga::Span::default(),
+    );
+    Ok(module.entry_points[binding_builder.entry_point_index]
+        .function
+        .expressions
+        .append(
+            naga::Expression::Compose {
+                ty,
+                components: handles,
+            },
+            naga::Span::default(),
+        ))
+}
+
 fn splat_scalar_operand(
     operator: naga::BinaryOperator,
     left: &mut naga::Handle<naga::Expression>,
@@ -419,120 +589,43 @@ impl Expression {
                 .function
                 .expressions
                 .append(naga::Expression::Literal(inner), ::naga::Span::default()),
-            Expression::Vector2 { x, y } => {
-                let naga_type = ::naga::Type {
-                    name: None,
-                    inner: ::naga::TypeInner::Vector {
-                        scalar: ::naga::Scalar {
-                            kind: ::naga::ScalarKind::Float,
-                            width: 4,
-                        },
-                        size: ::naga::VectorSize::Bi,
-                    },
-                };
-                let field_type = module.types.insert(naga_type, ::naga::Span::default());
-                let components_setup = [x, y]
-                    .iter()
-                    .map(|component| component.setup(module, binding_builder))
-                    .collect::<Result<_, _>>()?;
-                module.entry_points[binding_builder.entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        ::naga::Expression::Compose {
-                            ty: field_type,
-                            components: components_setup,
-                        },
-                        ::naga::Span::default(),
-                    )
-            }
-            Expression::Vector3 { x, y, z } => {
-                let naga_type = ::naga::Type {
-                    name: None,
-                    inner: ::naga::TypeInner::Vector {
-                        scalar: ::naga::Scalar {
-                            kind: ::naga::ScalarKind::Float,
-                            width: 4,
-                        },
-                        size: ::naga::VectorSize::Tri,
-                    },
-                };
-                let field_type = module.types.insert(naga_type, ::naga::Span::default());
-                let components_setup = [x, y, z]
-                    .iter()
-                    .map(|component| component.setup(module, binding_builder))
-                    .collect::<Result<_, _>>()?;
-                module.entry_points[binding_builder.entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        ::naga::Expression::Compose {
-                            ty: field_type,
-                            components: components_setup,
-                        },
-                        ::naga::Span::default(),
-                    )
-            }
-            Expression::Vector4 { x, y, z, w } => {
-                let naga_type = ::naga::Type {
-                    name: None,
-                    inner: ::naga::TypeInner::Vector {
-                        scalar: ::naga::Scalar {
-                            kind: ::naga::ScalarKind::Float,
-                            width: 4,
-                        },
-                        size: ::naga::VectorSize::Quad,
-                    },
-                };
-                let field_type = module.types.insert(naga_type, ::naga::Span::default());
-                let components_setup = [x, y, z, w]
-                    .iter()
-                    .map(|component| component.setup(module, binding_builder))
-                    .collect::<Result<_, _>>()?;
-                module.entry_points[binding_builder.entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        ::naga::Expression::Compose {
-                            ty: field_type,
-                            components: components_setup,
-                        },
-                        ::naga::Span::default(),
-                    )
-            }
+            Expression::Vector2 { x, y } => compose(
+                vector(naga::VectorSize::Bi),
+                F32,
+                &[x, y],
+                module,
+                binding_builder,
+            )?,
+            Expression::Vector3 { x, y, z } => compose(
+                vector(naga::VectorSize::Tri),
+                F32,
+                &[x, y, z],
+                module,
+                binding_builder,
+            )?,
+            Expression::Vector4 { x, y, z, w } => compose(
+                vector(naga::VectorSize::Quad),
+                F32,
+                &[x, y, z, w],
+                module,
+                binding_builder,
+            )?,
             Expression::Matrix4 {
                 x_axis,
                 y_axis,
                 z_axis,
                 w_axis,
-            } => {
-                let naga_type = ::naga::Type {
-                    name: None,
-                    inner: ::naga::TypeInner::Matrix {
-                        columns: ::naga::VectorSize::Quad,
-                        rows: ::naga::VectorSize::Quad,
-                        scalar: ::naga::Scalar {
-                            kind: ::naga::ScalarKind::Float,
-                            width: 4,
-                        },
-                    },
-                };
-                let field_type = module.types.insert(naga_type, ::naga::Span::default());
-                let components_setup = [x_axis, y_axis, z_axis, w_axis]
-                    .iter()
-                    .map(|component| component.setup(module, binding_builder))
-                    .collect::<Result<_, _>>()?;
-                module.entry_points[binding_builder.entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        ::naga::Expression::Compose {
-                            ty: field_type,
-                            components: components_setup,
-                        },
-                        ::naga::Span::default(),
-                    )
-            }
+            } => compose(
+                naga::TypeInner::Matrix {
+                    columns: naga::VectorSize::Quad,
+                    rows: naga::VectorSize::Quad,
+                    scalar: naga::Scalar::F32,
+                },
+                vector(naga::VectorSize::Quad),
+                &[x_axis, y_axis, z_axis, w_axis],
+                module,
+                binding_builder,
+            )?,
             Expression::BinaryOperator {
                 left,
                 right,
@@ -547,6 +640,7 @@ impl Expression {
                     module,
                     binding_builder,
                 )?;
+                check_operands(operator, left_setup, right_setup, module, binding_builder)?;
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -561,6 +655,7 @@ impl Expression {
             }
             Expression::UnaryOperator { value, operator } => {
                 let value_setup = value.setup(module, binding_builder)?;
+                check_operand(operator, value_setup, module, binding_builder)?;
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -576,11 +671,18 @@ impl Expression {
                 function,
                 arguments,
             } => {
-                let mut handles = arguments
+                let handles = arguments
                     .iter()
                     .map(|argument| argument.setup(module, binding_builder))
-                    .collect::<Result<Vec<_>, _>>()?
-                    .into_iter();
+                    .collect::<Result<Vec<_>, _>>()?;
+                let types = resolve_types(&handles, module, binding_builder)?;
+                if !arguments_match(function, &types, module) {
+                    return Err(ShaderError::UnsupportedArgumentTypes {
+                        function: function.to_wgsl_for_diagnostics(),
+                        arguments: type_names(&types, module),
+                    });
+                }
+                let mut handles = handles.into_iter();
                 let arg = handles.next().expect("Math expression without arguments");
                 let arg1 = handles.next();
                 let arg2 = handles.next();
@@ -710,6 +812,13 @@ impl Expression {
                         Span::default(),
                     );
                 let coordinate = field.coordinate.setup(module, binding_builder)?;
+                let coordinate_type = resolve_type(coordinate, module, binding_builder)?;
+                if coordinate_type != vector(naga::VectorSize::Bi) {
+                    return Err(ShaderError::UnsupportedArgumentTypes {
+                        function: "sample".to_string(),
+                        arguments: type_name(&coordinate_type, module),
+                    });
+                }
                 module.entry_points[binding_builder.entry_point_index]
                     .function
                     .expressions
@@ -1498,7 +1607,7 @@ mod tests {
 
     use super::*;
     use crate::test_util::{device, lower_to_module, lower_to_wgsl};
-    use crate::{InstanceBuffer, UniformBuffer};
+    use crate::{InstanceBuffer, TextureBuffer, UniformBuffer};
 
     #[repr(C)]
     #[derive(Clone, Copy, Pod, Zeroable, Uniform)]
@@ -1700,5 +1809,73 @@ mod tests {
             ],
         );
         insta::assert_snapshot!(wgsl);
+    }
+
+    fn lowering_error(wgsl_type: &str, expression: Expression) -> String {
+        lower_to_module(ShaderStage::Vertex, &[(wgsl_type, expression)])
+            .unwrap_err()
+            .to_string()
+    }
+
+    #[test]
+    fn mismatched_operands() {
+        let device = device();
+        let color = UniformBuffer::<Background>::new(&device).uniform().color;
+        let difference = Expression::from(glam::Vec2::ONE) - &color;
+        assert_eq!(
+            lowering_error("vec3<f32>", mix(&color, difference, 0.15)),
+            "unsupported operand types: vec2<f32> - vec3<f32>"
+        );
+        assert_eq!(
+            lowering_error("vec3<f32>", &color + 1),
+            "unsupported operand types: vec3<f32> + i32"
+        );
+        assert_eq!(
+            lowering_error("vec3<f32>", Expression::from(glam::Mat4::IDENTITY) * &color),
+            "unsupported operand types: mat4x4<f32> * vec3<f32>"
+        );
+    }
+
+    #[test]
+    fn negated_matrix() {
+        assert_eq!(
+            lowering_error("mat4x4<f32>", -Expression::from(glam::Mat4::IDENTITY)),
+            "unsupported operand type: -mat4x4<f32>"
+        );
+    }
+
+    #[test]
+    fn mismatched_math_arguments() {
+        let device = device();
+        let color = UniformBuffer::<Background>::new(&device).uniform().color;
+        assert_eq!(
+            lowering_error("f32", color.dot(glam::Vec2::ONE)),
+            "unsupported argument types: dot(vec3<f32>, vec2<f32>)"
+        );
+    }
+
+    #[test]
+    fn mismatched_vector_components() {
+        assert_eq!(
+            lowering_error("vec3<f32>", vec3(1.0, 2, 3.0)),
+            "unsupported argument types: vec3<f32>(f32, i32, f32)"
+        );
+    }
+
+    #[test]
+    fn mismatched_texture_coordinate() {
+        let device = device();
+        let texture = TextureBuffer::<f32>::new(
+            &device,
+            wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+        );
+        assert_eq!(
+            lowering_error("vec4<f32>", texture.sample(&glam::Vec3::ONE.into())),
+            "unsupported argument types: sample(vec3<f32>)"
+        );
     }
 }
