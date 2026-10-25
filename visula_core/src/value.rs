@@ -284,7 +284,7 @@ fn load_local_variable(
     ))
 }
 
-fn resolve_type(
+pub(crate) fn resolve_type(
     handle: naga::Handle<naga::Expression>,
     module: &naga::Module,
     binding_builder: &mut BindingBuilder,
@@ -312,7 +312,7 @@ fn resolve_types(
         .collect()
 }
 
-fn type_name(inner: &naga::TypeInner, module: &naga::Module) -> String {
+pub(crate) fn type_name(inner: &naga::TypeInner, module: &naga::Module) -> String {
     module
         .types
         .type_resolution_to_string(&naga::proc::TypeResolution::Value(inner.clone()))
@@ -1880,6 +1880,14 @@ fn fs_main() -> @location(0) vec4<f32> {{
         assert_eq!(
             lowering_error("vec3<f32>", Expression::from(0.5).lit()),
             "unsupported argument types: lit(f32)"
+        );
+    }
+
+    #[test]
+    fn mismatched_field_type() {
+        assert_eq!(
+            lowering_error("vec3<f32>", Expression::from(0.5)),
+            "mismatched types for fields.a: expected vec3<f32>, found f32"
         );
     }
 }

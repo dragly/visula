@@ -3,6 +3,7 @@ use naga::valid::ValidationFlags;
 use naga::Module;
 
 use crate::error::ShaderError;
+use crate::value::{resolve_type, type_name};
 use crate::{BindingBuilder, Expression};
 
 macro_rules! entry_point {
@@ -13,6 +14,38 @@ macro_rules! entry_point {
             .find(|e| e.stage == $shader_stage)
             .ok_or_else(|| ShaderError::EntryPointNotFound(format!("{:?}", $shader_stage)))?
     };
+}
+
+fn check_field_type(
+    module: &Module,
+    binding_builder: &mut BindingBuilder,
+    variable: naga::Handle<naga::LocalVariable>,
+    variable_name: &str,
+    index: usize,
+    expression: naga::Handle<naga::Expression>,
+) -> Result<(), ShaderError> {
+    let function = &module.entry_points[binding_builder.entry_point_index].function;
+    let naga::TypeInner::Struct { members, .. } =
+        &module.types[function.local_variables[variable].ty].inner
+    else {
+        return Ok(());
+    };
+    let Some(member) = members.get(index) else {
+        return Ok(());
+    };
+    let expected = &module.types[member.ty].inner;
+    let found = resolve_type(expression, module, binding_builder)?;
+    if found == *expected {
+        return Ok(());
+    }
+    Err(ShaderError::FieldTypeMismatch {
+        field: format!(
+            "{variable_name}.{}",
+            member.name.as_deref().unwrap_or_default()
+        ),
+        expected: type_name(expected, module),
+        found: type_name(&found, module),
+    })
 }
 
 pub fn inject(
@@ -41,6 +74,14 @@ pub fn inject(
         .enumerate()
         .map(|(index, value)| {
             let expression = value.setup(module, binding_builder)?;
+            check_field_type(
+                module,
+                binding_builder,
+                variable,
+                variable_name,
+                index,
+                expression,
+            )?;
             let access_index = entry_point!(module, binding_builder.shader_stage)
                 .function
                 .expressions
@@ -118,6 +159,14 @@ pub fn inject_before_return(
         .enumerate()
         .map(|(index, value)| {
             let expression = value.setup(module, binding_builder)?;
+            check_field_type(
+                module,
+                binding_builder,
+                variable,
+                variable_name,
+                index,
+                expression,
+            )?;
             let access_index = entry_point!(module, binding_builder.shader_stage)
                 .function
                 .expressions
