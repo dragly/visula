@@ -1,0 +1,32 @@
+---
+source: visula_core/src/value.rs
+expression: wgsl
+---
+struct Fields {
+    a: vec3<f32>,
+    b: vec3<f32>,
+    c: vec3<f32>,
+    d: vec3<f32>,
+    e: vec3<f32>,
+}
+
+struct BackgroundUniform {
+    color: vec3<f32>,
+    _padding: f32,
+}
+
+@group(1) @binding(0) 
+var<uniform> background: BackgroundUniform;
+
+@vertex 
+fn vs_main() -> @builtin(position) vec4<f32> {
+    var fields: Fields;
+
+    fields.a = max(background.color, vec3(0.0031308f));
+    fields.b = pow(background.color, vec3(0.41666666f));
+    fields.c = step(vec3(0.04045f), background.color);
+    fields.d = clamp(background.color, vec3(0f), vec3(1f));
+    fields.e = mix(background.color, vec3<f32>(1f, 1f, 1f), 0.5f);
+    let output: Fields = fields;
+    return vec4(0f);
+}
