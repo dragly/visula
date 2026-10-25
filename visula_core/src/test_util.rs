@@ -25,38 +25,39 @@ fn template(stage: ShaderStage, fields: &[(&str, Expression)]) -> String {
     )
 }
 
-pub fn lower_to_module(
+pub fn inject_fields(
+    source: &str,
     stage: ShaderStage,
-    fields: &[(&str, Expression)],
+    expressions: &[Expression],
 ) -> Result<naga::Module, ShaderError> {
-    let source = template(stage, fields);
-    let mut module = naga::front::wgsl::parse_str(&source)
-        .unwrap_or_else(|error| panic!("{}", error.emit_to_string(&source)));
-    let expressions: Vec<Expression> = fields.iter().map(|(_, value)| value.clone()).collect();
+    let mut module = naga::front::wgsl::parse_str(source)
+        .unwrap_or_else(|error| panic!("{}", error.emit_to_string(source)));
     match stage {
         ShaderStage::Vertex => {
             let mut binding_builder = BindingBuilder::new(&module, "vs_main", 0)?;
-            inject::inject(&mut module, &mut binding_builder, "fields", &expressions)?;
+            inject::inject(&mut module, &mut binding_builder, "fields", expressions)?;
         }
         _ => {
             let mut binding_builder = BindingBuilder::new(&module, "fs_main", 0)?;
-            inject::inject_before_return(
-                &mut module,
-                &mut binding_builder,
-                "fields",
-                &expressions,
-            )?;
+            inject::inject_before_return(&mut module, &mut binding_builder, "fields", expressions)?;
         }
     }
     Ok(module)
 }
 
-pub fn lower_to_wgsl(stage: ShaderStage, fields: &[(&str, Expression)]) -> String {
-    let module = lower_to_module(stage, fields).unwrap();
+pub fn lower_to_module(
+    stage: ShaderStage,
+    fields: &[(&str, Expression)],
+) -> Result<naga::Module, ShaderError> {
+    let expressions: Vec<Expression> = fields.iter().map(|(_, value)| value.clone()).collect();
+    inject_fields(&template(stage, fields), stage, &expressions)
+}
+
+pub fn write_wgsl(module: &naga::Module) -> String {
     let info = Validator::new(ValidationFlags::EXPRESSIONS, Capabilities::all())
-        .validate(&module)
+        .validate(module)
         .unwrap();
-    let wgsl = naga::back::wgsl::write_string(&module, &info, WriterFlags::all()).unwrap();
+    let wgsl = naga::back::wgsl::write_string(module, &info, WriterFlags::all()).unwrap();
 
     let reparsed = naga::front::wgsl::parse_str(&wgsl)
         .unwrap_or_else(|error| panic!("{}", error.emit_to_string(&wgsl)));
@@ -64,4 +65,8 @@ pub fn lower_to_wgsl(stage: ShaderStage, fields: &[(&str, Expression)]) -> Strin
         .validate(&reparsed)
         .unwrap_or_else(|error| panic!("{}", error.emit_to_string(&wgsl)));
     wgsl
+}
+
+pub fn lower_to_wgsl(stage: ShaderStage, fields: &[(&str, Expression)]) -> String {
+    write_wgsl(&lower_to_module(stage, fields).unwrap())
 }
