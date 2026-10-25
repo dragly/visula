@@ -450,6 +450,40 @@ fn arguments_match(
     !overloads.is_empty() && arguments.len() >= overloads.min_arguments()
 }
 
+fn argument_splat(
+    function: naga::MathFunction,
+    arguments: &[naga::TypeInner],
+    module: &naga::Module,
+) -> Option<(naga::VectorSize, naga::Scalar)> {
+    if !matches!(
+        function,
+        naga::MathFunction::Min
+            | naga::MathFunction::Max
+            | naga::MathFunction::Clamp
+            | naga::MathFunction::Mix
+            | naga::MathFunction::Step
+            | naga::MathFunction::SmoothStep
+            | naga::MathFunction::Pow
+            | naga::MathFunction::Atan2
+    ) {
+        return None;
+    }
+    let (size, scalar) = arguments.iter().find_map(|argument| match *argument {
+        naga::TypeInner::Vector { size, scalar } => Some((size, scalar)),
+        _ => None,
+    })?;
+    let splatted: Vec<_> = arguments
+        .iter()
+        .map(|argument| match *argument {
+            naga::TypeInner::Scalar(other) if other == scalar => {
+                naga::TypeInner::Vector { size, scalar }
+            }
+            _ => argument.clone(),
+        })
+        .collect();
+    arguments_match(function, &splatted, module).then_some((size, scalar))
+}
+
 fn compose(
     ty: naga::TypeInner,
     component: naga::TypeInner,
@@ -639,16 +673,32 @@ impl Expression {
                 function,
                 arguments,
             } => {
-                let handles = arguments
+                let mut handles = arguments
                     .iter()
                     .map(|argument| argument.setup(module, binding_builder))
                     .collect::<Result<Vec<_>, _>>()?;
                 let types = resolve_types(&handles, module, binding_builder)?;
                 if !arguments_match(function, &types, module) {
-                    return Err(ShaderError::UnsupportedArgumentTypes {
-                        function: function.to_wgsl_for_diagnostics(),
-                        arguments: type_names(&types, module),
-                    });
+                    let Some((size, scalar)) = argument_splat(function, &types, module) else {
+                        return Err(ShaderError::UnsupportedArgumentTypes {
+                            function: function.to_wgsl_for_diagnostics(),
+                            arguments: type_names(&types, module),
+                        });
+                    };
+                    for (handle, argument) in handles.iter_mut().zip(&types) {
+                        if *argument == naga::TypeInner::Scalar(scalar) {
+                            *handle = module.entry_points[binding_builder.entry_point_index]
+                                .function
+                                .expressions
+                                .append(
+                                    naga::Expression::Splat {
+                                        size,
+                                        value: *handle,
+                                    },
+                                    naga::Span::default(),
+                                );
+                        }
+                    }
                 }
                 let mut handles = handles.into_iter();
                 let arg = handles.next().expect("Math expression without arguments");
@@ -1818,6 +1868,10 @@ mod tests {
             lowering_error("f32", color.dot(glam::Vec2::ONE)),
             "unsupported argument types: dot(vec3<f32>, vec2<f32>)"
         );
+        assert_eq!(
+            lowering_error("vec3<f32>", color.max(1)),
+            "unsupported argument types: max(vec3<f32>, i32)"
+        );
     }
 
     #[test]
@@ -1889,5 +1943,22 @@ fn fs_main() -> @location(0) vec4<f32> {{
             lowering_error("vec3<f32>", Expression::from(0.5)),
             "mismatched types for fields.a: expected vec3<f32>, found f32"
         );
+    }
+
+    #[test]
+    fn scalar_math_arguments() {
+        let device = device();
+        let color = UniformBuffer::<Background>::new(&device).uniform().color;
+        let wgsl = lower_to_wgsl(
+            ShaderStage::Vertex,
+            &[
+                ("vec3<f32>", color.max(0.0031308)),
+                ("vec3<f32>", color.pow(1.0 / 2.4)),
+                ("vec3<f32>", color.step(0.04045)),
+                ("vec3<f32>", color.clamp(0.0, 1.0)),
+                ("vec3<f32>", color.mix(glam::Vec3::ONE, 0.5)),
+            ],
+        );
+        insta::assert_snapshot!(wgsl);
     }
 }
