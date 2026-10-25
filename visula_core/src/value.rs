@@ -284,57 +284,6 @@ fn load_local_variable(
     ))
 }
 
-fn is_expression_vec4(
-    handle: naga::Handle<naga::Expression>,
-    module: &naga::Module,
-    entry_point_index: usize,
-) -> bool {
-    let function = &module.entry_points[entry_point_index].function;
-    let expr = &function.expressions[handle];
-    match expr {
-        naga::Expression::Load { pointer } => {
-            let pointed = &function.expressions[*pointer];
-            if let naga::Expression::LocalVariable(local_handle) = pointed {
-                let local_var = &function.local_variables[*local_handle];
-                matches!(
-                    module.types[local_var.ty].inner,
-                    naga::TypeInner::Vector {
-                        size: naga::VectorSize::Quad,
-                        ..
-                    }
-                )
-            } else {
-                false
-            }
-        }
-        naga::Expression::ImageSample { image, .. } => {
-            if let naga::Expression::GlobalVariable(gv) = function.expressions[*image] {
-                let ty = module.global_variables[gv].ty;
-                matches!(
-                    module.types[ty].inner,
-                    naga::TypeInner::Image {
-                        class: naga::ImageClass::Sampled {
-                            kind: naga::ScalarKind::Float,
-                            ..
-                        },
-                        ..
-                    }
-                )
-            } else {
-                false
-            }
-        }
-        naga::Expression::Compose { ty, .. } => matches!(
-            module.types[*ty].inner,
-            naga::TypeInner::Vector {
-                size: naga::VectorSize::Quad,
-                ..
-            }
-        ),
-        _ => false,
-    }
-}
-
 fn resolve_type(
     handle: naga::Handle<naga::Expression>,
     module: &naga::Module,
@@ -466,6 +415,25 @@ fn check_operand(
         operator: symbol,
         operand: type_name(&operand, module),
     })
+}
+
+fn is_color_vec4(
+    function: &str,
+    color: naga::Handle<naga::Expression>,
+    module: &naga::Module,
+    binding_builder: &mut BindingBuilder,
+) -> Result<bool, ShaderError> {
+    let color = resolve_type(color, module, binding_builder)?;
+    if color == vector(naga::VectorSize::Quad) {
+        Ok(true)
+    } else if color == vector(naga::VectorSize::Tri) {
+        Ok(false)
+    } else {
+        Err(ShaderError::UnsupportedArgumentTypes {
+            function: function.to_string(),
+            arguments: type_name(&color, module),
+        })
+    }
 }
 
 fn arguments_match(
@@ -897,8 +865,7 @@ impl Expression {
             }
             Expression::Lit(color) => {
                 let color_handle = color.setup(module, binding_builder)?;
-                let is_vec4 =
-                    is_expression_vec4(color_handle, module, binding_builder.entry_point_index);
+                let is_vec4 = is_color_vec4("lit", color_handle, module, binding_builder)?;
                 let normal_handle = load_local_variable("_visula_normal", module, binding_builder)?;
                 let view_handle =
                     load_local_variable("_visula_view_direction", module, binding_builder)?;
@@ -927,8 +894,7 @@ impl Expression {
             }
             Expression::ToonLit(color) => {
                 let color_handle = color.setup(module, binding_builder)?;
-                let is_vec4 =
-                    is_expression_vec4(color_handle, module, binding_builder.entry_point_index);
+                let is_vec4 = is_color_vec4("toon_lit", color_handle, module, binding_builder)?;
                 let normal_handle = load_local_variable("_visula_normal", module, binding_builder)?;
                 let view_handle =
                     load_local_variable("_visula_view_direction", module, binding_builder)?;
@@ -958,7 +924,7 @@ impl Expression {
             Expression::DirectionalLit(color) => {
                 let color_handle = color.setup(module, binding_builder)?;
                 let is_vec4 =
-                    is_expression_vec4(color_handle, module, binding_builder.entry_point_index);
+                    is_color_vec4("directional_lit", color_handle, module, binding_builder)?;
                 let normal_handle = load_local_variable("_visula_normal", module, binding_builder)?;
                 let position_handle =
                     load_local_variable("_visula_position", module, binding_builder)?;
@@ -1606,7 +1572,7 @@ mod tests {
     use visula_derive::{Instance, Uniform};
 
     use super::*;
-    use crate::test_util::{device, lower_to_module, lower_to_wgsl};
+    use crate::test_util::{device, inject_fields, lower_to_module, lower_to_wgsl, write_wgsl};
     use crate::{InstanceBuffer, TextureBuffer, UniformBuffer};
 
     #[repr(C)]
@@ -1876,6 +1842,44 @@ mod tests {
         assert_eq!(
             lowering_error("vec4<f32>", texture.sample(&glam::Vec3::ONE.into())),
             "unsupported argument types: sample(vec3<f32>)"
+        );
+    }
+
+    #[test]
+    fn lit_vec4_instance_field() {
+        let device = device();
+        let particle = InstanceBuffer::<Particle>::new(&device).instance();
+        let source = format!(
+            "{}
+struct Fields {{
+    a: vec4<f32>,
+}}
+
+@fragment
+fn fs_main() -> @location(0) vec4<f32> {{
+    var _visula_normal: vec3<f32>;
+    var _visula_view_direction: vec3<f32>;
+    var _visula_position: vec3<f32>;
+    _visula_normal = vec3<f32>(0.0, 0.0, 1.0);
+    _visula_view_direction = vec3<f32>(0.0, 0.0, 1.0);
+    _visula_position = vec3<f32>(0.0);
+    var fields: Fields;
+    let output = fields;
+    return vec4<f32>(0.0);
+}}
+",
+            crate::LIGHTING_WGSL
+        );
+        let module =
+            inject_fields(&source, ShaderStage::Fragment, &[particle.color.lit()]).unwrap();
+        assert!(write_wgsl(&module).contains(" = visula_lit_vec4_(color, "));
+    }
+
+    #[test]
+    fn lit_scalar() {
+        assert_eq!(
+            lowering_error("vec3<f32>", Expression::from(0.5).lit()),
+            "unsupported argument types: lit(f32)"
         );
     }
 }
