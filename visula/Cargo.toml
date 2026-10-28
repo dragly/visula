@@ -31,7 +31,7 @@ wasm-bindgen = "0.2.104"
 cgmath = "0.17.0"
 thiserror = {workspace = true}
 gltf = "0.15.2"
-image = { version = "0.23", default-features = false, features = ["jpeg", "png"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 rand = "0.9"
 chrono = "0.4.42"
 web-time = "1.1.0"
