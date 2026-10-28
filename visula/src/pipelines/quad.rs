@@ -20,6 +20,9 @@ pub struct QuadPipelineDescriptor<'a> {
     pub vertex_format: wgpu::VertexFormat,
     pub index_data: &'a [u8],
     pub index_format: wgpu::IndexFormat,
+    pub bind_group_layouts: &'a [&'a wgpu::BindGroupLayout],
+    pub depth_write_enabled: bool,
+    pub depth_bias: wgpu::DepthBiasState,
 }
 
 pub struct QuadPipeline {
@@ -32,6 +35,7 @@ pub struct QuadPipeline {
     label: String,
     vertex_binding_builder: BindingBuilder,
     fragment_binding_builder: Option<BindingBuilder>,
+    bind_groups: Vec<Option<wgpu::BindGroup>>,
 }
 
 impl QuadPipeline {
@@ -133,6 +137,9 @@ impl QuadPipeline {
                 Some(&camera.bind_group_layout),
                 Some(&light.bind_group_layout),
             ];
+            for layout in descriptor.bind_group_layouts {
+                layouts.push(Some(layout));
+            }
             for layout in &vertex_uniform_layouts {
                 layouts.push(Some(layout));
             }
@@ -205,10 +212,10 @@ impl QuadPipeline {
             },
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: Some(true),
+                depth_write_enabled: Some(descriptor.depth_write_enabled),
                 depth_compare: Some(wgpu::CompareFunction::Less),
                 stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
+                bias: descriptor.depth_bias,
             }),
             multisample: wgpu::MultisampleState {
                 count: rendering_descriptor.sample_count,
@@ -350,7 +357,14 @@ impl QuadPipeline {
             label: descriptor.label.to_string(),
             vertex_binding_builder,
             fragment_binding_builder,
+            bind_groups: vec![None; descriptor.bind_group_layouts.len()],
         })
+    }
+
+    /// Sets the bind group for one of the layouts in [`QuadPipelineDescriptor::bind_group_layouts`].
+    /// The pipeline skips rendering until every one of them is set.
+    pub fn set_bind_group(&mut self, index: usize, bind_group: wgpu::BindGroup) {
+        self.bind_groups[index] = Some(bind_group);
     }
 
     pub fn update_geometry(
@@ -436,7 +450,7 @@ impl Renderable for QuadPipeline {
         }: &mut RenderData,
     ) {
         log::trace!("Rendering {}", self.label);
-        if self.index_count == 0 {
+        if self.index_count == 0 || self.bind_groups.iter().any(Option::is_none) {
             return;
         }
         let mut count = None;
@@ -524,6 +538,10 @@ impl Renderable for QuadPipeline {
                 instance_count = instance_count.max(binding.inner.borrow().count);
             }
             let mut current_slot = 2u32;
+            for bind_group in self.bind_groups.iter().flatten() {
+                render_pass.set_bind_group(current_slot, bind_group, &[]);
+                current_slot += 1;
+            }
             for bind_group in vertex_uniforms.iter() {
                 log::trace!("Setting vertex uniform bind group {current_slot}");
                 render_pass.set_bind_group(current_slot, bind_group, &[]);

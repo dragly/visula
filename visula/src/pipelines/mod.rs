@@ -1,5 +1,6 @@
 pub mod circles;
 pub mod cylinders;
+pub mod glyphs;
 pub mod instanced;
 pub mod lines;
 pub mod mesh;
@@ -13,6 +14,7 @@ pub mod torus;
 
 pub use circles::*;
 pub use cylinders::*;
+pub use glyphs::*;
 pub use instanced::*;
 pub use lines::*;
 pub use mesh::*;
