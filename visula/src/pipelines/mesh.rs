@@ -264,8 +264,7 @@ impl MeshPipeline {
         for binding in self.vertex_binding_builder.instances.values() {
             let other = binding.inner.borrow().count;
             if other == 0 {
-                count = None;
-                break;
+                return;
             }
             count = match count {
                 None => Some(other),
