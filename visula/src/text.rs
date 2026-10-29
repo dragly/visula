@@ -254,6 +254,18 @@ impl GlyphAtlas {
         self.revision
     }
 
+    /// Adds the glyph for a character to the atlas, if the font has one,
+    /// so that text with it is quick to lay out later.
+    pub fn prepare(&mut self, character: char) -> Result<(), crate::error::Error> {
+        let font_data = self.font_data.clone();
+        let face =
+            ttf_parser::Face::parse(&font_data, 0).map_err(|_| crate::error::Error::FontParse)?;
+        if let Some(glyph_id) = face.glyph_index(character) {
+            self.glyph(&face, glyph_id);
+        }
+        Ok(())
+    }
+
     /// Lays out text like [`tessellate_text_wrapped`], as one quad per glyph,
     /// and adds the glyphs it has not seen before to the atlas.
     pub fn lay_out_wrapped(
@@ -705,6 +717,18 @@ mod tests {
         };
         assert_eq!(texels(&first, 0), texels(&first, 1));
         assert_eq!(texels(&first, 0), texels(&second, 0));
+    }
+
+    #[test]
+    fn lays_out_prepared_glyphs_without_adding_them_again() {
+        let mut atlas = GlyphAtlas::new(&font()).unwrap();
+        atlas.prepare(' ').unwrap();
+        atlas.prepare('a').unwrap();
+        atlas.prepare('漢').unwrap();
+        let revision = atlas.revision();
+        assert_eq!(revision, 1);
+        atlas.lay_out_wrapped("a a", 1.0, 100.0).unwrap();
+        assert_eq!(atlas.revision(), revision);
     }
 
     #[test]
