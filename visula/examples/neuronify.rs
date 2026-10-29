@@ -335,7 +335,7 @@ impl Simulation {
             &MeshGeometry {
                 position: mesh_instance.position,
                 rotation: mesh_instance.rotation,
-                scale: Vec3::ONE.into(),
+                ..Default::default()
             },
             &MeshMaterial {
                 color: Expression::from(Vec4::new(1.0, 1.0, 1.0, 1.0)).lit(),

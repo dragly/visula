@@ -1,7 +1,7 @@
 use std::cell::Ref;
 use std::mem::size_of;
 
-use glam::{Quat, Vec3};
+use glam::{Quat, Vec3, Vec4};
 use naga::back::wgsl::WriterFlags;
 use naga::valid::ValidationFlags;
 use wgpu::util::DeviceExt;
@@ -26,6 +26,7 @@ pub struct MeshGeometry {
     pub rotation: Expression,
     pub position: Expression,
     pub scale: Expression,
+    pub color: Expression,
 }
 
 #[derive(Delegate)]
@@ -39,6 +40,7 @@ impl Default for MeshGeometry {
             rotation: Quat::IDENTITY.into(),
             position: Vec3::ZERO.into(),
             scale: Vec3::ONE.into(),
+            color: Vec4::ONE.into(),
         }
     }
 }

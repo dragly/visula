@@ -27,6 +27,7 @@ struct MeshGeometry {
     rotation: vec4<f32>,
     position: vec3<f32>,
     scale: vec3<f32>,
+    color: vec4<f32>,
 };
 
 struct MeshMaterial {
@@ -76,7 +77,7 @@ fn vs_main(
     out.normal = normal_matrix * normal;
     out.uv = uv;
     out.world_position = (transform_matrix * vec4<f32>(position, 1.0)).xyz;
-    out.vertex_color = color;
+    out.vertex_color = color * geometry.color;
     return out;
 }
 
