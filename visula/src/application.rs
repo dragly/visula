@@ -3,7 +3,7 @@ use crate::camera::Camera;
 use crate::light::DirectionalLight;
 use crate::post_process::PostProcessor;
 use crate::rendering_descriptor::RenderingDescriptor;
-use crate::simulation::ShadowRenderData;
+use crate::simulation::{ShadowRenderData, TransparencyRenderData};
 use crate::{camera::controller::CameraController, simulation::RenderData};
 use crate::{CameraControllerResponse, Simulation};
 use chrono::{DateTime, Utc};
@@ -486,6 +486,7 @@ impl Application {
             }
         };
         let mut encoder = self.encoder();
+        let mut transparent_encoder = self.encoder();
 
         let view = frame.texture.create_view(&TextureViewDescriptor::default());
 
@@ -577,7 +578,7 @@ impl Application {
             &self.camera,
         );
 
-        simulation.render(&mut RenderData {
+        let mut render_data = RenderData {
             view: &self.post_processor.hdr_view,
             multisampled_framebuffer: if msaa {
                 &self.multisampled_framebuffer
@@ -595,12 +596,25 @@ impl Application {
             camera: &self.camera,
             light: &self.light,
             sample_count: self.sample_count,
-        });
+            transparency: TransparencyRenderData::new(
+                &mut transparent_encoder,
+                &self.post_processor.transparency,
+            ),
+        };
+        simulation.render(&mut render_data);
+        let transparency_used = render_data.transparency.used();
+
+        let scene = encoder.finish();
+        let mut encoder = transparent_encoder;
 
         self.post_processor.render_ssao(&mut encoder, &self.queue);
 
         self.post_processor
             .render_outline(&mut encoder, &self.queue);
+
+        if transparency_used {
+            self.post_processor.render_transparency(&mut encoder);
+        }
 
         self.post_processor.render_bloom(&mut encoder, &self.queue);
 
@@ -676,7 +690,7 @@ impl Application {
         let screenshot_in_flight =
             self.encode_screenshot_copy_if_pending(&mut encoder, &frame.texture);
 
-        self.queue.submit(Some(encoder.finish()));
+        self.queue.submit([scene, encoder.finish()]);
         frame.present();
 
         if let Some(pending) = screenshot_in_flight {

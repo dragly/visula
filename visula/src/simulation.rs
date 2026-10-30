@@ -5,6 +5,7 @@ use crate::application::Application;
 use crate::camera::Camera;
 use crate::light::DirectionalLight;
 use crate::pipelines::{Circles, Cylinders, Lines, Polygons, Rects, Renderable, Spheres, Torus};
+use crate::post_process::transparency::TransparencyPass;
 use crate::CustomEvent;
 
 pub struct RenderData<'a> {
@@ -17,6 +18,38 @@ pub struct RenderData<'a> {
     pub camera: &'a Camera,
     pub light: &'a DirectionalLight,
     pub sample_count: u32,
+    pub transparency: TransparencyRenderData<'a>,
+}
+
+pub struct TransparencyRenderData<'a> {
+    encoder: &'a mut wgpu::CommandEncoder,
+    pass: &'a TransparencyPass,
+    used: bool,
+}
+
+impl<'a> TransparencyRenderData<'a> {
+    pub fn new(encoder: &'a mut wgpu::CommandEncoder, pass: &'a TransparencyPass) -> Self {
+        Self {
+            encoder,
+            pass,
+            used: false,
+        }
+    }
+
+    pub fn begin_render_pass(
+        &mut self,
+        label: &str,
+        depth_texture: &wgpu::TextureView,
+    ) -> wgpu::RenderPass<'_> {
+        let clear = !self.used;
+        self.used = true;
+        self.pass
+            .begin_render_pass(self.encoder, label, depth_texture, clear)
+    }
+
+    pub fn used(&self) -> bool {
+        self.used
+    }
 }
 
 pub struct ShadowRenderData<'a> {

@@ -100,3 +100,30 @@ fn fs_main(vertex: VertexOutput) -> FragmentOutput {
     output.normal = vec4<f32>(_visula_normal, 0.0);
     return output;
 }
+
+struct TransparentOutput {
+    @location(0) accumulation: vec4<f32>,
+    @location(1) weight: f32,
+};
+
+@fragment
+fn fs_transparent(vertex: VertexOutput) -> TransparentOutput {
+    var _visula_normal: vec3<f32> = normalize(vertex.normal);
+    var _visula_position: vec3<f32> = vertex.world_position;
+    var _visula_view_direction: vec3<f32> = normalize(u_globals.camera_position.xyz - vertex.world_position);
+    var _visula_input_color: vec4<f32> = vertex.vertex_color;
+
+    var material: MeshMaterial;
+
+    // Weighted blended order-independent transparency (McGuire and Bavoil, 2013),
+    // with depth measured relative to the distance between the camera and its center.
+    let alpha = clamp(material.color.a, 0.0, 1.0);
+    let distance = length(u_globals.camera_position.xyz - vertex.world_position);
+    let reference_distance = length(u_globals.camera_view_vector.xyz);
+    let weight = alpha * clamp(pow(reference_distance / distance, 4.0), 1e-2, 3e3);
+
+    var output: TransparentOutput;
+    output.accumulation = vec4<f32>(material.color.rgb * weight, alpha);
+    output.weight = weight;
+    return output;
+}

@@ -432,6 +432,7 @@ impl Renderable for QuadPipeline {
             camera,
             light,
             sample_count,
+            ..
         }: &mut RenderData,
     ) {
         log::trace!("Rendering {}", self.label);

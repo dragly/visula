@@ -4,6 +4,7 @@ pub mod outline;
 pub mod sky;
 pub mod ssao;
 pub mod tonemap;
+pub mod transparency;
 
 use crate::camera::Camera;
 use bloom::BloomPass;
@@ -12,6 +13,7 @@ use outline::OutlinePass;
 use sky::SkyPass;
 use ssao::SsaoPass;
 use tonemap::TonemapPass;
+use transparency::TransparencyPass;
 
 pub struct PostProcessor {
     pub config: PostProcessConfig,
@@ -22,6 +24,7 @@ pub struct PostProcessor {
     pub normal_msaa_view: wgpu::TextureView,
     pub normal_resolve_texture: wgpu::Texture,
     pub normal_resolve_view: wgpu::TextureView,
+    pub transparency: TransparencyPass,
     tonemap: TonemapPass,
     outline: Option<OutlinePass>,
     sky: SkyPass,
@@ -93,6 +96,14 @@ impl PostProcessor {
             sample_count,
         );
 
+        let transparency = TransparencyPass::new(
+            device,
+            wgpu::TextureFormat::Rgba16Float,
+            width,
+            height,
+            sample_count,
+        );
+
         let outline = if sample_count > 1 {
             Some(OutlinePass::new(
                 device,
@@ -114,6 +125,7 @@ impl PostProcessor {
             normal_msaa_view,
             normal_resolve_texture,
             normal_resolve_view,
+            transparency,
             tonemap,
             outline,
             sky,
@@ -223,6 +235,7 @@ impl PostProcessor {
             Self::create_normal_resolve_target(device, width, height);
         self.normal_resolve_texture = normal_resolve_texture;
         self.normal_resolve_view = normal_resolve_view;
+        self.transparency.resize(device, width, height);
 
         if let Some(ref mut ssao) = self.ssao {
             ssao.resize(
@@ -336,6 +349,10 @@ impl PostProcessor {
                 outline.render(encoder, &self.hdr_view);
             }
         }
+    }
+
+    pub fn render_transparency(&self, encoder: &mut wgpu::CommandEncoder) {
+        self.transparency.render(encoder, &self.hdr_view);
     }
 
     pub fn render_bloom(&self, encoder: &mut wgpu::CommandEncoder, queue: &wgpu::Queue) {
