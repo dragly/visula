@@ -494,7 +494,8 @@ impl ToonNeurons {
                 end: dendrite_instance.end,
                 start_radius: dendrite_instance.start_radius,
                 end_radius: dendrite_instance.end_radius,
-                color: dendrite_instance.color,
+                start_color: dendrite_instance.color.clone(),
+                end_color: dendrite_instance.color,
             },
             &CylinderMaterial {
                 color: Expression::InputColor.toon_lit(),
@@ -530,7 +531,8 @@ impl ToonNeurons {
                 end: axon_instance.end,
                 start_radius: axon_instance.start_radius,
                 end_radius: axon_instance.end_radius,
-                color: axon_instance.color,
+                start_color: axon_instance.color.clone(),
+                end_color: axon_instance.color,
             },
             &CylinderMaterial {
                 color: Expression::InputColor.toon_lit(),

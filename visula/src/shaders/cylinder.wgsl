@@ -22,7 +22,8 @@ struct VertexOutput {
     @location(2) cyl_end: vec3<f32>,
     @location(3) start_radius: f32,
     @location(4) end_radius: f32,
-    @location(5) input_color: vec3<f32>,
+    @location(5) start_color: vec3<f32>,
+    @location(6) end_color: vec3<f32>,
 };
 
 struct CylinderGeometry {
@@ -30,7 +31,8 @@ struct CylinderGeometry {
     end: vec3<f32>,
     start_radius: f32,
     end_radius: f32,
-    color: vec3<f32>,
+    start_color: vec3<f32>,
+    end_color: vec3<f32>,
 };
 
 struct CylinderMaterial {
@@ -67,7 +69,8 @@ fn cylinders(
     output.cyl_end = cyl.end;
     output.start_radius = cyl.start_radius;
     output.end_radius = cyl.end_radius;
-    output.input_color = cyl.color;
+    output.start_color = cyl.start_color;
+    output.end_color = cyl.end_color;
 
     return output;
 }
@@ -184,11 +187,13 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     }
 
     let hit_pos = ray_origin + t * ray_direction;
+    let axis = in.cyl_end - in.cyl_start;
+    let along_axis = clamp(dot(hit_pos - in.cyl_start, axis) / max(dot(axis, axis), 1e-8), 0.0, 1.0);
 
     var _visula_normal: vec3<f32> = normalize(result.yzw);
     var _visula_position: vec3<f32> = hit_pos;
     var _visula_view_direction: vec3<f32> = -ray_direction;
-    var _visula_input_color: vec3<f32> = in.input_color;
+    var _visula_input_color: vec3<f32> = mix(in.start_color, in.end_color, along_axis);
 
     let clip_position = u_globals.transform * vec4<f32>(hit_pos, 1.0);
     let frag_depth = clip_position.z / clip_position.w;

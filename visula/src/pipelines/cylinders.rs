@@ -51,7 +51,8 @@ pub struct CylinderGeometry {
     pub end: Expression,
     pub start_radius: Expression,
     pub end_radius: Expression,
-    pub color: Expression,
+    pub start_color: Expression,
+    pub end_color: Expression,
 }
 
 #[derive(Delegate)]
@@ -66,7 +67,8 @@ impl Default for CylinderGeometry {
             end: Vec3::X.into(),
             start_radius: 0.1.into(),
             end_radius: 0.1.into(),
-            color: Vec3::ONE.into(),
+            start_color: Vec3::ONE.into(),
+            end_color: Vec3::ONE.into(),
         }
     }
 }

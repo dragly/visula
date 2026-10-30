@@ -16,7 +16,8 @@ struct CylinderData {
     start_radius: f32,
     end: [f32; 3],
     end_radius: f32,
-    color: [f32; 3],
+    start_color: [f32; 3],
+    end_color: [f32; 3],
 }
 
 struct Simulation {
@@ -39,7 +40,8 @@ impl Simulation {
             start_radius: 0.2,
             end: [0.0, 3.0, 0.0],
             end_radius: 0.2,
-            color: [0.8, 0.2, 0.2],
+            start_color: [0.8, 0.2, 0.2],
+            end_color: [0.2, 0.3, 0.8],
         }];
         cyl_buffer.update(device, &app.queue, &cyl_data);
 
@@ -51,7 +53,8 @@ impl Simulation {
                 end: cyl_instance.end,
                 start_radius: cyl_instance.start_radius,
                 end_radius: cyl_instance.end_radius,
-                color: cyl_instance.color,
+                start_color: cyl_instance.start_color,
+                end_color: cyl_instance.end_color,
             },
             &CylinderMaterial {
                 color: Expression::InputColor.toon_lit(),
