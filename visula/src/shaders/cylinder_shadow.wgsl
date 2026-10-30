@@ -16,7 +16,6 @@ struct VertexOutput {
     @location(2) cyl_end: vec3<f32>,
     @location(3) start_radius: f32,
     @location(4) end_radius: f32,
-    @location(5) input_color: vec3<f32>,
 };
 
 struct CylinderGeometry {
@@ -24,7 +23,8 @@ struct CylinderGeometry {
     end: vec3<f32>,
     start_radius: f32,
     end_radius: f32,
-    color: vec3<f32>,
+    start_color: vec3<f32>,
+    end_color: vec3<f32>,
 };
 
 struct FragmentOutput {
@@ -61,7 +61,6 @@ fn cylinders_shadow(
     output.cyl_end = cyl.end;
     output.start_radius = cyl.start_radius;
     output.end_radius = cyl.end_radius;
-    output.input_color = cyl.color;
 
     return output;
 }
