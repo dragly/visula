@@ -69,7 +69,7 @@ impl QuadPipeline {
         ) {
             (Some(delegate), Some(variable_name)) => {
                 let mut builder = BindingBuilder::new(&module, "fs_main", 0)?;
-                delegate.inject_before_return(variable_name, &mut module, &mut builder)?;
+                delegate.inject_before_use(variable_name, &mut module, &mut builder)?;
                 Some(builder)
             }
             _ => None,

@@ -90,11 +90,11 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                         #core::inject::inject(module, binding_builder, shader_variable_name, &fields)
                     }
 
-                    fn inject_before_return(&self, shader_variable_name: &str, module: &mut #core::naga::Module, binding_builder: &mut #core::BindingBuilder) -> Result<(), #core::ShaderError> {
+                    fn inject_before_use(&self, shader_variable_name: &str, module: &mut #core::naga::Module, binding_builder: &mut #core::BindingBuilder) -> Result<(), #core::ShaderError> {
                         let fields = vec![
                             #(#field_insertions)*
                         ];
-                        #core::inject::inject_before_return(module, binding_builder, shader_variable_name, &fields)
+                        #core::inject::inject_before_use(module, binding_builder, shader_variable_name, &fields)
                     }
                 }
             }

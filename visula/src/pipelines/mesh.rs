@@ -85,7 +85,7 @@ impl MeshPipeline {
         let mut vertex_binding_builder = BindingBuilder::new(&module, "vs_main", 1)?;
         geometry.inject("geometry", &mut module, &mut vertex_binding_builder)?;
         let mut fragment_binding_builder = BindingBuilder::new(&module, "fs_main", 0)?;
-        material.inject_before_return("material", &mut module, &mut fragment_binding_builder)?;
+        material.inject_before_use("material", &mut module, &mut fragment_binding_builder)?;
 
         log::debug!("Validating generated mesh shader\n{module:#?}");
         let info =

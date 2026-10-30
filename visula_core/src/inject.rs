@@ -1,20 +1,10 @@
 use naga::back::wgsl::WriterFlags;
 use naga::valid::ValidationFlags;
-use naga::Module;
+use naga::{Arena, Block, Handle, Module, Statement};
 
 use crate::error::ShaderError;
 use crate::value::{resolve_type, type_name};
 use crate::{BindingBuilder, Expression};
-
-macro_rules! entry_point {
-    ($module: ident, $shader_stage: expr) => {
-        $module
-            .entry_points
-            .iter_mut()
-            .find(|e| e.stage == $shader_stage)
-            .ok_or_else(|| ShaderError::EntryPointNotFound(format!("{:?}", $shader_stage)))?
-    };
-}
 
 fn check_field_type(
     module: &Module,
@@ -48,20 +38,19 @@ fn check_field_type(
     })
 }
 
-pub fn inject(
+fn field_stores(
     module: &mut Module,
     binding_builder: &mut BindingBuilder,
     variable_name: &str,
     fields: &[Expression],
-) -> Result<(), ShaderError> {
+) -> Result<(Handle<naga::Expression>, Vec<Statement>), ShaderError> {
     binding_builder.shared.clear();
-    let variable = entry_point!(module, binding_builder.shader_stage)
-        .function
+    let function = &module.entry_points[binding_builder.entry_point_index].function;
+    let variable = function
         .local_variables
         .fetch_if(|variable| variable.name == Some(variable_name.into()))
         .ok_or_else(|| ShaderError::VariableNotFound(variable_name.to_string()))?;
-    let variable_expression = entry_point!(module, binding_builder.shader_stage)
-        .function
+    let variable_expression = function
         .expressions
         .fetch_if(|expression| match expression {
             naga::Expression::LocalVariable(v) => v == &variable,
@@ -69,7 +58,7 @@ pub fn inject(
         })
         .ok_or_else(|| ShaderError::VariableNotFound(variable_name.to_string()))?;
 
-    let fields_setup = fields
+    let stores = fields
         .iter()
         .enumerate()
         .map(|(index, value)| {
@@ -82,7 +71,7 @@ pub fn inject(
                 index,
                 expression,
             )?;
-            let access_index = entry_point!(module, binding_builder.shader_stage)
+            let access_index = module.entry_points[binding_builder.entry_point_index]
                 .function
                 .expressions
                 .append(
@@ -92,36 +81,18 @@ pub fn inject(
                     },
                     naga::Span::default(),
                 );
-            Ok(::naga::Statement::Store {
+            Ok(Statement::Store {
                 pointer: access_index,
                 value: expression,
             })
         })
         .collect::<Result<Vec<_>, ShaderError>>()?;
-    let mut pending = Vec::new();
-    pending.append(&mut binding_builder.pending_statements);
-    let mut new_body = ::naga::Block::from_vec(pending);
-    for store in fields_setup {
-        new_body.push(store, naga::Span::default());
-    }
+    let mut statements = std::mem::take(&mut binding_builder.pending_statements);
+    statements.extend(stores);
+    Ok((variable_expression, statements))
+}
 
-    for (statement, span) in entry_point!(module, binding_builder.shader_stage)
-        .function
-        .body
-        .span_iter_mut()
-    {
-        new_body.push(
-            statement.clone(),
-            match span {
-                Some(s) => *s,
-                None => naga::Span::default(),
-            },
-        );
-    }
-    entry_point!(module, binding_builder.shader_stage)
-        .function
-        .body = new_body;
-
+fn validate(module: &Module) -> Result<(), ShaderError> {
     let info = naga::valid::Validator::new(
         ValidationFlags::EXPRESSIONS,
         naga::valid::Capabilities::all(),
@@ -133,258 +104,84 @@ pub fn inject(
     Ok(())
 }
 
-pub fn inject_before_return(
+pub fn inject(
     module: &mut Module,
     binding_builder: &mut BindingBuilder,
     variable_name: &str,
     fields: &[Expression],
 ) -> Result<(), ShaderError> {
-    binding_builder.shared.clear();
-    let variable = entry_point!(module, binding_builder.shader_stage)
-        .function
-        .local_variables
-        .fetch_if(|variable| variable.name == Some(variable_name.into()))
-        .ok_or_else(|| ShaderError::VariableNotFound(variable_name.to_string()))?;
-    let variable_expression = entry_point!(module, binding_builder.shader_stage)
-        .function
-        .expressions
-        .fetch_if(|expression| match expression {
-            naga::Expression::LocalVariable(v) => v == &variable,
-            _ => false,
-        })
-        .ok_or_else(|| ShaderError::VariableNotFound(variable_name.to_string()))?;
+    let (_, statements) = field_stores(module, binding_builder, variable_name, fields)?;
+    let function = &mut module.entry_points[binding_builder.entry_point_index].function;
+    let mut body = Block::from_vec(statements);
+    for (statement, span) in function.body.span_iter() {
+        body.push(statement.clone(), *span);
+    }
+    function.body = body;
+    validate(module)
+}
 
-    let fields_setup = fields
+pub fn inject_before_use(
+    module: &mut Module,
+    binding_builder: &mut BindingBuilder,
+    variable_name: &str,
+    fields: &[Expression],
+) -> Result<(), ShaderError> {
+    let (variable, statements) = field_stores(module, binding_builder, variable_name, fields)?;
+    let function = &mut module.entry_points[binding_builder.entry_point_index].function;
+    let first_use = function
+        .body
         .iter()
-        .enumerate()
-        .map(|(index, value)| {
-            let expression = value.setup(module, binding_builder)?;
-            check_field_type(
-                module,
-                binding_builder,
-                variable,
-                variable_name,
-                index,
-                expression,
-            )?;
-            let access_index = entry_point!(module, binding_builder.shader_stage)
-                .function
-                .expressions
-                .append(
-                    naga::Expression::AccessIndex {
-                        index: index as u32,
-                        base: variable_expression,
-                    },
-                    naga::Span::default(),
-                );
-            Ok(::naga::Statement::Store {
-                pointer: access_index,
-                value: expression,
-            })
+        .position(|statement| {
+            uses(statement, variable, &function.expressions)
+                || matches!(statement, Statement::Return { .. })
         })
-        .collect::<Result<Vec<_>, ShaderError>>()?;
-
-    let original_body = &entry_point!(module, binding_builder.shader_stage)
-        .function
-        .body;
-
-    // Collect all non-return statements from the original body
-    let mut new_body = naga::Block::new();
-    for (statement, span) in original_body.span_iter() {
-        if !matches!(statement, naga::Statement::Return { .. }) {
-            new_body.push(statement.clone(), *span);
+        .unwrap_or(function.body.len());
+    let mut body = Block::new();
+    for (index, (statement, span)) in function.body.span_iter().enumerate() {
+        if index == first_use {
+            for statement in &statements {
+                body.push(statement.clone(), naga::Span::default());
+            }
+        }
+        body.push(statement.clone(), *span);
+    }
+    if first_use == function.body.len() {
+        for statement in statements {
+            body.push(statement, naga::Span::default());
         }
     }
+    function.body = body;
+    validate(module)
+}
 
-    // Insert pending statements (e.g. function calls) then field stores
-    for stmt in binding_builder.pending_statements.drain(..) {
-        new_body.push(stmt, naga::Span::default());
+fn uses(
+    statement: &Statement,
+    variable: Handle<naga::Expression>,
+    expressions: &Arena<naga::Expression>,
+) -> bool {
+    let block_uses = |block: &Block| {
+        block
+            .iter()
+            .any(|statement| uses(statement, variable, expressions))
+    };
+    match statement {
+        Statement::Emit(range) => range.clone().any(|handle| match expressions[handle] {
+            naga::Expression::Load { pointer } => pointer == variable,
+            naga::Expression::Access { base, .. } | naga::Expression::AccessIndex { base, .. } => {
+                base == variable
+            }
+            _ => false,
+        }),
+        Statement::Store { pointer, value } => *pointer == variable || *value == variable,
+        Statement::Call { arguments, .. } => arguments.contains(&variable),
+        Statement::Block(block) => block_uses(block),
+        Statement::If { accept, reject, .. } => block_uses(accept) || block_uses(reject),
+        Statement::Loop {
+            body, continuing, ..
+        } => block_uses(body) || block_uses(continuing),
+        Statement::Switch { cases, .. } => cases.iter().any(|case| block_uses(&case.body)),
+        _ => false,
     }
-    for store in fields_setup {
-        new_body.push(store, naga::Span::default());
-    }
-
-    // Build a fresh return that re-loads from the variable AFTER the stores.
-    // The original Return's expressions were pre-computed in an earlier Emit,
-    // so they read zero. We need new Load expressions that execute after our stores.
-    {
-        let ep = &mut module.entry_points[binding_builder.entry_point_index];
-        let var_ty = ep.function.local_variables[variable].ty;
-        let struct_members = match &module.types[var_ty].inner {
-            naga::TypeInner::Struct { members, .. } => members.clone(),
-            _ => panic!("inject_before_return target must be a struct"),
-        };
-
-        // Re-load the first field (color) from the struct
-        let new_access = ep.function.expressions.append(
-            naga::Expression::AccessIndex {
-                base: variable_expression,
-                index: 0,
-            },
-            naga::Span::default(),
-        );
-        let new_load = ep.function.expressions.append(
-            naga::Expression::Load {
-                pointer: new_access,
-            },
-            naga::Span::default(),
-        );
-
-        // Emit the new load
-        new_body.push(
-            naga::Statement::Emit(naga::Range::new_from_bounds(new_access, new_load)),
-            naga::Span::default(),
-        );
-
-        // Determine the return type. Fragment shaders return vec4<f32>.
-        let field_ty = &module.types[struct_members[0].ty].inner;
-        let return_value = match field_ty {
-            naga::TypeInner::Vector {
-                size: naga::VectorSize::Tri,
-                ..
-            } => {
-                // vec3 field → compose vec4(field, 1.0)
-                let one = ep.function.expressions.append(
-                    naga::Expression::Literal(naga::Literal::F32(1.0)),
-                    naga::Span::default(),
-                );
-                let vec4_type = module.types.insert(
-                    naga::Type {
-                        name: None,
-                        inner: naga::TypeInner::Vector {
-                            scalar: naga::Scalar {
-                                kind: naga::ScalarKind::Float,
-                                width: 4,
-                            },
-                            size: naga::VectorSize::Quad,
-                        },
-                    },
-                    naga::Span::default(),
-                );
-                let compose = ep.function.expressions.append(
-                    naga::Expression::Compose {
-                        ty: vec4_type,
-                        components: vec![new_load, one],
-                    },
-                    naga::Span::default(),
-                );
-                new_body.push(
-                    naga::Statement::Emit(naga::Range::new_from_bounds(one, compose)),
-                    naga::Span::default(),
-                );
-                compose
-            }
-            naga::TypeInner::Vector {
-                size: naga::VectorSize::Quad,
-                ..
-            } => {
-                // vec4 field → use directly
-                new_load
-            }
-            _ => {
-                // Fallback: use the loaded value directly
-                new_load
-            }
-        };
-
-        // If the function returns a struct (e.g. FragmentOutput with frag_depth),
-        // store the computed color into the output struct and return it.
-        // Otherwise return the color value directly (existing behavior).
-        let final_value = if let Some(ref result) = ep.function.result {
-            if let naga::TypeInner::Struct {
-                members: return_members,
-                ..
-            } = &module.types[result.ty].inner
-            {
-                let return_ty = result.ty;
-                let color_idx = return_members
-                    .iter()
-                    .position(|m| {
-                        matches!(
-                            &m.binding,
-                            Some(naga::Binding::Location { location: 0, .. })
-                        )
-                    })
-                    .unwrap_or(0);
-
-                let output_var_handle = ep
-                    .function
-                    .local_variables
-                    .iter()
-                    .find(|(_, v)| v.ty == return_ty)
-                    .map(|(h, _)| h);
-
-                if let Some(output_var_handle) = output_var_handle {
-                    let output_var_expr = ep
-                            .function
-                            .expressions
-                            .iter()
-                            .find(|(_, e)| {
-                                matches!(e, naga::Expression::LocalVariable(v) if *v == output_var_handle)
-                            })
-                            .map(|(h, _)| h)
-                            .expect("must have expression for output variable");
-
-                    let store_access = ep.function.expressions.append(
-                        naga::Expression::AccessIndex {
-                            base: output_var_expr,
-                            index: color_idx as u32,
-                        },
-                        naga::Span::default(),
-                    );
-                    new_body.push(
-                        naga::Statement::Store {
-                            pointer: store_access,
-                            value: return_value,
-                        },
-                        naga::Span::default(),
-                    );
-
-                    let output_load = ep.function.expressions.append(
-                        naga::Expression::Load {
-                            pointer: output_var_expr,
-                        },
-                        naga::Span::default(),
-                    );
-                    new_body.push(
-                        naga::Statement::Emit(naga::Range::new_from_bounds(
-                            output_load,
-                            output_load,
-                        )),
-                        naga::Span::default(),
-                    );
-                    output_load
-                } else {
-                    return_value
-                }
-            } else {
-                return_value
-            }
-        } else {
-            return_value
-        };
-
-        new_body.push(
-            naga::Statement::Return {
-                value: Some(final_value),
-            },
-            naga::Span::default(),
-        );
-    }
-
-    entry_point!(module, binding_builder.shader_stage)
-        .function
-        .body = new_body;
-
-    let info = naga::valid::Validator::new(
-        ValidationFlags::EXPRESSIONS,
-        naga::valid::Capabilities::all(),
-    )
-    .validate(module)
-    .map_err(Box::new)?;
-    let output_str = naga::back::wgsl::write_string(module, &info, WriterFlags::all())?;
-    log::debug!("Resulting shader code (inject_before_return):\n{output_str}");
-    Ok(())
 }
 
 #[cfg(test)]
