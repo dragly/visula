@@ -1,12 +1,28 @@
-use glam::Vec3;
+use bytemuck::{Pod, Zeroable};
+use glam::{Quat, Vec3, Vec4};
 use visula::{
-    primitives::mesh_primitive::MeshVertexAttributes, MeshGeometry, MeshMaterial, MeshPipeline,
+    primitives::{generate_sphere, mesh_primitive::MeshVertexAttributes},
+    srgb, InstanceBuffer, MeshBlending, MeshGeometry, MeshMaterial, MeshPipeline,
 };
+use visula_derive::Instance;
+use web_time::Instant;
 
 const PI: f32 = std::f32::consts::PI;
 
+#[repr(C, align(16))]
+#[derive(Clone, Copy, Instance, Pod, Zeroable)]
+struct Bubble {
+    position: Vec3,
+    _padding: f32,
+    color: Vec4,
+}
+
 struct MeshExample {
     mesh: MeshPipeline,
+    glass: MeshPipeline,
+    bubbles: MeshPipeline,
+    bubble_buffer: InstanceBuffer<Bubble>,
+    start: Instant,
 }
 
 fn trefoil_knot(t: f32) -> [f32; 3] {
@@ -14,6 +30,35 @@ fn trefoil_knot(t: f32) -> [f32; 3] {
     let y = (t).cos() - 2.0 * (2.0 * t).cos();
     let z = -(3.0 * t).sin();
     [x, y, z]
+}
+
+fn bubbles(seconds: f32) -> Vec<Bubble> {
+    let rings = [
+        (
+            Quat::from_rotation_x(0.5),
+            1.0,
+            [0xE63946, 0xF4A261, 0xE9C46A, 0xF15BB5, 0x9B5DE5],
+        ),
+        (
+            Quat::from_rotation_x(-0.5),
+            -1.0,
+            [0x00BBF9, 0x00F5D4, 0x57CC99, 0x4361EE, 0x7209B7],
+        ),
+    ];
+    rings
+        .iter()
+        .flat_map(|(tilt, direction, colors)| {
+            colors.iter().enumerate().map(move |(index, color)| {
+                let angle =
+                    direction * 0.5 * seconds + index as f32 / colors.len() as f32 * 2.0 * PI;
+                Bubble {
+                    position: *tilt * Vec3::new(angle.cos(), 0.0, angle.sin()) * 4.0,
+                    _padding: 0.0,
+                    color: srgb(*color).extend(0.5),
+                }
+            })
+        })
+        .collect()
 }
 
 impl MeshExample {
@@ -84,13 +129,61 @@ impl MeshExample {
 
         mesh.set_mesh_data(device, &vertices, &indices);
 
-        Self { mesh }
+        let mut glass = MeshPipeline::with_blending(
+            &app.rendering_descriptor(),
+            &MeshGeometry {
+                color: Vec4::new(0.6, 0.8, 1.0, 0.3).into(),
+                ..Default::default()
+            },
+            &MeshMaterial::default(),
+            MeshBlending::Transparent,
+        )
+        .unwrap();
+
+        let (glass_vertices, glass_indices) = generate_sphere(4.0, 64, 32, [255, 255, 255, 255]);
+        glass.set_mesh_data(device, &glass_vertices, &glass_indices);
+
+        let bubble_buffer = InstanceBuffer::<Bubble>::new(device);
+        let bubble = bubble_buffer.instance();
+        let mut bubbles = MeshPipeline::with_blending(
+            &app.rendering_descriptor(),
+            &MeshGeometry {
+                position: bubble.position,
+                color: bubble.color,
+                ..Default::default()
+            },
+            &MeshMaterial::default(),
+            MeshBlending::Transparent,
+        )
+        .unwrap();
+
+        let (bubble_vertices, bubble_indices) = generate_sphere(1.0, 32, 16, [255, 255, 255, 255]);
+        bubbles.set_mesh_data(device, &bubble_vertices, &bubble_indices);
+
+        app.camera_controller.current_transform.distance = 16.0;
+        app.camera_controller.target_transform = app.camera_controller.current_transform.clone();
+
+        Self {
+            mesh,
+            glass,
+            bubbles,
+            bubble_buffer,
+            start: Instant::now(),
+        }
     }
 }
 
 impl visula::Simulation for MeshExample {
+    fn update(&mut self, app: &mut visula::Application) {
+        let seconds = self.start.elapsed().as_secs_f32();
+        self.bubble_buffer
+            .update(&app.device, &app.queue, &bubbles(seconds));
+    }
+
     fn render(&mut self, data: &mut visula::RenderData) {
         self.mesh.render(data);
+        self.glass.render(data);
+        self.bubbles.render(data);
     }
 }
 

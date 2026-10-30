@@ -7,6 +7,7 @@ use naga::valid::ValidationFlags;
 use wgpu::util::DeviceExt;
 use wgpu::{BindGroupLayout, PipelineCompilationOptions};
 
+use crate::post_process::transparency;
 use crate::primitives::mesh_primitive::MeshVertexAttributes;
 use crate::{DefaultRenderPassDescriptor, RenderData, RenderingDescriptor};
 use visula_core::{BindingBuilder, Delegate as _, Expression, InstanceBinding};
@@ -14,6 +15,7 @@ use visula_derive::Delegate;
 
 pub struct MeshPipeline {
     pub render_pipeline: wgpu::RenderPipeline,
+    blending: MeshBlending,
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub vertex_count: usize,
@@ -53,11 +55,32 @@ impl Default for MeshMaterial {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MeshBlending {
+    #[default]
+    Opaque,
+    Transparent,
+}
+
 impl MeshPipeline {
     pub fn new(
         rendering_descriptor: &RenderingDescriptor,
         geometry: &MeshGeometry,
         material: &MeshMaterial,
+    ) -> Result<Self, visula_core::ShaderError> {
+        Self::with_blending(
+            rendering_descriptor,
+            geometry,
+            material,
+            MeshBlending::Opaque,
+        )
+    }
+
+    pub fn with_blending(
+        rendering_descriptor: &RenderingDescriptor,
+        geometry: &MeshGeometry,
+        material: &MeshMaterial,
+        blending: MeshBlending,
     ) -> Result<Self, visula_core::ShaderError> {
         let &RenderingDescriptor {
             device,
@@ -84,7 +107,11 @@ impl MeshPipeline {
         log::debug!("Injecting instance");
         let mut vertex_binding_builder = BindingBuilder::new(&module, "vs_main", 1)?;
         geometry.inject("geometry", &mut module, &mut vertex_binding_builder)?;
-        let mut fragment_binding_builder = BindingBuilder::new(&module, "fs_main", 0)?;
+        let fragment_entry_point = match blending {
+            MeshBlending::Opaque => "fs_main",
+            MeshBlending::Transparent => "fs_transparent",
+        };
+        let mut fragment_binding_builder = BindingBuilder::new(&module, fragment_entry_point, 0)?;
         material.inject_before_use("material", &mut module, &mut fragment_binding_builder)?;
 
         log::debug!("Validating generated mesh shader\n{module:#?}");
@@ -166,19 +193,22 @@ impl MeshPipeline {
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader_module,
-                entry_point: Some("fs_main"),
-                targets: &[
-                    Some(wgpu::ColorTargetState {
-                        format,
-                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    }),
-                    Some(wgpu::ColorTargetState {
-                        format: wgpu::TextureFormat::Rgba16Float,
-                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    }),
-                ],
+                entry_point: Some(fragment_entry_point),
+                targets: &match blending {
+                    MeshBlending::Opaque => [
+                        Some(wgpu::ColorTargetState {
+                            format,
+                            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        }),
+                        Some(wgpu::ColorTargetState {
+                            format: wgpu::TextureFormat::Rgba16Float,
+                            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        }),
+                    ],
+                    MeshBlending::Transparent => transparency::color_targets(),
+                },
                 compilation_options: PipelineCompilationOptions::default(),
             }),
             primitive: wgpu::PrimitiveState {
@@ -188,7 +218,7 @@ impl MeshPipeline {
             },
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: Some(true),
+                depth_write_enabled: Some(blending == MeshBlending::Opaque),
                 depth_compare: Some(wgpu::CompareFunction::Less),
                 stencil: wgpu::StencilState::default(),
                 bias: wgpu::DepthBiasState::default(),
@@ -216,6 +246,7 @@ impl MeshPipeline {
 
         Ok(MeshPipeline {
             render_pipeline,
+            blending,
             vertex_buffer,
             index_buffer,
             vertex_count: 0,
@@ -255,6 +286,7 @@ impl MeshPipeline {
             camera,
             light,
             sample_count,
+            transparency,
         }: &mut RenderData,
     ) {
         log::debug!("Rendering meshes");
@@ -302,18 +334,23 @@ impl MeshPipeline {
             .map(|v| v.inner.borrow().bind_group.clone())
             .collect();
 
-        let mut render_pass = encoder.begin_render_pass(
-            &DefaultRenderPassDescriptor::new(
-                "meshes",
-                view,
-                multisampled_framebuffer,
-                depth_texture,
-                normal_msaa,
-                normal_resolve,
-                *sample_count,
-            )
-            .build(),
-        );
+        let mut render_pass = match self.blending {
+            MeshBlending::Opaque => encoder.begin_render_pass(
+                &DefaultRenderPassDescriptor::new(
+                    "meshes",
+                    view,
+                    multisampled_framebuffer,
+                    depth_texture,
+                    normal_msaa,
+                    normal_resolve,
+                    *sample_count,
+                )
+                .build(),
+            ),
+            MeshBlending::Transparent => {
+                transparency.begin_render_pass("transparent meshes", depth_texture)
+            }
+        };
 
         render_pass.set_bind_group(0, &camera.bind_group, &[]);
         render_pass.set_bind_group(1, &light.bind_group, &[]);
