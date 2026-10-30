@@ -39,7 +39,7 @@ pub fn inject_fields(
         }
         _ => {
             let mut binding_builder = BindingBuilder::new(&module, "fs_main", 0)?;
-            inject::inject_before_return(&mut module, &mut binding_builder, "fields", expressions)?;
+            inject::inject_before_use(&mut module, &mut binding_builder, "fields", expressions)?;
         }
     }
     Ok(module)
