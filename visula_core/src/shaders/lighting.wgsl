@@ -19,11 +19,6 @@ fn compute_shadow(world_position: vec3<f32>) -> f32 {
     let light_clip = u_light.light_view_proj * vec4<f32>(world_position, 1.0);
     let light_ndc = light_clip.xyz / light_clip.w;
     let shadow_uv = light_ndc.xy * vec2<f32>(0.5, -0.5) + vec2<f32>(0.5, 0.5);
-
-    if shadow_uv.x < 0.0 || shadow_uv.x > 1.0 || shadow_uv.y < 0.0 || shadow_uv.y > 1.0 {
-        return 1.0;
-    }
-
     let depth = light_ndc.z;
 
     // Slope-scaled bias: steeper surfaces need more bias to avoid acne.
@@ -41,7 +36,11 @@ fn compute_shadow(world_position: vec3<f32>) -> f32 {
             shadow += textureSampleCompare(shadow_map, shadow_sampler, shadow_uv + offset, depth - bias);
         }
     }
-    return shadow / 25.0;
+
+    // Derivatives and textureSampleCompare need uniform control flow, so points outside
+    // the shadow map are sampled too and only ignored here
+    let outside_map = shadow_uv.x < 0.0 || shadow_uv.x > 1.0 || shadow_uv.y < 0.0 || shadow_uv.y > 1.0;
+    return select(shadow / 25.0, 1.0, outside_map);
 }
 
 fn visula_lit_vec3(color: vec3<f32>, normal: vec3<f32>, view_direction: vec3<f32>, world_position: vec3<f32>) -> vec3<f32> {
