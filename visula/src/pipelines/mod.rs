@@ -1,3 +1,4 @@
+pub mod arcs;
 pub mod circles;
 pub mod cylinders;
 pub mod glyphs;
@@ -12,6 +13,7 @@ pub mod renderable;
 pub mod spheres;
 pub mod torus;
 
+pub use arcs::*;
 pub use circles::*;
 pub use cylinders::*;
 pub use glyphs::*;
