@@ -28,7 +28,6 @@ pollster = { workspace = true }
 itertools = { workspace = true }
 wasm-bindgen-futures = "0.4"
 wasm-bindgen = "0.2.104"
-cgmath = "0.17.0"
 thiserror = {workspace = true}
 gltf = "0.15.2"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
