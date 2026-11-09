@@ -30,7 +30,6 @@ pub mod derive {
     pub use visula_derive::*;
 }
 pub use bytemuck;
-pub use cgmath;
 pub use egui_wgpu;
 pub use visula_core;
 pub use visula_core::{
@@ -75,12 +74,6 @@ pub use egui;
 pub use wasm_bindgen;
 pub use web_sys;
 pub use winit;
-
-pub type Vector2 = cgmath::Vector2<f32>;
-pub type Vector3 = cgmath::Vector3<f32>;
-pub type Matrix3 = cgmath::Matrix3<f32>;
-pub type Matrix4 = cgmath::Matrix4<f32>;
-pub type Point3 = cgmath::Point3<f32>;
 
 pub struct RunConfig {
     pub canvas_name: String,

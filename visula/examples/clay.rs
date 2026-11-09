@@ -4,14 +4,14 @@ use std::rc::Rc;
 
 use bytemuck::{Pod, Zeroable};
 
-use cgmath::InnerSpace;
 use clap::Parser;
+use glam::Vec3;
 use itertools_num::linspace;
 
 use visula::egui;
 use visula::{
     Expression, InstanceBuffer, RenderData, Renderable, RenderingControls, ShadowRenderData,
-    SphereGeometry, SphereMaterial, Spheres, UniformBuffer, Vector3,
+    SphereGeometry, SphereMaterial, Spheres, UniformBuffer,
 };
 use visula_derive::{Instance, Uniform};
 
@@ -23,9 +23,9 @@ struct Cli {
 
 #[derive(Clone, Debug, PartialEq)]
 struct Particle {
-    position: Vector3,
-    velocity: Vector3,
-    acceleration: Vector3,
+    position: Vec3,
+    velocity: Vec3,
+    acceleration: Vec3,
     mass: f32,
     id: usize,
 }
@@ -38,7 +38,7 @@ struct ParticleData {
 }
 
 trait TwoBodyForce {
-    fn force(&self, position_a: &Vector3, position_b: &Vector3) -> Vector3;
+    fn force(&self, position_a: &Vec3, position_b: &Vec3) -> Vec3;
 }
 
 struct LennardJones {
@@ -56,10 +56,10 @@ impl Default for LennardJones {
 }
 
 impl TwoBodyForce for LennardJones {
-    fn force(&self, position_a: &Vector3, position_b: &Vector3) -> Vector3 {
+    fn force(&self, position_a: &Vec3, position_b: &Vec3) -> Vec3 {
         let Self { eps, sigma, .. } = self;
         let r = position_a - position_b;
-        let r_l = r.magnitude();
+        let r_l = r.length();
 
         r / r_l.powi(2)
             * eps.powi(24)
@@ -71,18 +71,18 @@ impl TwoBodyForce for LennardJones {
 enum SphereTree {
     Empty,
     Leaf {
-        position: Vector3,
+        position: Vec3,
         id: usize,
     },
     Branch {
-        position: Vector3,
+        position: Vec3,
         radius: f32,
         left: Rc<RefCell<SphereTree>>,
         right: Rc<RefCell<SphereTree>>,
     },
 }
 
-fn node_distance(position: &Vector3, node: &SphereTree) -> f32 {
+fn node_distance(position: &Vec3, node: &SphereTree) -> f32 {
     let node_position = match node {
         SphereTree::Empty => {
             panic!("Encountered empty leaf node");
@@ -91,10 +91,10 @@ fn node_distance(position: &Vector3, node: &SphereTree) -> f32 {
         SphereTree::Branch { position, .. } => position,
     };
 
-    (position - node_position).magnitude()
+    (position - node_position).length()
 }
 
-fn is_near(position: &Vector3, node: &SphereTree) -> bool {
+fn is_near(position: &Vec3, node: &SphereTree) -> bool {
     let threshold = 8.0f32;
     let threshold2 = threshold.powi(2);
     match node {
@@ -104,14 +104,14 @@ fn is_near(position: &Vector3, node: &SphereTree) -> bool {
         SphereTree::Leaf {
             position: node_position,
             ..
-        } => (position - node_position).magnitude2() <= threshold2,
+        } => (position - node_position).length_squared() <= threshold2,
         SphereTree::Branch {
             position: node_position,
             radius,
             ..
         } => {
             let threshold_radius2 = (threshold + radius).powi(2);
-            (position - node_position).magnitude2() <= threshold_radius2
+            (position - node_position).length_squared() <= threshold_radius2
         }
     }
 }
@@ -127,12 +127,12 @@ fn integrate<F: TwoBodyForce>(
         out_particle.position += out_particle.velocity * dt;
     }
     for out_particle in out_state.iter_mut() {
-        out_particle.acceleration = Vector3::new(0.0, 0.0, 0.0);
+        out_particle.acceleration = Vec3::new(0.0, 0.0, 0.0);
     }
     let intermediate_state = out_state.to_vec();
-    let gravity = Vector3::new(0.0, -9.81, 0.0);
-    let bounds_min = Vector3::new(-40.0, -10.0, -40.0);
-    let bounds_max = Vector3::new(40.0, 100.0, 40.0);
+    let gravity = Vec3::new(0.0, -9.81, 0.0);
+    let bounds_min = Vec3::new(-40.0, -10.0, -40.0);
+    let bounds_max = Vec3::new(40.0, 100.0, 40.0);
 
     let sphere_tree = Rc::new(RefCell::new(SphereTree::Empty));
 
@@ -157,7 +157,7 @@ fn integrate<F: TwoBodyForce>(
                 }
                 SphereTree::Leaf { position, id } => {
                     let center = (particle.position + *position) / 2.0;
-                    let radius = (particle.position - *position).magnitude() / 2.0;
+                    let radius = (particle.position - *position).length() / 2.0;
                     new_node = Some(SphereTree::Branch {
                         position: center,
                         radius,
@@ -177,7 +177,7 @@ fn integrate<F: TwoBodyForce>(
                     radius,
                     position,
                 } => {
-                    let distance = (particle.position - *position).magnitude();
+                    let distance = (particle.position - *position).length();
                     if distance > *radius {
                         new_node = Some(SphereTree::Branch {
                             position: *position,
@@ -207,7 +207,7 @@ fn integrate<F: TwoBodyForce>(
                 position,
             } = &mut *current_node.borrow_mut()
             {
-                *radius = radius.max((particle.position - *position).magnitude());
+                *radius = radius.max((particle.position - *position).length());
                 if node_distance(&particle.position, &left.borrow())
                     < node_distance(&particle.position, &right.borrow())
                 {
@@ -266,14 +266,15 @@ fn integrate<F: TwoBodyForce>(
         let bounds_force = 6.0 * (bounds_force_min + bounds_force_max);
         out_particle.acceleration += bounds_force / out_particle.mass;
 
-        let damping =
-            -intermediate_particle.velocity * intermediate_particle.velocity.magnitude2() / 100.0;
+        let damping = -intermediate_particle.velocity
+            * intermediate_particle.velocity.length_squared()
+            / 100.0;
         out_particle.acceleration += damping / out_particle.mass;
     }
     for particle in out_state.iter_mut() {
         particle.velocity += 0.5 * particle.acceleration * dt;
-        if particle.velocity.magnitude2() < 0.1 {
-            particle.velocity = Vector3::new(0.0, 0.0, 0.0);
+        if particle.velocity.length_squared() < 0.1 {
+            particle.velocity = Vec3::new(0.0, 0.0, 0.0);
         }
     }
 }
@@ -288,9 +289,9 @@ fn generate(count: usize) -> Vec<Particle> {
         for y in linspace(start, end, count) {
             for z in linspace(start, end, count) {
                 current_particles.push(Particle {
-                    position: Vector3::new(x, y, z),
-                    velocity: Vector3::new(0.0, 0.0, 0.0),
-                    acceleration: Vector3::new(0.0, 0.0, 0.0),
+                    position: Vec3::new(x, y, z),
+                    velocity: Vec3::new(0.0, 0.0, 0.0),
+                    acceleration: Vec3::new(0.0, 0.0, 0.0),
                     mass: 1.0,
                     id,
                 });
@@ -336,7 +337,7 @@ impl Simulation {
             &SphereGeometry {
                 position: particle.position,
                 radius: settings.radius,
-                color: glam::Vec3::ZERO.into(),
+                color: Vec3::ZERO.into(),
             },
             &SphereMaterial {
                 color: Expression::from(glam::Vec3::new(0.2, 0.8, 0.6)).lit(),
