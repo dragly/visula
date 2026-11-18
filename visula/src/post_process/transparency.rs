@@ -68,13 +68,13 @@ impl Target {
         }
     }
 
-    fn attachment(&self, clear: Option<wgpu::Color>) -> wgpu::RenderPassColorAttachment<'_> {
+    fn attachment(&self, clear: wgpu::Color) -> wgpu::RenderPassColorAttachment<'_> {
         wgpu::RenderPassColorAttachment {
             view: self.msaa.as_ref().unwrap_or(&self.resolve),
             resolve_target: self.msaa.as_ref().map(|_| &self.resolve),
             depth_slice: None,
             ops: wgpu::Operations {
-                load: clear.map_or(wgpu::LoadOp::Load, wgpu::LoadOp::Clear),
+                load: wgpu::LoadOp::Clear(clear),
                 store: wgpu::StoreOp::Store,
             },
         }
@@ -237,33 +237,25 @@ impl TransparencyPass {
         );
     }
 
-    pub fn begin_render_pass<'encoder>(
+    pub(crate) fn begin_render_pass<'encoder>(
         &self,
         encoder: &'encoder mut wgpu::CommandEncoder,
-        label: &str,
         depth_texture: &wgpu::TextureView,
-        clear: bool,
     ) -> wgpu::RenderPass<'encoder> {
         encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some(label),
+            label: Some("transparent meshes"),
             color_attachments: &[
-                Some(self.accumulation.attachment(clear.then_some(wgpu::Color {
+                Some(self.accumulation.attachment(wgpu::Color {
                     r: 0.0,
                     g: 0.0,
                     b: 0.0,
                     a: 1.0,
-                }))),
-                Some(
-                    self.weight
-                        .attachment(clear.then_some(wgpu::Color::TRANSPARENT)),
-                ),
+                })),
+                Some(self.weight.attachment(wgpu::Color::TRANSPARENT)),
             ],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: depth_texture,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                }),
+                depth_ops: None,
                 stencil_ops: None,
             }),
             occlusion_query_set: None,

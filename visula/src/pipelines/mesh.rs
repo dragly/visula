@@ -274,15 +274,7 @@ impl MeshPipeline {
         self.vertex_count = indices.len();
     }
 
-    pub fn render(
-        &self,
-        RenderData {
-            pass,
-            camera,
-            light,
-            transparency,
-        }: &mut RenderData,
-    ) {
+    pub fn render(&self, data: &mut RenderData) {
         log::debug!("Rendering meshes");
         if self.vertex_count == 0 {
             return;
@@ -328,13 +320,10 @@ impl MeshPipeline {
             .map(|v| v.inner.borrow().bind_group.clone())
             .collect();
 
-        let mut transparent_pass;
+        let (camera, light) = (data.camera, data.light);
         let render_pass = match self.blending {
-            MeshBlending::Opaque => &mut **pass,
-            MeshBlending::Transparent => {
-                transparent_pass = transparency.begin_render_pass("transparent meshes");
-                &mut transparent_pass
-            }
+            MeshBlending::Opaque => &mut *data.pass,
+            MeshBlending::Transparent => data.transparent_pass(),
         };
 
         render_pass.push_debug_group("meshes");
