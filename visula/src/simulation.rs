@@ -12,40 +12,52 @@ pub struct RenderData<'a> {
     pub pass: &'a mut wgpu::RenderPass<'static>,
     pub camera: &'a Camera,
     pub light: &'a DirectionalLight,
-    pub transparency: TransparencyRenderData<'a>,
+    pub(crate) transparency: TransparencyRenderData<'a>,
 }
 
-pub struct TransparencyRenderData<'a> {
+impl RenderData<'_> {
+    pub fn transparent_pass(&mut self) -> &mut wgpu::RenderPass<'static> {
+        self.transparency.pass()
+    }
+}
+
+pub(crate) struct TransparencyRenderData<'a> {
     encoder: &'a mut wgpu::CommandEncoder,
-    pass: &'a TransparencyPass,
+    transparency: &'a TransparencyPass,
     depth_texture: &'a wgpu::TextureView,
-    used: bool,
+    pass: Option<wgpu::RenderPass<'static>>,
 }
 
 impl<'a> TransparencyRenderData<'a> {
-    pub fn new(
+    pub(crate) fn new(
         encoder: &'a mut wgpu::CommandEncoder,
-        pass: &'a TransparencyPass,
+        transparency: &'a TransparencyPass,
         depth_texture: &'a wgpu::TextureView,
     ) -> Self {
         Self {
             encoder,
-            pass,
+            transparency,
             depth_texture,
-            used: false,
+            pass: None,
         }
     }
 
-    pub fn begin_render_pass(&mut self, label: &str) -> wgpu::RenderPass<'static> {
-        let clear = !self.used;
-        self.used = true;
-        self.pass
-            .begin_render_pass(self.encoder, label, self.depth_texture, clear)
-            .forget_lifetime()
+    fn pass(&mut self) -> &mut wgpu::RenderPass<'static> {
+        let Self {
+            encoder,
+            transparency,
+            depth_texture,
+            pass,
+        } = self;
+        pass.get_or_insert_with(|| {
+            transparency
+                .begin_render_pass(encoder, depth_texture)
+                .forget_lifetime()
+        })
     }
 
-    pub fn used(&self) -> bool {
-        self.used
+    pub(crate) fn used(&self) -> bool {
+        self.pass.is_some()
     }
 }
 
