@@ -1,6 +1,6 @@
 use crate::rendering_descriptor::RenderingDescriptor;
 use crate::simulation::{RenderData, ShadowRenderData};
-use crate::{DefaultRenderPassDescriptor, Renderable};
+use crate::Renderable;
 use itertools::Itertools;
 use naga::{back::wgsl::WriterFlags, valid::ValidationFlags};
 use std::borrow::Cow;
@@ -437,15 +437,9 @@ impl Renderable for QuadPipeline {
     fn render(
         &self,
         RenderData {
-            encoder,
-            view,
-            multisampled_framebuffer,
-            depth_texture,
-            normal_msaa,
-            normal_resolve,
+            pass,
             camera,
             light,
-            sample_count,
             ..
         }: &mut RenderData,
     ) {
@@ -509,56 +503,46 @@ impl Renderable for QuadPipeline {
                     .collect()
             })
             .unwrap_or_default();
-        {
-            let default_render_pass = DefaultRenderPassDescriptor::new(
-                &self.label,
-                view,
-                multisampled_framebuffer,
-                depth_texture,
-                normal_msaa,
-                normal_resolve,
-                *sample_count,
-            );
-            let mut render_pass = encoder.begin_render_pass(&default_render_pass.build());
-            render_pass.set_bind_group(0, &camera.bind_group, &[]);
-            render_pass.set_bind_group(1, &light.bind_group, &[]);
+        pass.push_debug_group(&self.label);
+        pass.set_bind_group(0, &camera.bind_group, &[]);
+        pass.set_bind_group(1, &light.bind_group, &[]);
 
-            render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_index_buffer(self.index_buffer.slice(..), self.index_format);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            let mut instance_count = if self.vertex_binding_builder.instances.is_empty() {
-                1
-            } else {
-                0
-            };
-            for (binding, buffer) in bindings.iter() {
-                let slot = binding.slot;
-                log::trace!("Setting vertex buffer {slot}");
-                render_pass.set_vertex_buffer(slot, buffer.slice(..));
-                instance_count = instance_count.max(binding.inner.borrow().count);
-            }
-            let mut current_slot = 2u32;
-            for bind_group in self.bind_groups.iter().flatten() {
-                render_pass.set_bind_group(current_slot, bind_group, &[]);
-                current_slot += 1;
-            }
-            for bind_group in vertex_uniforms.iter() {
-                log::trace!("Setting vertex uniform bind group {current_slot}");
-                render_pass.set_bind_group(current_slot, bind_group, &[]);
-                current_slot += 1;
-            }
-            for bind_group in fragment_textures.iter() {
-                log::trace!("Setting fragment texture bind group {current_slot}");
-                render_pass.set_bind_group(current_slot, bind_group, &[]);
-                current_slot += 1;
-            }
-            for bind_group in fragment_uniforms.iter() {
-                log::trace!("Setting fragment uniform bind group {current_slot}");
-                render_pass.set_bind_group(current_slot, bind_group, &[]);
-                current_slot += 1;
-            }
-            render_pass.draw_indexed(0..self.index_count as u32, 0, 0..instance_count as u32);
+        pass.set_pipeline(&self.render_pipeline);
+        pass.set_index_buffer(self.index_buffer.slice(..), self.index_format);
+        pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        let mut instance_count = if self.vertex_binding_builder.instances.is_empty() {
+            1
+        } else {
+            0
+        };
+        for (binding, buffer) in bindings.iter() {
+            let slot = binding.slot;
+            log::trace!("Setting vertex buffer {slot}");
+            pass.set_vertex_buffer(slot, buffer.slice(..));
+            instance_count = instance_count.max(binding.inner.borrow().count);
         }
+        let mut current_slot = 2u32;
+        for bind_group in self.bind_groups.iter().flatten() {
+            pass.set_bind_group(current_slot, bind_group, &[]);
+            current_slot += 1;
+        }
+        for bind_group in vertex_uniforms.iter() {
+            log::trace!("Setting vertex uniform bind group {current_slot}");
+            pass.set_bind_group(current_slot, bind_group, &[]);
+            current_slot += 1;
+        }
+        for bind_group in fragment_textures.iter() {
+            log::trace!("Setting fragment texture bind group {current_slot}");
+            pass.set_bind_group(current_slot, bind_group, &[]);
+            current_slot += 1;
+        }
+        for bind_group in fragment_uniforms.iter() {
+            log::trace!("Setting fragment uniform bind group {current_slot}");
+            pass.set_bind_group(current_slot, bind_group, &[]);
+            current_slot += 1;
+        }
+        pass.draw_indexed(0..self.index_count as u32, 0, 0..instance_count as u32);
+        pass.pop_debug_group();
     }
 
     fn render_shadow(&self, shadow_data: &mut ShadowRenderData) {

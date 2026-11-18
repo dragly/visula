@@ -9,7 +9,7 @@ use wgpu::{BindGroupLayout, PipelineCompilationOptions};
 
 use crate::post_process::transparency;
 use crate::primitives::mesh_primitive::MeshVertexAttributes;
-use crate::{DefaultRenderPassDescriptor, RenderData, RenderingDescriptor};
+use crate::{RenderData, RenderingDescriptor};
 use visula_core::{BindingBuilder, Delegate as _, Expression, InstanceBinding};
 use visula_derive::Delegate;
 
@@ -277,15 +277,9 @@ impl MeshPipeline {
     pub fn render(
         &self,
         RenderData {
-            encoder,
-            view,
-            multisampled_framebuffer,
-            depth_texture,
-            normal_msaa,
-            normal_resolve,
+            pass,
             camera,
             light,
-            sample_count,
             transparency,
         }: &mut RenderData,
     ) {
@@ -334,24 +328,16 @@ impl MeshPipeline {
             .map(|v| v.inner.borrow().bind_group.clone())
             .collect();
 
-        let mut render_pass = match self.blending {
-            MeshBlending::Opaque => encoder.begin_render_pass(
-                &DefaultRenderPassDescriptor::new(
-                    "meshes",
-                    view,
-                    multisampled_framebuffer,
-                    depth_texture,
-                    normal_msaa,
-                    normal_resolve,
-                    *sample_count,
-                )
-                .build(),
-            ),
+        let mut transparent_pass;
+        let render_pass = match self.blending {
+            MeshBlending::Opaque => &mut **pass,
             MeshBlending::Transparent => {
-                transparency.begin_render_pass("transparent meshes", depth_texture)
+                transparent_pass = transparency.begin_render_pass("transparent meshes");
+                &mut transparent_pass
             }
         };
 
+        render_pass.push_debug_group("meshes");
         render_pass.set_bind_group(0, &camera.bind_group, &[]);
         render_pass.set_bind_group(1, &light.bind_group, &[]);
 
@@ -383,5 +369,6 @@ impl MeshPipeline {
 
         log::debug!("Drawing {instance_count} instances");
         render_pass.draw_indexed(0..self.vertex_count as u32, 0, 0..instance_count as u32);
+        render_pass.pop_debug_group();
     }
 }

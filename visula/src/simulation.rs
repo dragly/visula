@@ -9,42 +9,39 @@ use crate::post_process::transparency::TransparencyPass;
 use crate::CustomEvent;
 
 pub struct RenderData<'a> {
-    pub view: &'a wgpu::TextureView,
-    pub multisampled_framebuffer: &'a wgpu::TextureView,
-    pub depth_texture: &'a wgpu::TextureView,
-    pub normal_msaa: &'a wgpu::TextureView,
-    pub normal_resolve: &'a wgpu::TextureView,
-    pub encoder: &'a mut wgpu::CommandEncoder,
+    pub pass: &'a mut wgpu::RenderPass<'static>,
     pub camera: &'a Camera,
     pub light: &'a DirectionalLight,
-    pub sample_count: u32,
     pub transparency: TransparencyRenderData<'a>,
 }
 
 pub struct TransparencyRenderData<'a> {
     encoder: &'a mut wgpu::CommandEncoder,
     pass: &'a TransparencyPass,
+    depth_texture: &'a wgpu::TextureView,
     used: bool,
 }
 
 impl<'a> TransparencyRenderData<'a> {
-    pub fn new(encoder: &'a mut wgpu::CommandEncoder, pass: &'a TransparencyPass) -> Self {
+    pub fn new(
+        encoder: &'a mut wgpu::CommandEncoder,
+        pass: &'a TransparencyPass,
+        depth_texture: &'a wgpu::TextureView,
+    ) -> Self {
         Self {
             encoder,
             pass,
+            depth_texture,
             used: false,
         }
     }
 
-    pub fn begin_render_pass(
-        &mut self,
-        label: &str,
-        depth_texture: &wgpu::TextureView,
-    ) -> wgpu::RenderPass<'_> {
+    pub fn begin_render_pass(&mut self, label: &str) -> wgpu::RenderPass<'static> {
         let clear = !self.used;
         self.used = true;
         self.pass
-            .begin_render_pass(self.encoder, label, depth_texture, clear)
+            .begin_render_pass(self.encoder, label, self.depth_texture, clear)
+            .forget_lifetime()
     }
 
     pub fn used(&self) -> bool {
