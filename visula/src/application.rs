@@ -185,7 +185,10 @@ impl Application {
         let camera_controller = CameraController::new(&window);
 
         #[cfg(target_arch = "wasm32")]
-        let sample_count = 1;
+        let sample_count = match adapter.get_info().backend {
+            wgpu::Backend::BrowserWebGpu => 4,
+            _ => 1,
+        };
         #[cfg(not(target_arch = "wasm32"))]
         let sample_count = 4;
         let depth_texture_in = device.create_texture(&wgpu::TextureDescriptor {
