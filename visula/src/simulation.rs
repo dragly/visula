@@ -62,8 +62,7 @@ impl<'a> TransparencyRenderData<'a> {
 }
 
 pub struct ShadowRenderData<'a> {
-    pub encoder: &'a mut wgpu::CommandEncoder,
-    pub shadow_texture: &'a wgpu::TextureView,
+    pub pass: &'a mut wgpu::RenderPass<'static>,
     pub light: &'a DirectionalLight,
 }
 
