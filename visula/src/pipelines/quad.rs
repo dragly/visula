@@ -582,54 +582,36 @@ impl Renderable for QuadPipeline {
             .map(|v| (v, Ref::map(v.inner.borrow(), |v| &v.buffer)))
             .collect();
 
-        {
-            let mut render_pass =
-                shadow_data
-                    .encoder
-                    .begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some(&format!("{} shadow pass", self.label)),
-                        color_attachments: &[],
-                        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                            view: shadow_data.shadow_texture,
-                            depth_ops: Some(wgpu::Operations {
-                                load: wgpu::LoadOp::Load,
-                                store: wgpu::StoreOp::Store,
-                            }),
-                            stencil_ops: None,
-                        }),
-                        occlusion_query_set: None,
-                        timestamp_writes: None,
-                        multiview_mask: None,
-                    });
+        let render_pass = &mut shadow_data.pass;
+        render_pass.push_debug_group(&format!("{} shadow", self.label));
+        render_pass.set_bind_group(0, &shadow_data.light.shadow_bind_group, &[]);
+        render_pass.set_pipeline(shadow_pipeline);
+        render_pass.set_index_buffer(self.index_buffer.slice(..), self.index_format);
+        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
 
-            render_pass.set_bind_group(0, &shadow_data.light.shadow_bind_group, &[]);
-            render_pass.set_pipeline(shadow_pipeline);
-            render_pass.set_index_buffer(self.index_buffer.slice(..), self.index_format);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-
-            let mut instance_count = if self.vertex_binding_builder.instances.is_empty() {
-                1
-            } else {
-                0
-            };
-            for (binding, buffer) in bindings.iter() {
-                let slot = binding.slot;
-                render_pass.set_vertex_buffer(slot, buffer.slice(..));
-                instance_count = instance_count.max(binding.inner.borrow().count);
-            }
-
-            let vertex_uniforms: Vec<wgpu::BindGroup> = self
-                .vertex_binding_builder
-                .uniforms
-                .values()
-                .map(|v| v.inner.borrow().bind_group.clone())
-                .collect();
-            for (current_slot, bind_group) in (1u32..).zip(vertex_uniforms.iter()) {
-                render_pass.set_bind_group(current_slot, bind_group, &[]);
-            }
-
-            render_pass.draw_indexed(0..self.index_count as u32, 0, 0..instance_count as u32);
+        let mut instance_count = if self.vertex_binding_builder.instances.is_empty() {
+            1
+        } else {
+            0
+        };
+        for (binding, buffer) in bindings.iter() {
+            let slot = binding.slot;
+            render_pass.set_vertex_buffer(slot, buffer.slice(..));
+            instance_count = instance_count.max(binding.inner.borrow().count);
         }
+
+        let vertex_uniforms: Vec<wgpu::BindGroup> = self
+            .vertex_binding_builder
+            .uniforms
+            .values()
+            .map(|v| v.inner.borrow().bind_group.clone())
+            .collect();
+        for (current_slot, bind_group) in (1u32..).zip(vertex_uniforms.iter()) {
+            render_pass.set_bind_group(current_slot, bind_group, &[]);
+        }
+
+        render_pass.draw_indexed(0..self.index_count as u32, 0, 0..instance_count as u32);
+        render_pass.pop_debug_group();
     }
 }
 

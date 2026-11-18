@@ -463,9 +463,9 @@ impl Application {
 
         let view = frame.texture.create_view(&TextureViewDescriptor::default());
 
-        {
-            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("shadow clear"),
+        let mut shadow_pass = encoder
+            .begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("shadow"),
                 color_attachments: &[],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &self.light.shadow_texture_view,
@@ -478,13 +478,13 @@ impl Application {
                 occlusion_query_set: None,
                 timestamp_writes: None,
                 multiview_mask: None,
-            });
-        }
+            })
+            .forget_lifetime();
         simulation.render_shadow(&mut ShadowRenderData {
-            encoder: &mut encoder,
-            shadow_texture: &self.light.shadow_texture_view,
+            pass: &mut shadow_pass,
             light: &self.light,
         });
+        drop(shadow_pass);
 
         let msaa = self.sample_count > 1;
         let post_processor = &self.post_processor;
