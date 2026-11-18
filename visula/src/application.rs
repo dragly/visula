@@ -552,9 +552,6 @@ impl Application {
 
         self.post_processor.render_bloom(&mut encoder, &self.queue);
 
-        self.post_processor
-            .render_tonemap(&mut encoder, &self.queue, &view);
-
         let raw_input = self.egui_renderer.state.take_egui_input(&self.window);
         let active = self.activation.as_ref().map(|activation| activation.active);
         let mut done = false;
@@ -596,27 +593,30 @@ impl Application {
             &tris,
             &screen_descriptor,
         );
-        let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("egui"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &view,
-                resolve_target: None,
-                depth_slice: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
-        self.egui_renderer.renderer.render(
-            &mut render_pass.forget_lifetime(),
-            &tris,
-            &screen_descriptor,
-        );
+        let mut output_pass = encoder
+            .begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("tonemap and egui"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    depth_slice: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                occlusion_query_set: None,
+                timestamp_writes: None,
+                multiview_mask: None,
+            })
+            .forget_lifetime();
+        self.post_processor
+            .render_tonemap(&mut output_pass, &self.queue);
+        self.egui_renderer
+            .renderer
+            .render(&mut output_pass, &tris, &screen_descriptor);
+        drop(output_pass);
         for x in &full_output.textures_delta.free {
             self.egui_renderer.renderer.free_texture(x)
         }

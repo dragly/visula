@@ -265,24 +265,7 @@ impl TonemapPass {
         queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
     }
 
-    pub fn render(&self, encoder: &mut wgpu::CommandEncoder, output_view: &wgpu::TextureView) {
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("tonemap pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: output_view,
-                resolve_target: None,
-                depth_slice: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
-
+    pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>) {
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.bind_group, &[]);
         render_pass.draw(0..3, 0..1);
