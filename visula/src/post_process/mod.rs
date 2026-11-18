@@ -309,6 +309,10 @@ impl PostProcessor {
         self.rebuild_tonemap(device);
     }
 
+    pub fn reads_normals(&self) -> bool {
+        self.ssao.is_some() || (self.config.outline.enabled && self.outline.is_some())
+    }
+
     pub fn render_sky(
         &self,
         render_pass: &mut wgpu::RenderPass<'_>,
