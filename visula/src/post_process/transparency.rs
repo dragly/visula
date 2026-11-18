@@ -75,7 +75,11 @@ impl Target {
             depth_slice: None,
             ops: wgpu::Operations {
                 load: wgpu::LoadOp::Clear(clear),
-                store: wgpu::StoreOp::Store,
+                store: if self.msaa.is_some() {
+                    wgpu::StoreOp::Discard
+                } else {
+                    wgpu::StoreOp::Store
+                },
             },
         }
     }

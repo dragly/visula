@@ -487,38 +487,23 @@ impl Application {
         });
 
         let msaa = self.sample_count > 1;
-        let hdr_view = &self.post_processor.hdr_view;
-        let normal_resolve_view = &self.post_processor.normal_resolve_view;
+        let post_processor = &self.post_processor;
         let mut scene_pass = encoder
             .begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("scene"),
                 color_attachments: &[
-                    Some(wgpu::RenderPassColorAttachment {
-                        view: if msaa {
-                            &self.multisampled_framebuffer
-                        } else {
-                            hdr_view
-                        },
-                        resolve_target: msaa.then_some(hdr_view),
-                        depth_slice: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(simulation.clear_color()),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    }),
-                    Some(wgpu::RenderPassColorAttachment {
-                        view: if msaa {
-                            &self.post_processor.normal_msaa_view
-                        } else {
-                            normal_resolve_view
-                        },
-                        resolve_target: msaa.then_some(normal_resolve_view),
-                        depth_slice: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(Color::TRANSPARENT),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    }),
+                    Some(scene_color_attachment(
+                        msaa.then_some(&self.multisampled_framebuffer),
+                        &post_processor.hdr_view,
+                        true,
+                        simulation.clear_color(),
+                    )),
+                    Some(scene_color_attachment(
+                        msaa.then_some(&post_processor.normal_msaa_view),
+                        &post_processor.normal_resolve_view,
+                        post_processor.reads_normals(),
+                        Color::TRANSPARENT,
+                    )),
                 ],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &self.depth_texture,
@@ -717,6 +702,27 @@ impl Application {
         T: visula_core::Instance + bytemuck::Pod,
     {
         visula_core::InstanceBuffer::new_with_init(&self.device, data).instance()
+    }
+}
+
+fn scene_color_attachment<'a>(
+    multisampled: Option<&'a wgpu::TextureView>,
+    resolved: &'a wgpu::TextureView,
+    keep: bool,
+    clear: Color,
+) -> wgpu::RenderPassColorAttachment<'a> {
+    wgpu::RenderPassColorAttachment {
+        view: multisampled.unwrap_or(resolved),
+        resolve_target: (multisampled.is_some() && keep).then_some(resolved),
+        depth_slice: None,
+        ops: wgpu::Operations {
+            load: wgpu::LoadOp::Clear(clear),
+            store: if keep && multisampled.is_none() {
+                wgpu::StoreOp::Store
+            } else {
+                wgpu::StoreOp::Discard
+            },
+        },
     }
 }
 
