@@ -135,54 +135,7 @@ impl SkyPass {
         queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn render(
-        &self,
-        encoder: &mut wgpu::CommandEncoder,
-        color_view: &wgpu::TextureView,
-        resolve_target: &wgpu::TextureView,
-        depth_view: &wgpu::TextureView,
-        normal_msaa: &wgpu::TextureView,
-        normal_resolve: &wgpu::TextureView,
-        camera: &Camera,
-        sample_count: u32,
-    ) {
-        let msaa = sample_count > 1;
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("sky pass"),
-            color_attachments: &[
-                Some(wgpu::RenderPassColorAttachment {
-                    view: if msaa { color_view } else { resolve_target },
-                    resolve_target: if msaa { Some(resolve_target) } else { None },
-                    depth_slice: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                }),
-                Some(wgpu::RenderPassColorAttachment {
-                    view: if msaa { normal_msaa } else { normal_resolve },
-                    resolve_target: if msaa { Some(normal_resolve) } else { None },
-                    depth_slice: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                }),
-            ],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: depth_view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
-
+    pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>, camera: &Camera) {
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &camera.bind_group, &[]);
         render_pass.set_bind_group(1, &self.params_bind_group, &[]);

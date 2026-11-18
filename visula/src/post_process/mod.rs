@@ -311,26 +311,15 @@ impl PostProcessor {
 
     pub fn render_sky(
         &self,
-        encoder: &mut wgpu::CommandEncoder,
+        render_pass: &mut wgpu::RenderPass<'_>,
         queue: &wgpu::Queue,
-        multisampled_framebuffer: &wgpu::TextureView,
-        depth_texture: &wgpu::TextureView,
         camera: &Camera,
     ) {
         self.sky.update_params(queue, self.config.sky.mode);
         if self.config.sky.mode == config::SkyMode::Off {
             return;
         }
-        self.sky.render(
-            encoder,
-            multisampled_framebuffer,
-            &self.hdr_view,
-            depth_texture,
-            &self.normal_msaa_view,
-            &self.normal_resolve_view,
-            camera,
-            self.sample_count,
-        );
+        self.sky.render(render_pass, camera);
     }
 
     pub fn render_ssao(&self, encoder: &mut wgpu::CommandEncoder, queue: &wgpu::Queue) {

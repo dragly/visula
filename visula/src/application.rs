@@ -18,8 +18,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use wgpu::{
     BackendOptions, Color, CommandEncoder, CurrentSurfaceTexture, Device, Dx12BackendOptions,
-    GlBackendOptions, InstanceDescriptor, SurfaceTexture, TextureFormat, TextureView,
-    TextureViewDescriptor,
+    GlBackendOptions, InstanceDescriptor, SurfaceTexture, TextureFormat, TextureViewDescriptor,
 };
 use winit::{
     dpi::PhysicalSize,
@@ -451,32 +450,6 @@ impl Application {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None })
     }
 
-    pub fn clear(&self, view: &TextureView, encoder: &mut CommandEncoder, clear_color: Color) {
-        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("clear"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &self.multisampled_framebuffer,
-                resolve_target: Some(view),
-                depth_slice: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(clear_color),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: &self.depth_texture,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: wgpu::StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
-    }
-
     pub fn render(&mut self, simulation: &mut impl Simulation) {
         let frame = match self.next_frame() {
             Ok(frame) => frame,
@@ -514,12 +487,11 @@ impl Application {
         });
 
         let msaa = self.sample_count > 1;
-        {
-            let hdr_view = &self.post_processor.hdr_view;
-            let normal_msaa_view = &self.post_processor.normal_msaa_view;
-            let normal_resolve_view = &self.post_processor.normal_resolve_view;
-            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("clear"),
+        let hdr_view = &self.post_processor.hdr_view;
+        let normal_resolve_view = &self.post_processor.normal_resolve_view;
+        let mut scene_pass = encoder
+            .begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("scene"),
                 color_attachments: &[
                     Some(wgpu::RenderPassColorAttachment {
                         view: if msaa {
@@ -527,7 +499,7 @@ impl Application {
                         } else {
                             hdr_view
                         },
-                        resolve_target: if msaa { Some(hdr_view) } else { None },
+                        resolve_target: msaa.then_some(hdr_view),
                         depth_slice: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(simulation.clear_color()),
@@ -536,15 +508,11 @@ impl Application {
                     }),
                     Some(wgpu::RenderPassColorAttachment {
                         view: if msaa {
-                            normal_msaa_view
+                            &self.post_processor.normal_msaa_view
                         } else {
                             normal_resolve_view
                         },
-                        resolve_target: if msaa {
-                            Some(normal_resolve_view)
-                        } else {
-                            None
-                        },
+                        resolve_target: msaa.then_some(normal_resolve_view),
                         depth_slice: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(Color::TRANSPARENT),
@@ -563,46 +531,27 @@ impl Application {
                 occlusion_query_set: None,
                 timestamp_writes: None,
                 multiview_mask: None,
-            });
-        }
+            })
+            .forget_lifetime();
 
-        self.post_processor.render_sky(
-            &mut encoder,
-            &self.queue,
-            if msaa {
-                &self.multisampled_framebuffer
-            } else {
-                &self.post_processor.hdr_view
-            },
-            &self.depth_texture,
-            &self.camera,
-        );
+        self.post_processor
+            .render_sky(&mut scene_pass, &self.queue, &self.camera);
 
-        let mut render_data = RenderData {
-            view: &self.post_processor.hdr_view,
-            multisampled_framebuffer: if msaa {
-                &self.multisampled_framebuffer
-            } else {
-                &self.post_processor.hdr_view
-            },
-            depth_texture: &self.depth_texture,
-            normal_msaa: if msaa {
-                &self.post_processor.normal_msaa_view
-            } else {
-                &self.post_processor.normal_resolve_view
-            },
-            normal_resolve: &self.post_processor.normal_resolve_view,
-            encoder: &mut encoder,
-            camera: &self.camera,
-            light: &self.light,
-            sample_count: self.sample_count,
-            transparency: TransparencyRenderData::new(
-                &mut transparent_encoder,
-                &self.post_processor.transparency,
-            ),
+        let transparency_used = {
+            let mut render_data = RenderData {
+                pass: &mut scene_pass,
+                camera: &self.camera,
+                light: &self.light,
+                transparency: TransparencyRenderData::new(
+                    &mut transparent_encoder,
+                    &self.post_processor.transparency,
+                    &self.depth_texture,
+                ),
+            };
+            simulation.render(&mut render_data);
+            render_data.transparency.used()
         };
-        simulation.render(&mut render_data);
-        let transparency_used = render_data.transparency.used();
+        drop(scene_pass);
 
         let scene = encoder.finish();
         let mut encoder = transparent_encoder;
