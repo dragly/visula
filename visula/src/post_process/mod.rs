@@ -357,19 +357,14 @@ impl PostProcessor {
         }
     }
 
-    pub fn render_tonemap(
-        &self,
-        encoder: &mut wgpu::CommandEncoder,
-        queue: &wgpu::Queue,
-        output_view: &wgpu::TextureView,
-    ) {
+    pub fn render_tonemap(&self, render_pass: &mut wgpu::RenderPass<'_>, queue: &wgpu::Queue) {
         self.tonemap.update_params(
             queue,
             self.config.tonemapping,
             self.ssao.is_some(),
             self.bloom.is_some(),
         );
-        self.tonemap.render(encoder, output_view);
+        self.tonemap.render(render_pass);
     }
 }
 
