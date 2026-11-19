@@ -3,7 +3,7 @@ use crate::camera::Camera;
 use crate::light::DirectionalLight;
 use crate::post_process::PostProcessor;
 use crate::rendering_descriptor::RenderingDescriptor;
-use crate::simulation::{ShadowRenderData, TransparencyRenderData};
+use crate::simulation::{PrepareData, ShadowRenderData, TransparencyRenderData};
 use crate::{camera::controller::CameraController, simulation::RenderData};
 use crate::{CameraControllerResponse, Simulation};
 use chrono::{DateTime, Utc};
@@ -462,6 +462,12 @@ impl Application {
         let mut transparent_encoder = self.encoder();
 
         let view = frame.texture.create_view(&TextureViewDescriptor::default());
+
+        simulation.prepare(&mut PrepareData {
+            encoder: &mut encoder,
+            camera: &self.camera,
+            light: &self.light,
+        });
 
         let mut shadow_pass = encoder
             .begin_render_pass(&wgpu::RenderPassDescriptor {

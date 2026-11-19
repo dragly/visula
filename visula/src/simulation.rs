@@ -8,6 +8,12 @@ use crate::pipelines::{Circles, Cylinders, Lines, Polygons, Rects, Renderable, S
 use crate::post_process::transparency::TransparencyPass;
 use crate::CustomEvent;
 
+pub struct PrepareData<'a> {
+    pub encoder: &'a mut wgpu::CommandEncoder,
+    pub camera: &'a Camera,
+    pub light: &'a DirectionalLight,
+}
+
 pub struct RenderData<'a> {
     pub pass: &'a mut wgpu::RenderPass<'static>,
     pub camera: &'a Camera,
@@ -69,6 +75,7 @@ pub struct ShadowRenderData<'a> {
 pub trait Simulation {
     fn handle_event(&mut self, _application: &mut Application, _event: &Event<CustomEvent>) {}
     fn update(&mut self, _application: &mut Application) {}
+    fn prepare(&mut self, _data: &mut PrepareData) {}
     fn render(&mut self, _data: &mut RenderData) {}
     fn render_shadow(&mut self, _data: &mut ShadowRenderData) {}
     fn gui(&mut self, _application: &Application, _context: &Context) {}
@@ -119,6 +126,9 @@ impl Simulation for Box<dyn Simulation> {
     }
     fn update(&mut self, application: &mut Application) {
         self.as_mut().update(application)
+    }
+    fn prepare(&mut self, data: &mut PrepareData) {
+        self.as_mut().prepare(data)
     }
     fn render(&mut self, data: &mut RenderData) {
         self.as_mut().render(data)
