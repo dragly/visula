@@ -7,6 +7,7 @@ use naga::valid::ValidationFlags;
 use wgpu::util::DeviceExt;
 use wgpu::{BindGroupLayout, PipelineCompilationOptions};
 
+use crate::pipelines::layouts_by_group;
 use crate::post_process::transparency;
 use crate::primitives::mesh_primitive::MeshVertexAttributes;
 use crate::{RenderData, RenderingDescriptor};
@@ -127,31 +128,16 @@ impl MeshPipeline {
             source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(&output_str)),
         });
 
-        let vertex_uniform_bind_group_layouts: Vec<&BindGroupLayout> = vertex_binding_builder
-            .uniforms
-            .values()
-            .map(|binding| binding.bind_group_layout.as_ref())
+        let delegate_bind_group_layouts: Vec<(u32, BindGroupLayout)> = vertex_binding_builder
+            .bind_group_layouts()
+            .into_iter()
+            .chain(fragment_binding_builder.bind_group_layouts())
             .collect();
 
-        let fragment_texture_bind_group_layouts: Vec<BindGroupLayout> = fragment_binding_builder
-            .textures
-            .values()
-            .map(|binding| binding.inner.borrow().bind_group_layout.clone())
-            .collect();
-
-        let bind_group_layouts = {
-            let mut layouts: Vec<Option<&wgpu::BindGroupLayout>> = vec![
-                Some(&camera.bind_group_layout),
-                Some(&light.bind_group_layout),
-            ];
-            for layout in &vertex_uniform_bind_group_layouts {
-                layouts.push(Some(layout));
-            }
-            for layout in &fragment_texture_bind_group_layouts {
-                layouts.push(Some(layout));
-            }
-            layouts
-        };
+        let bind_group_layouts = layouts_by_group(
+            &[&camera.bind_group_layout, &light.bind_group_layout],
+            &delegate_bind_group_layouts,
+        );
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Mesh pipeline layout"),
@@ -306,18 +292,11 @@ impl MeshPipeline {
             .map(|v| (v, Ref::map(v.inner.borrow(), |v| &v.buffer)))
             .collect();
 
-        let uniforms: Vec<wgpu::BindGroup> = self
+        let bind_groups: Vec<(u32, wgpu::BindGroup)> = self
             .vertex_binding_builder
-            .uniforms
-            .values()
-            .map(|v| v.inner.borrow().bind_group.clone())
-            .collect();
-
-        let textures: Vec<wgpu::BindGroup> = self
-            .fragment_binding_builder
-            .textures
-            .values()
-            .map(|v| v.inner.borrow().bind_group.clone())
+            .bind_groups()
+            .into_iter()
+            .chain(self.fragment_binding_builder.bind_groups())
             .collect();
 
         let (camera, light) = (data.camera, data.light);
@@ -342,22 +321,72 @@ impl MeshPipeline {
             instance_count = instance_count.max(binding.inner.borrow().count);
         }
 
-        let mut current_slot = 2;
-
-        for bind_group in textures.iter() {
-            log::debug!("Setting texture bind group at slot {}", current_slot);
-            render_pass.set_bind_group(current_slot, bind_group, &[]);
-            current_slot += 1;
-        }
-
-        for bind_group in uniforms.iter() {
-            log::debug!("Setting bind group {}", current_slot);
-            render_pass.set_bind_group(current_slot, bind_group, &[]);
-            current_slot += 1;
+        for (group, bind_group) in &bind_groups {
+            log::debug!("Setting bind group {group}");
+            render_pass.set_bind_group(*group, bind_group, &[]);
         }
 
         log::debug!("Drawing {instance_count} instances");
         render_pass.draw_indexed(0..self.vertex_count as u32, 0, 0..instance_count as u32);
         render_pass.pop_debug_group();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bytemuck::{Pod, Zeroable};
+    use visula_core::{TextureBuffer, UniformBuffer};
+    use visula_derive::Uniform;
+
+    use super::*;
+    use crate::pipelines::test_util::TestScene;
+
+    #[repr(C)]
+    #[derive(Clone, Copy, Pod, Zeroable, Uniform)]
+    struct Offset {
+        position: [f32; 3],
+        _padding: f32,
+    }
+
+    #[repr(C)]
+    #[derive(Clone, Copy, Pod, Zeroable, Uniform)]
+    struct Tint {
+        color: [f32; 4],
+    }
+
+    #[test]
+    fn textured_mesh_with_uniforms_binds_every_group_to_its_layout() {
+        let scene = TestScene::new();
+        let device = &scene.device;
+        let offset = UniformBuffer::<Offset>::new(device).uniform();
+        let tint = UniformBuffer::<Tint>::new(device).uniform();
+        let texture = TextureBuffer::<f32>::new(
+            device,
+            wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+        );
+        let mut mesh = MeshPipeline::new(
+            &scene.rendering_descriptor(),
+            &MeshGeometry {
+                position: offset.position,
+                ..Default::default()
+            },
+            &MeshMaterial {
+                color: (tint.color * texture.sample(&Expression::UV)).lit(),
+            },
+        )
+        .unwrap();
+        let vertex = MeshVertexAttributes {
+            position: [0.0; 3],
+            normal: [0.0, 0.0, 1.0],
+            uv: [0.0; 2],
+            color: [255; 4],
+        };
+        mesh.set_mesh_data(device, &[vertex; 3], &[0, 1, 2]);
+
+        scene.render(|data| mesh.render(data));
     }
 }

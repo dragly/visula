@@ -187,6 +187,7 @@ pub fn integrate_uniform(
         *handle,
         UniformBinding {
             expression: settings_expression,
+            group: bind_group,
             bind_group_layout: bind_group_layout.clone(),
             inner: inner.clone(),
         },
@@ -264,6 +265,7 @@ pub fn integrate_texture(
     binding_builder.textures.insert(
         *handle,
         TextureBinding {
+            group,
             image,
             sampler,
             inner: inner.clone(),
