@@ -15,7 +15,7 @@ pub struct PrepareData<'a> {
 }
 
 pub struct RenderData<'a> {
-    pub pass: &'a mut wgpu::RenderPass<'static>,
+    pub pass: wgpu::RenderPass<'static>,
     pub camera: &'a Camera,
     pub light: &'a DirectionalLight,
     pub(crate) transparency: TransparencyRenderData<'a>,
@@ -68,7 +68,7 @@ impl<'a> TransparencyRenderData<'a> {
 }
 
 pub struct ShadowRenderData<'a> {
-    pub pass: &'a mut wgpu::RenderPass<'static>,
+    pub pass: wgpu::RenderPass<'static>,
     pub light: &'a DirectionalLight,
 }
 

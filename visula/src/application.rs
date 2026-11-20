@@ -469,7 +469,7 @@ impl Application {
             light: &self.light,
         });
 
-        let mut shadow_pass = encoder
+        let shadow_pass = encoder
             .begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("shadow"),
                 color_attachments: &[],
@@ -487,10 +487,9 @@ impl Application {
             })
             .forget_lifetime();
         simulation.render_shadow(&mut ShadowRenderData {
-            pass: &mut shadow_pass,
+            pass: shadow_pass,
             light: &self.light,
         });
-        drop(shadow_pass);
 
         let msaa = self.sample_count > 1;
         let post_processor = &self.post_processor;
@@ -530,7 +529,7 @@ impl Application {
 
         let transparency_used = {
             let mut render_data = RenderData {
-                pass: &mut scene_pass,
+                pass: scene_pass,
                 camera: &self.camera,
                 light: &self.light,
                 transparency: TransparencyRenderData::new(
@@ -542,7 +541,6 @@ impl Application {
             simulation.render(&mut render_data);
             render_data.transparency.used()
         };
-        drop(scene_pass);
 
         let scene = encoder.finish();
         let mut encoder = transparent_encoder;
