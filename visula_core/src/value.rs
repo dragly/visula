@@ -7,7 +7,7 @@ use std::{
 use itertools::Itertools;
 use naga::common::wgsl::{TryToWgsl, TypeContext};
 use naga::proc::OverloadSet;
-use naga::{GlobalVariable, ResourceBinding, Span};
+use naga::Span;
 
 use crate::{BindingBuilder, InstanceField, ShaderError, TextureField, UniformField};
 
@@ -761,74 +761,16 @@ impl Expression {
                 }
             }
             Expression::TextureField(field) => {
-                binding_builder
-                    .textures
-                    .entry(field.handle)
-                    .or_insert(crate::TextureBinding {
-                        inner: field.inner.clone(),
-                    });
-                let sampler_type = module.types.insert(
-                    naga::Type {
-                        name: None,
-                        inner: naga::TypeInner::Sampler { comparison: false },
-                    },
-                    naga::Span::default(),
-                );
-                let texture_group = binding_builder.current_bind_group;
-                binding_builder.current_bind_group += 1;
-                let sampler_variable = module.global_variables.append(
-                    GlobalVariable {
-                        name: Some("u_sampler".to_string()),
-                        space: naga::AddressSpace::Handle,
-                        binding: Some(ResourceBinding {
-                            group: texture_group,
-                            binding: 0,
-                        }),
-                        ty: sampler_type,
-                        init: None,
-                        memory_decorations: naga::MemoryDecorations::empty(),
-                    },
-                    Span::default(),
-                );
-                let texture_type = module.types.insert(
-                    naga::Type {
-                        name: None,
-                        inner: naga::TypeInner::Image {
-                            dim: naga::ImageDimension::D2,
-                            arrayed: false,
-                            class: naga::ImageClass::Sampled {
-                                kind: naga::ScalarKind::Float,
-                                multi: false,
-                            },
-                        },
-                    },
-                    naga::Span::default(),
-                );
-                let texture = module.global_variables.append(
-                    GlobalVariable {
-                        name: Some("u_texture".to_string()),
-                        space: naga::AddressSpace::Handle,
-                        binding: Some(ResourceBinding {
-                            group: texture_group,
-                            binding: 1,
-                        }),
-                        ty: texture_type,
-                        init: None,
-                        memory_decorations: naga::MemoryDecorations::empty(),
-                    },
-                    Span::default(),
-                );
-                let image = module.entry_points[binding_builder.entry_point_index]
-                    .function
-                    .expressions
-                    .append(naga::Expression::GlobalVariable(texture), Span::default());
-                let sampler = module.entry_points[binding_builder.entry_point_index]
-                    .function
-                    .expressions
-                    .append(
-                        naga::Expression::GlobalVariable(sampler_variable),
-                        Span::default(),
+                if !binding_builder.textures.contains_key(&field.handle) {
+                    crate::integrate::integrate_texture(
+                        &field.inner,
+                        &field.handle,
+                        module,
+                        binding_builder,
                     );
+                }
+                let crate::TextureBinding { image, sampler, .. } =
+                    binding_builder.textures[&field.handle];
                 let coordinate = field.coordinate.setup(module, binding_builder)?;
                 let coordinate_type = resolve_type(coordinate, module, binding_builder)?;
                 if coordinate_type != vector(naga::VectorSize::Bi) {
@@ -1897,6 +1839,22 @@ mod tests {
             lowering_error("vec4<f32>", texture.sample(&glam::Vec3::ONE.into())),
             "unsupported argument types: sample(vec3<f32>)"
         );
+    }
+
+    #[test]
+    fn texture_sampled_twice() {
+        let device = device();
+        let texture = TextureBuffer::<f32>::new(
+            &device,
+            wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+        );
+        let sample = texture.sample(&glam::Vec2::ZERO.into());
+        let wgsl = lower_to_wgsl(ShaderStage::Fragment, &[("vec4<f32>", &sample + &sample)]);
+        insta::assert_snapshot!(wgsl);
     }
 
     #[test]

@@ -1,0 +1,21 @@
+---
+source: visula_core/src/value.rs
+expression: wgsl
+---
+struct Fields {
+    a: vec4<f32>,
+}
+
+@group(1) @binding(0) 
+var u_sampler: sampler;
+@group(1) @binding(1) 
+var u_texture: texture_2d<f32>;
+
+@fragment 
+fn fs_main() -> @location(0) vec4<f32> {
+    var fields: Fields;
+
+    fields.a = (textureSample(u_texture, u_sampler, vec2<f32>(0f, 0f)) + textureSample(u_texture, u_sampler, vec2<f32>(0f, 0f)));
+    let output: Fields = fields;
+    return vec4(0f);
+}
