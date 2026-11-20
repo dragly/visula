@@ -322,7 +322,7 @@ impl MeshPipeline {
 
         let (camera, light) = (data.camera, data.light);
         let render_pass = match self.blending {
-            MeshBlending::Opaque => &mut *data.pass,
+            MeshBlending::Opaque => &mut data.pass,
             MeshBlending::Transparent => data.transparent_pass(),
         };
 
