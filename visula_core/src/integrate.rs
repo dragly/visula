@@ -1,10 +1,10 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    binding_builder::{InstanceBinding, UniformBinding, VertexBufferLayoutBuilder},
+    binding_builder::{InstanceBinding, TextureBinding, UniformBinding, VertexBufferLayoutBuilder},
     instance_buffer::InstanceBufferInner,
     uniform_buffer::UniformBufferInner,
-    BindingBuilder, BufferBindingField,
+    BindingBuilder, BufferBindingField, TextureBufferInner,
 };
 
 #[derive(Clone, Debug)]
@@ -188,6 +188,84 @@ pub fn integrate_uniform(
         UniformBinding {
             expression: settings_expression,
             bind_group_layout: bind_group_layout.clone(),
+            inner: inner.clone(),
+        },
+    );
+    binding_builder.current_bind_group += 1;
+}
+
+pub fn integrate_texture(
+    inner: &Rc<RefCell<TextureBufferInner>>,
+    handle: &uuid::Uuid,
+    module: &mut naga::Module,
+    binding_builder: &mut BindingBuilder,
+) {
+    if binding_builder.textures.contains_key(handle) {
+        return;
+    }
+
+    let group = binding_builder.current_bind_group;
+    let sampler_type = module.types.insert(
+        naga::Type {
+            name: None,
+            inner: naga::TypeInner::Sampler { comparison: false },
+        },
+        naga::Span::default(),
+    );
+    let sampler_variable = module.global_variables.append(
+        naga::GlobalVariable {
+            name: Some("u_sampler".to_string()),
+            space: naga::AddressSpace::Handle,
+            binding: Some(naga::ResourceBinding { group, binding: 0 }),
+            ty: sampler_type,
+            init: None,
+            memory_decorations: naga::MemoryDecorations::empty(),
+        },
+        naga::Span::default(),
+    );
+    let texture_type = module.types.insert(
+        naga::Type {
+            name: None,
+            inner: naga::TypeInner::Image {
+                dim: naga::ImageDimension::D2,
+                arrayed: false,
+                class: naga::ImageClass::Sampled {
+                    kind: naga::ScalarKind::Float,
+                    multi: false,
+                },
+            },
+        },
+        naga::Span::default(),
+    );
+    let texture_variable = module.global_variables.append(
+        naga::GlobalVariable {
+            name: Some("u_texture".to_string()),
+            space: naga::AddressSpace::Handle,
+            binding: Some(naga::ResourceBinding { group, binding: 1 }),
+            ty: texture_type,
+            init: None,
+            memory_decorations: naga::MemoryDecorations::empty(),
+        },
+        naga::Span::default(),
+    );
+
+    let expressions = &mut module.entry_points[binding_builder.entry_point_index]
+        .function
+        .expressions;
+    let image = expressions.append(
+        naga::Expression::GlobalVariable(texture_variable),
+        naga::Span::default(),
+    );
+    let sampler = expressions.append(
+        naga::Expression::GlobalVariable(sampler_variable),
+        naga::Span::default(),
+    );
+
+    binding_builder.textures.insert(
+        *handle,
+        TextureBinding {
+            image,
+            sampler,
             inner: inner.clone(),
         },
     );

@@ -41,6 +41,8 @@ pub struct InstanceBinding {
 }
 
 pub struct TextureBinding {
+    pub image: Handle<Expression>,
+    pub sampler: Handle<Expression>,
     pub inner: Rc<RefCell<TextureBufferInner>>,
 }
 
