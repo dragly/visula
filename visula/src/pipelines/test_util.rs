@@ -1,6 +1,6 @@
 use crate::post_process::transparency::TransparencyPass;
 use crate::simulation::TransparencyRenderData;
-use crate::{Camera, DirectionalLight, RenderData, RenderingDescriptor};
+use crate::{Camera, DirectionalLight, RenderData, RenderingDescriptor, ShadowRenderData};
 
 const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
@@ -77,6 +77,25 @@ impl TestScene {
         });
         self.queue
             .submit([encoder.finish(), transparent_encoder.finish()]);
+    }
+
+    pub fn render_shadow(&self, render: impl FnOnce(&mut ShadowRenderData)) {
+        let mut encoder = self.device.create_command_encoder(&Default::default());
+        let pass = encoder
+            .begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[],
+                depth_stencil_attachment: Some(depth_attachment(&self.light.shadow_texture_view)),
+                occlusion_query_set: None,
+                timestamp_writes: None,
+                multiview_mask: None,
+            })
+            .forget_lifetime();
+        render(&mut ShadowRenderData {
+            pass,
+            light: &self.light,
+        });
+        self.queue.submit([encoder.finish()]);
     }
 
     fn render_target(&self, format: wgpu::TextureFormat) -> wgpu::TextureView {

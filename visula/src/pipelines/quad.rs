@@ -1,3 +1,4 @@
+use crate::pipelines::layouts_by_group;
 use crate::rendering_descriptor::RenderingDescriptor;
 use crate::simulation::{RenderData, ShadowRenderData};
 use crate::Renderable;
@@ -25,9 +26,14 @@ pub struct QuadPipelineDescriptor<'a> {
     pub depth_bias: wgpu::DepthBiasState,
 }
 
+struct ShadowPipeline {
+    render_pipeline: wgpu::RenderPipeline,
+    binding_builder: BindingBuilder,
+}
+
 pub struct QuadPipeline {
     render_pipeline: wgpu::RenderPipeline,
-    shadow_render_pipeline: Option<wgpu::RenderPipeline>,
+    shadow_pipeline: Option<ShadowPipeline>,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     index_count: usize,
@@ -106,51 +112,23 @@ impl QuadPipeline {
             source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(&output_str)),
         });
 
-        let vertex_uniform_layouts: Vec<&BindGroupLayout> = vertex_binding_builder
-            .uniforms
-            .values()
-            .map(|binding| binding.bind_group_layout.as_ref())
+        let delegate_bind_group_layouts: Vec<(u32, BindGroupLayout)> = vertex_binding_builder
+            .bind_group_layouts()
+            .into_iter()
+            .chain(
+                fragment_binding_builder
+                    .iter()
+                    .flat_map(BindingBuilder::bind_group_layouts),
+            )
             .collect();
 
-        let fragment_uniform_layouts: Vec<&BindGroupLayout> = fragment_binding_builder
-            .as_ref()
-            .map(|b| {
-                b.uniforms
-                    .values()
-                    .map(|binding| binding.bind_group_layout.as_ref())
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        let fragment_texture_layouts: Vec<BindGroupLayout> = fragment_binding_builder
-            .as_ref()
-            .map(|b| {
-                b.textures
-                    .values()
-                    .map(|binding| binding.inner.borrow().bind_group_layout.clone())
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        let bind_group_layouts = {
-            let mut layouts: Vec<Option<&wgpu::BindGroupLayout>> = vec![
-                Some(&camera.bind_group_layout),
-                Some(&light.bind_group_layout),
-            ];
-            for layout in descriptor.bind_group_layouts {
-                layouts.push(Some(layout));
-            }
-            for layout in &vertex_uniform_layouts {
-                layouts.push(Some(layout));
-            }
-            for layout in &fragment_texture_layouts {
-                layouts.push(Some(layout));
-            }
-            for layout in &fragment_uniform_layouts {
-                layouts.push(Some(layout));
-            }
-            layouts
-        };
+        let leading_layouts: Vec<&BindGroupLayout> =
+            [&camera.bind_group_layout, &light.bind_group_layout]
+                .iter()
+                .copied()
+                .chain(descriptor.bind_group_layouts.iter().copied())
+                .collect();
+        let bind_group_layouts = layouts_by_group(&leading_layouts, &delegate_bind_group_layouts);
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some(&format!("{} pipeline layout", descriptor.label)),
@@ -226,7 +204,7 @@ impl QuadPipeline {
             cache: None,
         });
 
-        let shadow_render_pipeline = if let Some(shadow_source) = descriptor.shadow_shader_source {
+        let shadow_pipeline = if let Some(shadow_source) = descriptor.shadow_shader_source {
             let mut shadow_module = naga::front::wgsl::parse_str(shadow_source)?;
             let mut shadow_builder = BindingBuilder::new(&shadow_module, "vs_main", 1)?;
             vertex_delegate.inject(
@@ -273,20 +251,11 @@ impl QuadPipeline {
                 buffers
             };
 
-            let shadow_uniform_layouts: Vec<&BindGroupLayout> = shadow_builder
-                .uniforms
-                .values()
-                .map(|binding| binding.bind_group_layout.as_ref())
-                .collect();
-
-            let shadow_bind_group_layouts = {
-                let mut layouts: Vec<Option<&wgpu::BindGroupLayout>> =
-                    vec![Some(&light.shadow_bind_group_layout)];
-                for layout in &shadow_uniform_layouts {
-                    layouts.push(Some(layout));
-                }
-                layouts
-            };
+            let shadow_delegate_bind_group_layouts = shadow_builder.bind_group_layouts();
+            let shadow_bind_group_layouts = layouts_by_group(
+                &[&light.shadow_bind_group_layout],
+                &shadow_delegate_bind_group_layouts,
+            );
 
             let shadow_pipeline_layout =
                 device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -311,8 +280,8 @@ impl QuadPipeline {
                 None
             };
 
-            Some(
-                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            Some(ShadowPipeline {
+                render_pipeline: device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some(&format!("{} shadow render pipeline", descriptor.label)),
                     layout: Some(&shadow_pipeline_layout),
                     vertex: wgpu::VertexState {
@@ -342,14 +311,15 @@ impl QuadPipeline {
                     multiview_mask: None,
                     cache: None,
                 }),
-            )
+                binding_builder: shadow_builder,
+            })
         } else {
             None
         };
 
         Ok(QuadPipeline {
             render_pipeline,
-            shadow_render_pipeline,
+            shadow_pipeline,
             vertex_buffer,
             index_buffer,
             index_count,
@@ -477,32 +447,16 @@ impl Renderable for QuadPipeline {
             .values()
             .map(|v| (v, Ref::map(v.inner.borrow(), |v| &v.buffer)))
             .collect();
-        let vertex_uniforms: Vec<wgpu::BindGroup> = self
+        let delegate_bind_groups: Vec<(u32, wgpu::BindGroup)> = self
             .vertex_binding_builder
-            .uniforms
-            .values()
-            .map(|v| v.inner.borrow().bind_group.clone())
+            .bind_groups()
+            .into_iter()
+            .chain(
+                self.fragment_binding_builder
+                    .iter()
+                    .flat_map(BindingBuilder::bind_groups),
+            )
             .collect();
-        let fragment_textures: Vec<wgpu::BindGroup> = self
-            .fragment_binding_builder
-            .as_ref()
-            .map(|b| {
-                b.textures
-                    .values()
-                    .map(|v| v.inner.borrow().bind_group.clone())
-                    .collect()
-            })
-            .unwrap_or_default();
-        let fragment_uniforms: Vec<wgpu::BindGroup> = self
-            .fragment_binding_builder
-            .as_ref()
-            .map(|b| {
-                b.uniforms
-                    .values()
-                    .map(|v| v.inner.borrow().bind_group.clone())
-                    .collect()
-            })
-            .unwrap_or_default();
         pass.push_debug_group(&self.label);
         pass.set_bind_group(0, &camera.bind_group, &[]);
         pass.set_bind_group(1, &light.bind_group, &[]);
@@ -521,32 +475,19 @@ impl Renderable for QuadPipeline {
             pass.set_vertex_buffer(slot, buffer.slice(..));
             instance_count = instance_count.max(binding.inner.borrow().count);
         }
-        let mut current_slot = 2u32;
-        for bind_group in self.bind_groups.iter().flatten() {
-            pass.set_bind_group(current_slot, bind_group, &[]);
-            current_slot += 1;
+        for (group, bind_group) in (2u32..).zip(self.bind_groups.iter().flatten()) {
+            pass.set_bind_group(group, bind_group, &[]);
         }
-        for bind_group in vertex_uniforms.iter() {
-            log::trace!("Setting vertex uniform bind group {current_slot}");
-            pass.set_bind_group(current_slot, bind_group, &[]);
-            current_slot += 1;
-        }
-        for bind_group in fragment_textures.iter() {
-            log::trace!("Setting fragment texture bind group {current_slot}");
-            pass.set_bind_group(current_slot, bind_group, &[]);
-            current_slot += 1;
-        }
-        for bind_group in fragment_uniforms.iter() {
-            log::trace!("Setting fragment uniform bind group {current_slot}");
-            pass.set_bind_group(current_slot, bind_group, &[]);
-            current_slot += 1;
+        for (group, bind_group) in &delegate_bind_groups {
+            log::trace!("Setting bind group {group}");
+            pass.set_bind_group(*group, bind_group, &[]);
         }
         pass.draw_indexed(0..self.index_count as u32, 0, 0..instance_count as u32);
         pass.pop_debug_group();
     }
 
     fn render_shadow(&self, shadow_data: &mut ShadowRenderData) {
-        let Some(ref shadow_pipeline) = self.shadow_render_pipeline else {
+        let Some(ref shadow_pipeline) = self.shadow_pipeline else {
             return;
         };
         if self.index_count == 0 {
@@ -585,7 +526,7 @@ impl Renderable for QuadPipeline {
         let render_pass = &mut shadow_data.pass;
         render_pass.push_debug_group(&format!("{} shadow", self.label));
         render_pass.set_bind_group(0, &shadow_data.light.shadow_bind_group, &[]);
-        render_pass.set_pipeline(shadow_pipeline);
+        render_pass.set_pipeline(&shadow_pipeline.render_pipeline);
         render_pass.set_index_buffer(self.index_buffer.slice(..), self.index_format);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
 
@@ -600,14 +541,8 @@ impl Renderable for QuadPipeline {
             instance_count = instance_count.max(binding.inner.borrow().count);
         }
 
-        let vertex_uniforms: Vec<wgpu::BindGroup> = self
-            .vertex_binding_builder
-            .uniforms
-            .values()
-            .map(|v| v.inner.borrow().bind_group.clone())
-            .collect();
-        for (current_slot, bind_group) in (1u32..).zip(vertex_uniforms.iter()) {
-            render_pass.set_bind_group(current_slot, bind_group, &[]);
+        for (group, bind_group) in shadow_pipeline.binding_builder.bind_groups() {
+            render_pass.set_bind_group(group, &bind_group, &[]);
         }
 
         render_pass.draw_indexed(0..self.index_count as u32, 0, 0..instance_count as u32);
@@ -617,7 +552,68 @@ impl Renderable for QuadPipeline {
 
 #[cfg(test)]
 mod tests {
+    use bytemuck::{Pod, Zeroable};
+    use glam::Vec2;
+    use visula_core::{TextureBuffer, UniformBuffer};
+    use visula_derive::Uniform;
+
     use super::*;
+    use crate::pipelines::test_util::TestScene;
+    use crate::{SphereGeometry, SphereMaterial, Spheres};
+
+    #[repr(C)]
+    #[derive(Clone, Copy, Pod, Zeroable, Uniform)]
+    struct Offset {
+        position: [f32; 3],
+        _padding: f32,
+    }
+
+    #[repr(C)]
+    #[derive(Clone, Copy, Pod, Zeroable, Uniform)]
+    struct Appearance {
+        color: [f32; 3],
+        radius: f32,
+        _padding: [f32; 4],
+    }
+
+    #[repr(C)]
+    #[derive(Clone, Copy, Pod, Zeroable, Uniform)]
+    struct Tint {
+        color: [f32; 3],
+        _padding: f32,
+    }
+
+    #[test]
+    fn uniforms_and_textures_bind_every_group_to_its_layout() {
+        let scene = TestScene::new();
+        let device = &scene.device;
+        let offset = UniformBuffer::<Offset>::new(device).uniform();
+        let appearance = UniformBuffer::<Appearance>::new(device).uniform();
+        let tint = UniformBuffer::<Tint>::new(device).uniform();
+        let texture = TextureBuffer::<f32>::new(
+            device,
+            wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+        );
+        let spheres = Spheres::new(
+            &scene.rendering_descriptor(),
+            &SphereGeometry {
+                position: offset.position,
+                radius: appearance.radius,
+                color: appearance.color,
+            },
+            &SphereMaterial {
+                color: tint.color * texture.sample(&Vec2::ZERO.into()).length(),
+            },
+        )
+        .unwrap();
+
+        scene.render(|data| spheres.render(data));
+        scene.render_shadow(|data| spheres.render_shadow(data));
+    }
 
     #[test]
     fn grown_size_doubles_then_steps_by_mebibyte() {
