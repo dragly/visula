@@ -41,6 +41,7 @@ pub struct InstanceBinding {
 }
 
 pub struct TextureBinding {
+    pub group: u32,
     pub image: Handle<Expression>,
     pub sampler: Handle<Expression>,
     pub inner: Rc<RefCell<TextureBufferInner>>,
@@ -48,6 +49,7 @@ pub struct TextureBinding {
 
 pub struct UniformBinding {
     pub expression: Handle<Expression>,
+    pub group: u32,
     pub bind_group_layout: Rc<BindGroupLayout>,
     pub inner: Rc<RefCell<UniformBufferInner>>,
 }
@@ -145,6 +147,32 @@ impl BindingBuilder {
             }
         }
         max_location.map_or(0, |m| m + 1)
+    }
+
+    pub fn bind_group_layouts(&self) -> Vec<(u32, BindGroupLayout)> {
+        let uniforms = self
+            .uniforms
+            .values()
+            .map(|binding| (binding.group, binding.bind_group_layout.as_ref().clone()));
+        let textures = self.textures.values().map(|binding| {
+            (
+                binding.group,
+                binding.inner.borrow().bind_group_layout.clone(),
+            )
+        });
+        uniforms.chain(textures).collect()
+    }
+
+    pub fn bind_groups(&self) -> Vec<(u32, BindGroup)> {
+        let uniforms = self
+            .uniforms
+            .values()
+            .map(|binding| (binding.group, binding.inner.borrow().bind_group.clone()));
+        let textures = self
+            .textures
+            .values()
+            .map(|binding| (binding.group, binding.inner.borrow().bind_group.clone()));
+        uniforms.chain(textures).collect()
     }
 
     pub fn sorted_bindings(&self) -> Vec<InstanceBinding> {
